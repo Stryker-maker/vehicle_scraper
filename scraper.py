@@ -340,14 +340,21 @@ def filter_listings(listings):
 # ─────────────────────────────────────────────
 # Rank listings
 # ─────────────────────────────────────────────
+
 def rank_listings(matches):
     pw = weights["price"]
     mw = weights["mileage"]
     dw = weights["distance"]
 
-    max_price_val    = max(v["price"]        for v in matches)
-    max_mileage_val  = max(v["mileage"]      for v in matches)
-    max_distance_val = max(v["distance_km"]  for v in matches)
+    for v in matches:
+        try:
+            v["mileage"] = int(v["mileage"])
+        except (ValueError, TypeError):
+            v["mileage"] = 999999
+
+    max_price_val    = max(v["price"]       for v in matches)
+    max_mileage_val  = max(v["mileage"]     for v in matches)
+    max_distance_val = max(v["distance_km"] for v in matches)
 
     for v in matches:
         price_score    = v["price"]       / max_price_val    if max_price_val    > 0 else 0
@@ -361,7 +368,6 @@ def rank_listings(matches):
 
     matches.sort(key=lambda v: v["score"])
     return matches
-
 
 # ─────────────────────────────────────────────
 # Display results
