@@ -1,0 +1,34 @@
+{
+  "vehicle_key": "ford_f150",
+  "make": "Ford",
+  "model": "F-150",
+  "autotrader_make": "ford",
+  "autotrader_model": "f-150",
+  "kijiji_make": "Ford",
+  "kijiji_model": "F-150",
+  "min_year": 2016,
+  "max_year": 2025,
+  "max_price": 60000,
+  "fuel": "Gas",
+  "engine": "",
+  "home_city": "Red Deer, AB",
+  "home_coords": [52.2681, -113.8112],
+  "max_distance_km": 800,
+  "max_results": 50,
+  "ranking_weights": {
+    "price": 0.50,
+    "mileage": 0.20,
+    "distance": 0.15,
+    "trim": 0.15
+  },
+  "search_locations": [
+    "Red Deer, AB", "Edmonton, AB", "Calgary, AB", "Lethbridge, AB",
+    "Medicine Hat, AB", "Grande Prairie, AB", "Fort McMurray, AB",
+    "Lloydminster, AB", "Camrose, AB", "Wetaskiwin, AB", "Lacombe, AB",
+    "Ponoka, AB", "Sylvan Lake, AB", "Innisfail, AB", "Olds, AB",
+    "Didsbury, AB", "Cochrane, AB", "Airdrie, AB", "Okotoks, AB",
+    "High River, AB", "Drumheller, AB", "Stettler, AB", "Wainwright, AB",
+    "Saskatoon, SK", "Regina, SK", "Prince Albert, SK", "Swift Current, SK",
+    "Kelowna, BC", "Kamloops, BC"
+  ]
+}
