@@ -63,7 +63,7 @@ jobs:
       - name: Kijiji — Ford F-350
         env:
           ORS_API_KEY: ${{ secrets.ORS_API_KEY }}
-        run: python kijiji_diagnose.py
+        run: python kijiji_scraper.py --config config_f350.json
         continue-on-error: true
 
       - name: Kijiji — Ford F-150
