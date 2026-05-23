@@ -1,1 +1,21 @@
-{"candidates": {}, "zero_weeks": {}}
+{
+  "candidates": {
+    "Sherwood Park, AB": 1,
+    "Strathmore, AB": 2,
+    "Moose Jaw, SK": 2,
+    "Leduc, AB": 1,
+    "Tsuu T'Ina Nation, AB": 1,
+    "Vernon Bc, BC": 2,
+    "West Kelowna, BC": 1,
+    "Taber, AB": 1
+  },
+  "zero_weeks": {
+    "Lloydminster, AB": 1,
+    "Lacombe, AB": 1,
+    "Innisfail, AB": 1,
+    "Didsbury, AB": 1,
+    "Cochrane, AB": 1,
+    "Drumheller, AB": 1,
+    "Wainwright, AB": 1
+  }
+}

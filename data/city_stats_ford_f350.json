@@ -1,1 +1,26 @@
-{"candidates": {}, "zero_weeks": {}}
+{
+  "candidates": {
+    "Spruce Grove, AB": 1,
+    "Sherwood Park, AB": 1,
+    "Moose Jaw, SK": 1
+  },
+  "zero_weeks": {
+    "Edmonton, AB": 1,
+    "Lloydminster, AB": 1,
+    "Camrose, AB": 1,
+    "Lacombe, AB": 1,
+    "Ponoka, AB": 1,
+    "Sylvan Lake, AB": 1,
+    "Innisfail, AB": 1,
+    "Didsbury, AB": 1,
+    "Cochrane, AB": 1,
+    "Airdrie, AB": 1,
+    "Okotoks, AB": 1,
+    "High River, AB": 1,
+    "Drumheller, AB": 1,
+    "Stettler, AB": 1,
+    "Wainwright, AB": 1,
+    "Prince Albert, SK": 1,
+    "Kelowna, BC": 1
+  }
+}
