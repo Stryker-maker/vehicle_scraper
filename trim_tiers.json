@@ -1,0 +1,28 @@
+{
+  "_comment": "Tier 1 = base, Tier 2 = mid, Tier 3 = premium. Matching is case-insensitive substring.",
+  "ford_f350": {
+    "tier3": ["lariat", "platinum", "king ranch", "tremor", "limited", "fx4"],
+    "tier2": ["xlt"],
+    "tier1": ["xl", "stx", "regular"]
+  },
+  "ford_f150": {
+    "tier3": ["lariat", "platinum", "king ranch", "tremor", "limited", "raptor", "fx4"],
+    "tier2": ["xlt", "sport"],
+    "tier1": ["xl", "stx", "regular"]
+  },
+  "ram_3500": {
+    "tier3": ["laramie", "longhorn", "limited", "rebel", "power wagon", "laramie longhorn"],
+    "tier2": ["big horn", "bighorn", "lone star", "slt"],
+    "tier1": ["tradesman", "regular", "st"]
+  },
+  "toyota_tundra": {
+    "tier3": ["platinum", "1794", "trd pro", "capstone", "limited"],
+    "tier2": ["trd off road", "trd sport", "sr5"],
+    "tier1": ["sr", "regular", "work truck"]
+  },
+  "subaru_forester": {
+    "tier3": ["touring", "wilderness"],
+    "tier2": ["sport", "limited"],
+    "tier1": ["base", "premium", "convenience", "touring base"]
+  }
+}
