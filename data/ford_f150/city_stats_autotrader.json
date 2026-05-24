@@ -1,0 +1,16 @@
+{
+  "candidates": {
+    "Sherwood Park, AB": 1,
+    "Taber, AB": 1,
+    "Salmon Arm, BC": 1
+  },
+  "zero_weeks": {
+    "Lloydminster, AB": 1,
+    "Lacombe, AB": 1,
+    "Didsbury, AB": 1,
+    "Drumheller, AB": 1,
+    "Wainwright, AB": 1,
+    "Vernon Bc, BC": 1,
+    "West Kelowna, BC": 1
+  }
+}
