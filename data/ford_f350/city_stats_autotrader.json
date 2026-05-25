@@ -1,21 +1,22 @@
 {
   "candidates": {
-    "Maple Creek, SK": 1
+    "Maple Creek, SK": 2
   },
   "zero_weeks": {
-    "Lloydminster, AB": 1,
-    "Lacombe, AB": 1,
-    "Ponoka, AB": 1,
-    "Innisfail, AB": 1,
-    "Didsbury, AB": 1,
-    "Cochrane, AB": 1,
-    "Airdrie, AB": 1,
-    "High River, AB": 1,
-    "Drumheller, AB": 1,
-    "Stettler, AB": 1,
-    "Wainwright, AB": 1,
-    "Prince Albert, SK": 1,
-    "Swift Current, SK": 1,
-    "Kelowna, BC": 1
+    "Lloydminster, AB": 2,
+    "Lacombe, AB": 2,
+    "Ponoka, AB": 2,
+    "Innisfail, AB": 2,
+    "Didsbury, AB": 2,
+    "Cochrane, AB": 2,
+    "Airdrie, AB": 2,
+    "High River, AB": 2,
+    "Drumheller, AB": 2,
+    "Stettler, AB": 2,
+    "Wainwright, AB": 2,
+    "Prince Albert, SK": 2,
+    "Kelowna, BC": 2,
+    "Lethbridge, AB": 1,
+    "Wetaskiwin, AB": 1
   }
 }
