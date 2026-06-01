@@ -1,14 +1,17 @@
 {
   "candidates": {
     "Sherwood Park, AB": 2,
-    "Taber, AB": 2,
-    "Salmon Arm, BC": 2
+    "Red Deer County, AB": 1,
+    "Peace River, AB": 1
   },
   "zero_weeks": {
-    "Lloydminster, AB": 2,
-    "Lacombe, AB": 2,
-    "Didsbury, AB": 2,
-    "Drumheller, AB": 2,
-    "Wainwright, AB": 2
+    "Lloydminster, AB": 3,
+    "Lacombe, AB": 3,
+    "Didsbury, AB": 3,
+    "Drumheller, AB": 3,
+    "Wainwright, AB": 3,
+    "Sylvan Lake, AB": 1,
+    "Vernon Bc, BC": 1,
+    "West Kelowna, BC": 1
   }
 }
