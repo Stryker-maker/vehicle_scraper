@@ -2,16 +2,18 @@
   "candidates": {
     "Sherwood Park, AB": 2,
     "Red Deer County, AB": 1,
-    "Peace River, AB": 1
+    "Peace River, AB": 1,
+    "Vernon, BC": 1
   },
   "zero_weeks": {
-    "Lloydminster, AB": 3,
-    "Lacombe, AB": 3,
-    "Didsbury, AB": 3,
-    "Drumheller, AB": 3,
-    "Wainwright, AB": 3,
-    "Sylvan Lake, AB": 1,
-    "Vernon Bc, BC": 1,
-    "West Kelowna, BC": 1
+    "Lloydminster, AB": 4,
+    "Lacombe, AB": 4,
+    "Didsbury, AB": 4,
+    "Drumheller, AB": 4,
+    "Wainwright, AB": 4,
+    "Sylvan Lake, AB": 2,
+    "Vernon Bc, BC": 2,
+    "West Kelowna, BC": 2,
+    "Tsuu T'Ina Nation, AB": 1
   }
 }
