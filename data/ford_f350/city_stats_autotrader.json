@@ -3,20 +3,22 @@
     "Melfort, SK": 2
   },
   "zero_weeks": {
-    "Lloydminster, AB": 5,
-    "Lacombe, AB": 5,
-    "Ponoka, AB": 5,
-    "Innisfail, AB": 5,
-    "Didsbury, AB": 5,
-    "Cochrane, AB": 5,
-    "Airdrie, AB": 5,
-    "High River, AB": 5,
-    "Drumheller, AB": 5,
-    "Stettler, AB": 5,
-    "Wainwright, AB": 5,
-    "Prince Albert, SK": 5,
-    "Camrose, AB": 3,
-    "Sylvan Lake, AB": 3,
-    "Fort Mcmurray, AB": 2
+    "Lloydminster, AB": 6,
+    "Lacombe, AB": 6,
+    "Ponoka, AB": 6,
+    "Innisfail, AB": 6,
+    "Didsbury, AB": 6,
+    "Cochrane, AB": 6,
+    "Airdrie, AB": 6,
+    "High River, AB": 6,
+    "Drumheller, AB": 6,
+    "Stettler, AB": 6,
+    "Wainwright, AB": 6,
+    "Prince Albert, SK": 6,
+    "Camrose, AB": 4,
+    "Sylvan Lake, AB": 4,
+    "Fort Mcmurray, AB": 3,
+    "Grande Prairie, AB": 1,
+    "Okotoks, AB": 1
   }
 }
