@@ -57,7 +57,19 @@ jobs:
           ORS_API_KEY: ${{ secrets.ORS_API_KEY }}
         run: python scraper.py --config config_forester.json
         continue-on-error: true
+ 
+      - name: AutoTrader — Honda Odyssey
+        env:
+          ORS_API_KEY: ${{ secrets.ORS_API_KEY }}
+        run: python scraper.py --config config_odyssey.json
+        continue-on-error: true
 
+      - name: AutoTrader — Kia Carnival
+        env:
+          ORS_API_KEY: ${{ secrets.ORS_API_KEY }}
+        run: python scraper.py --config config_carnival.json
+        continue-on-error: true
+        
       # ── Kijiji ──────────────────────────────────────────────────────────
 
       - name: Kijiji — Ford F-350
@@ -90,6 +102,18 @@ jobs:
         run: python kijiji_scraper.py --config config_forester.json
         continue-on-error: true
 
+      - name: Kijiji — Honda Odyssey
+        env:
+          ORS_API_KEY: ${{ secrets.ORS_API_KEY }}
+        run: python kijiji_scraper.py --config config_odyssey.json
+        continue-on-error: true
+
+      - name: Kijiji — Kia Carnival
+        env:
+          ORS_API_KEY: ${{ secrets.ORS_API_KEY }}
+        run: python kijiji_scraper.py --config config_carnival.json
+        continue-on-error: true
+
       # ── Merge ────────────────────────────────────────────────────────────
 
       - name: Merge — Ford F-350
@@ -110,6 +134,14 @@ jobs:
 
       - name: Merge — Subaru Forester
         run: python merge.py --config config_forester.json
+        continue-on-error: true
+
+      - name: Merge — Honda Odyssey
+        run: python merge.py --config config_odyssey.json
+        continue-on-error: true
+
+      - name: Merge — Kia Carnival
+        run: python merge.py --config config_carnival.json
         continue-on-error: true
 
       # ── Commit results ───────────────────────────────────────────────────
