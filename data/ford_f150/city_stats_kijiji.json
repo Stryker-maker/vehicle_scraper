@@ -1,22 +1,18 @@
 {
   "candidates": {},
   "zero_weeks": {
-    "Grande Prairie, AB": 6,
-    "Fort Mcmurray, AB": 6,
-    "Lloydminster, AB": 6,
-    "Innisfail, AB": 6,
-    "Cochrane, AB": 6,
-    "Airdrie, AB": 6,
-    "Tsuu T'Ina Nation, AB": 6,
-    "Vernon Bc, BC": 6,
-    "West Kelowna, BC": 6,
-    "Melfort, SK": 5,
-    "Lethbridge, AB": 4,
-    "Salmon Arm, BC": 4,
-    "Taber, AB": 3,
-    "Drumheller, AB": 1,
-    "Lloydminster, SK": 1,
-    "Nisku, AB": 1,
-    "Strathmore, AB": 1
+    "Grande Prairie, AB": 7,
+    "Fort Mcmurray, AB": 7,
+    "Lloydminster, AB": 7,
+    "Innisfail, AB": 7,
+    "Cochrane, AB": 7,
+    "Airdrie, AB": 7,
+    "Tsuu T'Ina Nation, AB": 7,
+    "West Kelowna, BC": 7,
+    "Melfort, SK": 6,
+    "Lethbridge, AB": 5,
+    "Taber, AB": 4,
+    "Kelowna, BC": 1,
+    "Kamloops, BC": 1
   }
 }
