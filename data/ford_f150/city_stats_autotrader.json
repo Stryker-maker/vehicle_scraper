@@ -5,18 +5,15 @@
     "Peace River, AB": 1,
     "Vernon, BC": 2,
     "Fort Saskatchewan, AB": 1,
-    "Fort Macleod, AB": 1
+    "Fort Macleod, AB": 2,
+    "Rimbey, AB": 1,
+    "Prince George, BC": 1
   },
   "zero_weeks": {
-    "Lloydminster, AB": 7,
-    "Lacombe, AB": 7,
-    "Didsbury, AB": 7,
-    "Drumheller, AB": 7,
-    "Wainwright, AB": 7,
-    "Sylvan Lake, AB": 5,
-    "Vernon Bc, BC": 5,
-    "Tsuu T'Ina Nation, AB": 4,
-    "Carstairs, AB": 1,
-    "Taber, AB": 1
+    "Sylvan Lake, AB": 6,
+    "Vernon Bc, BC": 6,
+    "Tsuu T'Ina Nation, AB": 5,
+    "Taber, AB": 2,
+    "Stettler, AB": 1
   }
 }

@@ -3,32 +3,8 @@
     "Sherwood Park, AB": 2
   },
   "zero_weeks": {
-    "Red Deer, AB": 7,
-    "Lethbridge, AB": 7,
-    "Medicine Hat, AB": 7,
-    "Grande Prairie, AB": 7,
-    "Fort Mcmurray, AB": 7,
-    "Lloydminster, AB": 7,
-    "Wetaskiwin, AB": 7,
-    "Lacombe, AB": 7,
-    "Ponoka, AB": 7,
-    "Sylvan Lake, AB": 7,
-    "Innisfail, AB": 7,
-    "Olds, AB": 7,
-    "Didsbury, AB": 7,
-    "Cochrane, AB": 7,
-    "Airdrie, AB": 7,
-    "Okotoks, AB": 7,
-    "High River, AB": 7,
-    "Drumheller, AB": 7,
-    "Stettler, AB": 7,
-    "Wainwright, AB": 7,
-    "Saskatoon, SK": 7,
-    "Regina, SK": 7,
-    "Prince Albert, SK": 7,
-    "Swift Current, SK": 7,
-    "Kelowna, BC": 7,
-    "Edmonton, AB": 1,
-    "Calgary, AB": 1
+    "Edmonton, AB": 2,
+    "Calgary, AB": 2,
+    "Kamloops, BC": 1
   }
 }

@@ -1,26 +1,15 @@
 {
   "candidates": {
-    "Melfort, SK": 2
+    "Melfort, SK": 2,
+    "Lloydminster, SK": 1
   },
   "zero_weeks": {
-    "Lloydminster, AB": 7,
-    "Lacombe, AB": 7,
-    "Ponoka, AB": 7,
-    "Innisfail, AB": 7,
-    "Didsbury, AB": 7,
-    "Cochrane, AB": 7,
-    "Airdrie, AB": 7,
-    "High River, AB": 7,
-    "Drumheller, AB": 7,
-    "Stettler, AB": 7,
-    "Wainwright, AB": 7,
-    "Prince Albert, SK": 7,
-    "Camrose, AB": 5,
-    "Sylvan Lake, AB": 5,
-    "Fort Mcmurray, AB": 4,
-    "Grande Prairie, AB": 2,
-    "Okotoks, AB": 2,
-    "Medicine Hat, AB": 1,
-    "Wetaskiwin, AB": 1
+    "Camrose, AB": 6,
+    "Sylvan Lake, AB": 6,
+    "Fort Mcmurray, AB": 5,
+    "Okotoks, AB": 3,
+    "Wetaskiwin, AB": 2,
+    "Red Deer, AB": 1,
+    "Kamloops, BC": 1
   }
 }
