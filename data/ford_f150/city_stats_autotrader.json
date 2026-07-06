@@ -1,19 +1,20 @@
 {
   "candidates": {
     "Sherwood Park, AB": 2,
-    "Red Deer County, AB": 1,
+    "Red Deer County, AB": 2,
     "Peace River, AB": 1,
-    "Vernon, BC": 2,
     "Fort Saskatchewan, AB": 1,
-    "Fort Macleod, AB": 2,
-    "Rimbey, AB": 1,
-    "Prince George, BC": 1
+    "Rimbey, AB": 2,
+    "Prince George, BC": 1,
+    "Innisfail, AB": 1,
+    "Brooks, AB": 1,
+    "Kimberley, BC": 1,
+    "West Kelowna, BC": 1
   },
   "zero_weeks": {
-    "Sylvan Lake, AB": 6,
-    "Vernon Bc, BC": 6,
-    "Tsuu T'Ina Nation, AB": 5,
-    "Taber, AB": 2,
-    "Stettler, AB": 1
+    "Sylvan Lake, AB": 7,
+    "Vernon Bc, BC": 7,
+    "Tsuu T'Ina Nation, AB": 6,
+    "Prince Albert, SK": 1
   }
 }

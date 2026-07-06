@@ -1,10 +1,16 @@
 {
   "candidates": {
     "Melfort, SK": 2,
-    "Lloydminster, SK": 1
+    "Lloydminster, SK": 2,
+    "Okotoks, AB": 1,
+    "Moose Jaw, SK": 1,
+    "Red Deer, AB": 1,
+    "Picture Butte, AB": 1,
+    "Lethbridge, AB": 1,
+    "Medicine Hat, AB": 1
   },
   "zero_weeks": {
-    "Camrose, AB": 6,
+    "Camrose, AB": 7,
     "Sylvan Lake, AB": 6,
     "Fort Mcmurray, AB": 5,
     "Okotoks, AB": 3,
