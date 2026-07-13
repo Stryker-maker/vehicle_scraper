@@ -28,12 +28,10 @@
     "Red Deer, AB",
     "Edmonton, AB",
     "Calgary, AB",
-    "Lethbridge, AB",
     "Medicine Hat, AB",
     "Camrose, AB",
     "Wetaskiwin, AB",
     "Ponoka, AB",
-    "Sylvan Lake, AB",
     "Olds, AB",
     "Okotoks, AB",
     "High River, AB",
@@ -51,12 +49,14 @@
     "Moose Jaw, SK",
     "Leduc, AB",
     "Tsuu T'Ina Nation, AB",
-    "Vernon Bc, BC",
     "Taber, AB",
     "Salmon Arm, BC",
     "Vernon, BC",
     "Fort Macleod, AB",
     "Airdrie, AB",
-    "Maple Creek, SK"
+    "Maple Creek, SK",
+    "Rimbey, AB",
+    "West Kelowna, BC",
+    "Melfort, SK"
   ]
 }

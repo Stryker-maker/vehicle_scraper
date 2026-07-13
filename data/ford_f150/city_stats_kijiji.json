@@ -2,21 +2,17 @@
   "candidates": {},
   "zero_weeks": {
     "Lloydminster, AB": 7,
-    "Lethbridge, AB": 7,
-    "Taber, AB": 6,
-    "Kelowna, BC": 3,
-    "Kamloops, BC": 3,
-    "Lloydminster, SK": 2,
-    "Nisku, AB": 2,
-    "Strathmore, AB": 2,
-    "Leduc, AB": 2,
+    "Taber, AB": 7,
+    "Kelowna, BC": 4,
+    "Kamloops, BC": 4,
+    "Nisku, AB": 3,
+    "Strathmore, AB": 3,
     "Vernon Bc, BC": 2,
-    "Salmon Arm, BC": 2,
-    "Stettler, AB": 1,
-    "Tsuu T'Ina Nation, AB": 1,
-    "Vernon, BC": 1,
-    "Fort Macleod, AB": 1,
-    "Airdrie, AB": 1,
-    "Maple Creek, SK": 1
+    "Vernon, BC": 2,
+    "Fort Macleod, AB": 2,
+    "Airdrie, AB": 2,
+    "Maple Creek, SK": 2,
+    "Rimbey, AB": 1,
+    "Melfort, SK": 1
   }
 }

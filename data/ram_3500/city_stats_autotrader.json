@@ -1,11 +1,12 @@
 {
   "candidates": {
     "Fort Saskatchewan, AB": 1,
-    "Vernon, BC": 1
+    "Vernon, BC": 1,
+    "Islay, AB": 1
   },
   "zero_weeks": {
-    "Calgary, AB": 7,
-    "Regina, SK": 4,
-    "Kelowna, BC": 2
+    "Regina, SK": 5,
+    "Kelowna, BC": 3,
+    "Edmonton, AB": 1
   }
 }
