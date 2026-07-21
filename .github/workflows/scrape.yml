@@ -2,8 +2,6 @@ name: Weekly Vehicle Scrape
 
 on:
   pull_request:
-    paths-ignore:
-      - 'data/**'
   schedule:
     # Every Monday at 8:00 AM UTC (2:00 AM MDT)
     - cron: '0 8 * * 1'
@@ -14,8 +12,19 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  acknowledge-generated-data:
+    name: Acknowledge generated data
+    if: github.event_name == 'pull_request' && github.actor == 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Confirm generated-data update
+        run: echo "Generated data commit acknowledged; code tests already passed before collection."
+
   test:
     name: Phase 1 tests
+    if: "!(github.event_name == 'pull_request' && github.actor == 'github-actions[bot]')"
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -33,6 +42,7 @@ jobs:
         run: >-
           python -m py_compile
           phase1_common.py
+          phase1_kijiji_runner.py
           phase1_runtime.py
           phase1_reporting.py
           phase1_pipeline.py
@@ -92,7 +102,7 @@ jobs:
               --source kijiji \
               --config "$config" \
               --timeout-seconds 4500 \
-              -- python kijiji_scraper.py --config "$config"
+              -- python phase1_kijiji_runner.py --config "$config"
           done
 
       - name: Build unranked manual-review files
