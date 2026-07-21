@@ -6,7 +6,7 @@ Phase 1 keeps both AutoTrader and Kijiji collection enabled while preventing the
 
 - Both source scrapers still run for every configured vehicle.
 - The Phase 1 wrapper runs each collector against an isolated temporary configuration, so one source cannot change the approved search locations used by another source.
-- The wrapper disables the legacy `max_results` cap during collection. Every listing that passes the source scraper's existing filters is retained, including result sets larger than 50 or 200 vehicles.
+- The wrapper overrides the legacy `max_results` value with an effectively unbounded runtime value. Every listing that passes the source scraper's existing filters is retained, including result sets larger than 50 or 200 vehicles.
 - Each collector has a 75-minute timeout. A timeout is recorded and the remaining collectors continue.
 - Every source run writes structured collection and data-quality evidence under `data/<vehicle>/run_status/`.
 - Same-day reruns keep one price-history observation per listing and do not create an artificial extra week.
