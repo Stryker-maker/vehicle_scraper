@@ -11,7 +11,7 @@ from phase1_pipeline import (
     expected_output_path, source_status_path, write_json,
 )
 
-FIELDS=["rank","year","make","model","trim","trim_tier","price","price_history","trend","weeks_tracked","price_first_seen","price_last_week","price_change_week","price_change_total","mileage","engine","fuel","accident_flag","days_on_market","dealer","seller_type","dealer_address","location","distance_km","distance_method","listing_id","url","score","source"]
+FIELDS=["rank","year","make","model","trim","trim_tier","price","price_history","trend","weeks_tracked","price_first_seen","price_last_week","price_change_week","price_change_total","mileage","engine","fuel","accident_flag","days_on_market","dealer","seller_type","dealer_address","location","distance_km","distance_method","listing_id","url_region_hint","url_region_status","url","score","source"]
 
 
 class ReportingTests(unittest.TestCase):
@@ -38,7 +38,8 @@ class ReportingTests(unittest.TestCase):
                     "model":"Vehicle", "price":"25000", "mileage":"100000",
                     "dealer_address":"Example, AB", "location":"Example, AB",
                     "distance_km":"100", "distance_method":"address",
-                    "listing_id":f"{source}-{index}", "url":f"https://x/2020-{index}",
+                    "listing_id":f"{source}-{index}", "url":f"https://www.kijiji.ca/v-cars-trucks/calgary/2020-{index}",
+                    "url_region_hint":"calgary", "url_region_status":"unverified_url_evidence",
                     "score":".2", "source":"AutoTrader" if source=="autotrader" else "Kijiji",
                 })
                 writer.writerow(row)
@@ -50,8 +51,8 @@ class ReportingTests(unittest.TestCase):
             "run_id":"run-1", "vehicle_key":"test_vehicle", "source":source,
             "execution_status":"success", "collection_status":"success",
             "completed_at_utc":"now", "output_updated_this_run":True,
-            "schema_valid":True, "row_count":count, "row_cap_disabled":True,
-            "config_isolated":True,
+            "schema_valid":True, "row_count":count, "current_row_count":count,
+            "stale_row_count":0, "row_cap_disabled":True, "config_isolated":True,
             "data_quality_status":"warnings_present" if source=="kijiji" else "clean",
             "quality_warning_rows":count if source=="kijiji" else 0,
             "quality_warning_count":count if source=="kijiji" else 0,
@@ -76,15 +77,20 @@ class ReportingTests(unittest.TestCase):
         kijiji = next(row for row in rows if row["source"] == "Kijiji")
         self.assertEqual(kijiji["location"], "")
         self.assertEqual(kijiji["distance_km"], "")
+        self.assertEqual(kijiji["distance_method"], "disabled_unverified_location")
         self.assertEqual(kijiji["unverified_location_value"], "Example, AB")
+        self.assertEqual(kijiji["url_region_hint"], "calgary")
 
-    def test_degraded_source_is_excluded(self):
+    def test_degraded_source_is_excluded_and_reports_stale_rows(self):
         self.success("autotrader")
         self.rows("kijiji", 1)
         write_json(source_status_path(self.root, self.config, "kijiji"), {
-            "run_id":"run-1", "execution_status":"degraded",
-            "output_updated_this_run":False, "schema_valid":True, "row_count":1,
+            "run_id":"run-1", "execution_status":"degraded", "collection_status":"degraded",
+            "output_updated_this_run":False, "schema_valid":True, "row_count":0,
+            "current_row_count":0, "stale_row_count":1,
             "row_cap_disabled":True, "config_isolated":True,
+            "data_quality_status":"not_evaluated_stale_output",
+            "quality_warning_rows":0, "quality_warning_count":0,
             "failure_reasons":["no_fresh_output"],
         })
         result = build_manual_review(
@@ -92,6 +98,11 @@ class ReportingTests(unittest.TestCase):
         )["vehicles"][0]
         self.assertEqual(result["included_sources"], ["autotrader"])
         self.assertEqual(result["row_count"], 1)
+        report = collect_health(root=self.root, config_paths=[self.config_path], run_id="run-1")
+        stale = next(entry for entry in report["sources"] if entry["source"] == "kijiji")
+        self.assertEqual(stale["current_row_count"], 0)
+        self.assertEqual(stale["stale_row_count"], 1)
+        self.assertEqual(stale["data_quality_status"], "not_evaluated_stale_output")
 
     def test_missing_source_degrades_health(self):
         self.success("autotrader")
