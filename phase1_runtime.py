@@ -126,10 +126,13 @@ def run_source(
         isolated_command = replace_config_argument(
             command, root=root, original=config_path, runtime=runtime_path
         )
+        environment = os.environ.copy()
+        if source == "kijiji":
+            environment["PHASE1_KIJIJI_DISTANCE_DISABLED"] = "1"
         try:
             completed = subprocess.run(
                 isolated_command, cwd=root, text=True, capture_output=True,
-                check=False, timeout=timeout_seconds,
+                check=False, timeout=timeout_seconds, env=environment,
             )
             returncode = completed.returncode
             stdout, stderr = completed.stdout or "", completed.stderr or ""
@@ -148,6 +151,10 @@ def run_source(
         or after_signature[0] >= started_ns
     ))
     validation = validate_csv(output_path)
+    observed_rows = int(validation["row_count"])
+    current_rows = observed_rows if fresh else 0
+    stale_rows = observed_rows if output_path.exists() and not fresh else 0
+
     failures: list[str] = []
     if timed_out:
         failures.append("collector_timed_out")
@@ -155,9 +162,9 @@ def run_source(
         failures.append("collector_command_failed")
     if not fresh:
         failures.append("no_fresh_output")
-    if not validation["schema_valid"]:
+    if fresh and not validation["schema_valid"]:
         failures.append("invalid_output_schema")
-    if validation["row_count"] < 1:
+    if fresh and current_rows < 1:
         failures.append("empty_output")
     status_name = (
         "timed_out" if timed_out else "failed" if returncode != 0
@@ -170,10 +177,20 @@ def run_source(
         restore_history(history_path, snapshot)
         deduped_after = 0
 
-    quality = analyze_csv_quality(output_path, source) if validation["schema_valid"] else {
-        "data_quality_status": "not_evaluated", "quality_warning_rows": 0,
-        "quality_warning_count": 0, "quality_warning_summary": {},
-    }
+    if fresh and validation["schema_valid"]:
+        quality = analyze_csv_quality(output_path, source)
+    elif stale_rows:
+        quality = {
+            "data_quality_status": "not_evaluated_stale_output",
+            "quality_warning_rows": 0, "quality_warning_count": 0,
+            "quality_warning_summary": {},
+        }
+    else:
+        quality = {
+            "data_quality_status": "not_evaluated", "quality_warning_rows": 0,
+            "quality_warning_count": 0, "quality_warning_summary": {},
+        }
+
     config_isolated = config_path.read_bytes() == original_config
     if not config_isolated:
         config_path.write_bytes(original_config)
@@ -182,7 +199,7 @@ def run_source(
             status_name = "degraded"
 
     status = {
-        "schema_version": 2, "run_id": run_id or os.environ.get("GITHUB_RUN_ID", "local"),
+        "schema_version": 3, "run_id": run_id or os.environ.get("GITHUB_RUN_ID", "local"),
         "vehicle_key": config["vehicle_key"], "source": source,
         "config_path": str(config_path.relative_to(root)), "command": list(command),
         "started_at_utc": started_at, "completed_at_utc": utc_now(),
@@ -194,13 +211,20 @@ def run_source(
         "configured_max_results": config.get("max_results"),
         "effective_max_results": "unbounded", "row_cap_disabled": True,
         "config_isolated": config_isolated,
+        "distance_processing_disabled": source == "kijiji",
+        "distance_filter_disabled": source == "kijiji",
+        "legacy_source_ranking_disabled": source == "kijiji",
+        "row_count": current_rows, "current_row_count": current_rows,
+        "stale_row_count": stale_rows, "stale_output_available": stale_rows > 0,
+        "observed_file_row_count": observed_rows,
         "same_day_history_removed_before_run": removed_before,
         "same_day_history_duplicates_removed_after_run": deduped_after,
-        **validation, **quality, "stdout_tail": stdout[-4000:], "stderr_tail": stderr[-4000:],
+        **{**validation, "row_count": current_rows}, **quality,
+        "stdout_tail": stdout[-4000:], "stderr_tail": stderr[-4000:],
     }
     write_json(status_path, status)
     print(
-        f"[{config['vehicle_key']}:{source}] {status_name} | rows={validation['row_count']} "
-        f"| fresh={fresh} | quality={quality['data_quality_status']}"
+        f"[{config['vehicle_key']}:{source}] {status_name} | current_rows={current_rows} "
+        f"| stale_rows={stale_rows} | fresh={fresh} | quality={quality['data_quality_status']}"
     )
     return status
