@@ -20,7 +20,7 @@ SOURCE_FIELDS = [
     "price_change_week", "price_change_total", "mileage", "engine", "fuel",
     "accident_flag", "days_on_market", "dealer", "seller_type",
     "dealer_address", "location", "distance_km", "distance_method",
-    "listing_id", "url", "source",
+    "listing_id", "url_region_hint", "url_region_status", "url", "source",
 ]
 MANUAL_REVIEW_FIELDS = [
     "ranking_status", "review_status", "collection_status", "data_quality_status",
@@ -162,7 +162,7 @@ def status_is_current_success(status: dict[str, Any], run_id: str) -> bool:
         and status.get("execution_status") == "success"
         and status.get("output_updated_this_run") is True
         and status.get("schema_valid") is True
-        and int(status.get("row_count", 0)) > 0
+        and int(status.get("current_row_count", status.get("row_count", 0))) > 0
         and status.get("row_cap_disabled") is True
         and status.get("config_isolated") is True
     )
