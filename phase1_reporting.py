@@ -37,7 +37,8 @@ def transform_manual_review_row(row: dict[str, str], status: dict[str, Any]) -> 
             "distance_status": "disabled_due_to_unverified_location",
             "unverified_location_value": transformed["location"],
             "unverified_distance_value": transformed["distance_km"],
-            "dealer_address": "", "location": "", "distance_km": "", "distance_method": "",
+            "dealer_address": "", "location": "", "distance_km": "",
+            "distance_method": "disabled_unverified_location",
         })
     elif warnings:
         transformed["review_status"] = "data_quality_review_required"
@@ -90,7 +91,8 @@ def build_manual_review(
             "# Merged ranking disabled\n\nThe automated cross-source merged ranking is disabled "
             "during Phase 1. Existing merged CSV files are historical and are no longer "
             f"refreshed. Use `../manual_review/{key}_manual_review_latest.csv` for current "
-            "unranked, uncapped data.\n", encoding="utf-8",
+            "unranked, uncapped data. Kijiji distance filtering and location-based ranking "
+            "are disabled because its listing locations are unverified.\n", encoding="utf-8",
         )
         warning_rows = sum(1 for row in rows if row["quality_warnings"])
         summaries.append({
@@ -117,17 +119,21 @@ def collect_health(
             status_path = source_status_path(root, config, source)
             if status_path.exists():
                 status = load_json(status_path)
+                current_run = status.get("run_id") == active_run
+                current_rows = int(status.get("current_row_count", status.get("row_count", 0))) if current_run else 0
+                stale_rows = int(status.get("stale_row_count", 0))
                 entries.append({
                     "vehicle_key": config["vehicle_key"], "source": source,
                     "healthy": status_is_current_success(status, active_run),
-                    "current_run": status.get("run_id") == active_run,
+                    "current_run": current_run,
                     "execution_status": status.get("execution_status", "unknown"),
                     "collection_status": status.get("collection_status", status.get("execution_status", "unknown")),
                     "data_quality_status": status.get("data_quality_status", "not_evaluated"),
                     "quality_warning_rows": status.get("quality_warning_rows", 0),
                     "quality_warning_count": status.get("quality_warning_count", 0),
                     "quality_warning_summary": status.get("quality_warning_summary", {}),
-                    "row_count": status.get("row_count", 0),
+                    "row_count": current_rows, "current_row_count": current_rows,
+                    "stale_row_count": stale_rows,
                     "failure_reasons": status.get("failure_reasons", []),
                     "status_path": str(status_path.relative_to(root)),
                 })
@@ -138,6 +144,7 @@ def collect_health(
                     "collection_status": "missing", "data_quality_status": "not_evaluated",
                     "quality_warning_rows": 0, "quality_warning_count": 0,
                     "quality_warning_summary": {}, "row_count": 0,
+                    "current_row_count": 0, "stale_row_count": 0,
                     "failure_reasons": ["missing_status"],
                     "status_path": str(status_path.relative_to(root)),
                 })
@@ -145,7 +152,7 @@ def collect_health(
     warnings = [entry for entry in entries if entry["data_quality_status"] == "warnings_present"]
     overall = "degraded" if unhealthy else "success_with_warnings" if warnings else "success"
     return {
-        "schema_version": 2, "run_id": active_run, "generated_at_utc": utc_now(),
+        "schema_version": 3, "run_id": active_run, "generated_at_utc": utc_now(),
         "overall_status": overall, "expected_source_runs": len(entries),
         "healthy_source_runs": len(entries) - len(unhealthy),
         "unhealthy_source_runs": len(unhealthy),
@@ -163,15 +170,15 @@ def write_health_report(*, root: Path, report: dict[str, Any]) -> tuple[Path, Pa
         f"- Overall status: **{str(report['overall_status']).upper()}**",
         f"- Healthy source runs: {report['healthy_source_runs']}/{report['expected_source_runs']}",
         f"- Source runs with quality warnings: {report.get('source_runs_with_quality_warnings', 0)}",
-        "", "| Vehicle | Source | Collection | Data quality | Rows | Warning rows | Failure reasons |",
-        "|---|---|---:|---:|---:|---:|---|",
+        "", "| Vehicle | Source | Collection | Data quality | Current rows | Stale rows | Warning rows | Failure reasons |",
+        "|---|---|---:|---:|---:|---:|---:|---|",
     ]
     for entry in report["sources"]:
         reasons = ", ".join(entry["failure_reasons"]) or "—"
         lines.append(
             f"| {entry['vehicle_key']} | {entry['source']} | {entry['collection_status']} | "
-            f"{entry['data_quality_status']} | {entry['row_count']} | "
-            f"{entry['quality_warning_rows']} | {reasons} |"
+            f"{entry['data_quality_status']} | {entry['current_row_count']} | "
+            f"{entry['stale_row_count']} | {entry['quality_warning_rows']} | {reasons} |"
         )
     markdown_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return json_path, markdown_path
