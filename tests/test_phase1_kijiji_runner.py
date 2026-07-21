@@ -57,6 +57,15 @@ class KijijiRunnerTests(unittest.TestCase):
         self.assertIn("phase1_filter_kijiji_listings", patched)
         self.assertIn("url_region_hint", patched)
 
+    def test_current_legacy_scraper_matches_patch_contract(self):
+        repository_root = Path(__file__).resolve().parents[1]
+        source = (repository_root / "kijiji_scraper.py").read_text(encoding="utf-8")
+        patched = patch_legacy_source(source)
+        compile(patched, "kijiji_scraper.py", "exec")
+        self.assertNotIn("    listings = resolve_all_distances(listings)", patched)
+        self.assertNotIn("    update_locations(matches)", patched)
+        self.assertIn("phase1_display_summary(ranked)", patched)
+
 
 if __name__ == "__main__":
     unittest.main()
