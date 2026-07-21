@@ -1,0 +1,27 @@
+{
+  "command": [
+    "python",
+    "scraper.py",
+    "--config",
+    "config_carnival.json"
+  ],
+  "completed_at_utc": "2026-07-21T15:18:35+00:00",
+  "config_path": "config_carnival.json",
+  "execution_status": "success",
+  "exit_code": 0,
+  "expected_output": "data/kia_carnival/latest/kia_carnival_autotrader_latest.csv",
+  "failure_reasons": [],
+  "missing_columns": [],
+  "output_exists": true,
+  "output_updated_this_run": true,
+  "row_count": 11,
+  "run_id": "29840838725",
+  "schema_valid": true,
+  "schema_version": 1,
+  "source": "autotrader",
+  "started_at_utc": "2026-07-21T15:14:27+00:00",
+  "stderr_tail": "",
+  "stdout_tail": "Accidents:     Unknown\n  Trend:         Down $1,000 over 3 weeks\n  Dealer:        Sherwood Kia (Dealer)\n  Location:      Sherwood Park, AB\n  Distance:      163 km (address)\n  Score:         0.7258\n  URL:           https://www.autotrader.ca/offers/kia-carnival-sx-brown-leather-low-km-certified-full-loa-gasoline-white-cat_ma39gr200750tr13918-10a8da25-1d57-4d3f-9914-0cc092684c3d\n\n  Rank 8\n  2022 Kia Carnival LX  SUV Styling, Minivan Space, Smart Tech\n  Trim tier:     Base (Tier 1)\n  Price:         $28,995  [No change noted]\n  Mileage:       98,537 km\n  Accidents:     Accident reported\n  Trend:         Down $1,000 over 5 weeks\n  Dealer:        Vernon Kia (Dealer)\n  Location:      Vernon, BC\n  Distance:      699 km (address)\n  Score:         0.7262\n  URL:           https://www.autotrader.ca/offers/kia-carnival-lx-suv-styling-minivan-space-smart-tech-gasoline-grey-cat_ma39gr200750tr5309-4acf6f47-dbb2-4a37-9afe-e3d58dd53e12\n\n  Rank 9\n  2023 Kia Carnival LX\n  Trim tier:     Base (Tier 1)\n  Price:         $35,989  [No change noted]\n  Mileage:       61,983 km\n  Accidents:     Unknown\n  Trend:         Unchanged for 1 weeks\n  Dealer:        Salmon Arm GM (Dealer)\n  Location:      SALMON ARM, BC\n  Distance:      648 km (city_center)\n  Score:         0.7752\n  URL:           https://www.autotrader.ca/offers/kia-carnival-lx-gasoline-black-cat_ma39gr200750tr5309-7e61c1ad-4f39-4a9a-80cf-83e5ec6b1f94\n\n  Rank 10\n  2023 Kia Carnival LX\n  Trim tier:     Base (Tier 1)\n  Price:         $34,995  [No change noted]\n  Mileage:       61,983 km\n  Accidents:     No accidents reported\n  Trend:         Unchanged for 3 weeks\n  Dealer:        Unknown (Dealer)\n  Location:      Peachland, BC\n  Distance:      776 km (city_center)\n  Score:         0.7875\n  URL:           https://www.autotrader.ca/offers/kia-carnival-lx-gasoline-cat_ma39gr200750-41eba304-1bad-46a1-a208-0e9abec6da55\n\n  Rank 11\n  2023 Kia Carnival SX  - Sunroof -  Cooled Seats\n  Trim tier:     Base (Tier 1)\n  Price:         $39,888  [No change noted]\n  Mileage:       88,162 km\n  Accidents:     Accident reported\n  Trend:         Unchanged for 1 weeks\n  Dealer:        Vernon Dodge Jeep (Dealer)\n  Location:      VERNON, BC\n  Distance:      698 km (address)\n  Score:         0.8544\n  URL:           https://www.autotrader.ca/offers/kia-carnival-sx-sunroof-cooled-seats-gasoline-white-cat_ma39gr200750tr13918-21f54764-f8c7-4f35-8e32-6bd72a614cb2\n\n  Archived: data/kia_carnival/autotrader/kia_carnival_autotrader_2026-07-21_15-18.csv\n  Latest:   data/kia_carnival/latest/kia_carnival_autotrader_latest.csv\n\nUpdating location list...\n\n  Location summary (kia_carnival AutoTrader):\n    Active cities: 44\n      On watch:  Lethbridge, AB: 7/8\n      On watch:  Medicine Hat, AB: 7/8\n      On watch:  Grande Prairie, AB: 7/8\n      On watch:  Fort Mcmurray, AB: 7/8\n      On watch:  Lloydminster, AB: 7/8\n      On watch:  Camrose, AB: 7/8\n      On watch:  Wetaskiwin, AB: 7/8\n      On watch:  Lacombe, AB: 7/8\n      On watch:  Ponoka, AB: 7/8\n      On watch:  Sylvan Lake, AB: 7/8\n      On watch:  Innisfail, AB: 7/8\n      On watch:  Olds, AB: 7/8\n      On watch:  Didsbury, AB: 7/8\n      On watch:  Cochrane, AB: 7/8\n      On watch:  Okotoks, AB: 7/8\n      On watch:  High River, AB: 7/8\n      On watch:  Drumheller, AB: 7/8\n      On watch:  Stettler, AB: 7/8\n      On watch:  Wainwright, AB: 7/8\n      On watch:  Saskatoon, SK: 7/8\n      On watch:  Regina, SK: 7/8\n      On watch:  Prince Albert, SK: 7/8\n      On watch:  Swift Current, SK: 7/8\n      On watch:  Kelowna, BC: 7/8\n      On watch:  Kamloops, BC: 7/8\n      On watch:  Carstairs, AB: 7/8\n      On watch:  Lloydminster, SK: 7/8\n      On watch:  Melfort, SK: 7/8\n      On watch:  Strathmore, AB: 7/8\n      On watch:  Moose Jaw, SK: 7/8\n      On watch:  Tsuu T'Ina Nation, AB: 7/8\n      On watch:  Vernon Bc, BC: 7/8\n      On watch:  West Kelowna, BC: 7/8\n      On watch:  Taber, AB: 7/8\n      On watch:  Nisku, AB: 6/8\n      On watch:  Airdrie, AB: 4/8\n      On watch:  Calgary, AB: 3/8\n",
+  "validation_error": null,
+  "vehicle_key": "kia_carnival"
+}

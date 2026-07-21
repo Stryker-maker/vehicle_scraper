@@ -1,0 +1,27 @@
+{
+  "command": [
+    "python",
+    "kijiji_scraper.py",
+    "--config",
+    "config_odyssey.json"
+  ],
+  "completed_at_utc": "2026-07-21T17:15:23+00:00",
+  "config_path": "config_odyssey.json",
+  "execution_status": "success",
+  "exit_code": 0,
+  "expected_output": "data/honda_odyssey/latest/honda_odyssey_kijiji_latest.csv",
+  "failure_reasons": [],
+  "missing_columns": [],
+  "output_exists": true,
+  "output_updated_this_run": true,
+  "row_count": 50,
+  "run_id": "29840838725",
+  "schema_valid": true,
+  "schema_version": 1,
+  "source": "kijiji",
+  "started_at_utc": "2026-07-21T17:03:45+00:00",
+  "stderr_tail": "",
+  "stdout_tail": " Accidents:  Unknown\n  Trend:      Unchanged for 5 weeks\n  Seller:     Unknown (Dealer)\n  Location:   Calgary, AB\n  Distance:   149 km (address)\n  Listed:     N/A\n  Score:      0.5837\n  URL:        https://www.kijiji.ca/v-cars-trucks/calgary/2019-honda-odyssey-exl-backup-camera-heated-leather-seats-sunroo/1735286047\n\n  Rank 43\n  2019 Honda Odyssey Unknown\n  Trim tier:  Base (Tier 1)\n  Price:      $35,995  [No change noted]\n  Mileage:    73,320 km\n  Accidents:  Unknown\n  Trend:      Down $3,000 over 2 weeks\n  Seller:     Unknown (Private)\n  Location:   Carstairs, AB\n  Distance:   91 km (address)\n  Listed:     N/A\n  Score:      0.5876\n  URL:        https://www.kijiji.ca/v-cars-trucks/regina/2019-honda-odyssey-ex-fresh-trade/1739960489\n\n  Rank 44\n  2020 Honda Odyssey Unknown\n  Trim tier:  Base (Tier 1)\n  Price:      $23,900  [No change noted]\n  Mileage:    226,030 km\n  Accidents:  Unknown\n  Trend:      Unchanged for 1 weeks\n  Seller:     Unknown (Private)\n  Location:   Carstairs, AB\n  Distance:   91 km (address)\n  Listed:     N/A\n  Score:      0.5892\n  URL:        https://www.kijiji.ca/v-cars-trucks/mississauga-peel-region/2020-toyota-sienna-se-8-passenger-leather-camera/1740235416\n\n  Rank 45\n  2022 Honda Odyssey Unknown\n  Trim tier:  Base (Tier 1)\n  Price:      $35,999  [No change noted]\n  Mileage:    86,393 km\n  Accidents:  Unknown\n  Trend:      First seen this week\n  Seller:     Unknown (Private)\n  Location:   Carstairs, AB\n  Distance:   91 km (address)\n  Listed:     N/A\n  Score:      0.5981\n  URL:        https://www.kijiji.ca/v-cars-trucks/hamilton/2022-honda-odyssey-ex-l/1740883757\n\n  Rank 46\n  2018 Honda Odyssey Unknown\n  Trim tier:  Base (Tier 1)\n  Price:      $29,526  [No change noted]\n  Mileage:    154,263 km\n  Accidents:  Unknown\n  Trend:      First seen this week\n  Seller:     Unknown (Dealer)\n  Location:   Calgary, AB\n  Distance:   149 km (address)\n  Listed:     N/A\n  Score:      0.5987\n  URL:        https://www.kijiji.ca/v-cars-trucks/calgary/2018-honda-odyssey-touring/1740648983\n\n  Rank 47\n  2023 Honda Odyssey Unknown\n  Trim tier:  Base (Tier 1)\n  Price:      $39,995  [No change noted]\n  Mileage:    26,298 km\n  Accidents:  Unknown\n  Trend:      Unchanged for 3 weeks\n  Seller:     Unknown (Dealer)\n  Location:   Calgary, AB\n  Distance:   149 km (address)\n  Listed:     N/A\n  Score:      0.6007\n  URL:        https://www.kijiji.ca/v-cars-trucks/calgary/2023-honda-odyssey-ex-l-auto-8-seater-leather-carplay-b/1739732431\n\n  Rank 48\n  2022 Honda Odyssey Unknown\n  Trim tier:  Base (Tier 1)\n  Price:      $32,995  [No change noted]\n  Mileage:    133,559 km\n  Accidents:  No accidents reported\n  Trend:      First seen this week\n  Seller:     Unknown (Private)\n  Location:   Carstairs, AB\n  Distance:   91 km (address)\n  Listed:     N/A\n  Score:      0.606\n  URL:        https://www.kijiji.ca/v-cars-trucks/hamilton/2022-honda-odyssey-ex-l-navi-auto-no-accidents-sunroof/1740563473\n\n  Rank 49\n  2022 Honda Odyssey Unknown\n  Trim tier:  Base (Tier 1)\n  Price:      $32,998  [No change noted]\n  Mileage:    121,531 km\n  Accidents:  Unknown\n  Trend:      Down $3,000 over 5 weeks\n  Seller:     Unknown (Dealer)\n  Location:   Calgary, AB\n  Distance:   149 km (address)\n  Listed:     N/A\n  Score:      0.6072\n  URL:        https://www.kijiji.ca/v-cars-trucks/calgary/2022-honda-odyssey-ex-l-navi-auto/1728645378\n\n  Rank 50\n  2018 Honda Odyssey Unknown\n  Trim tier:  Base (Tier 1)\n  Price:      $30,000  [No change noted]\n  Mileage:    160,000 km\n  Accidents:  Unknown\n  Trend:      Unchanged for 3 weeks\n  Seller:     Unknown (Private)\n  Location:   Calgary, AB\n  Distance:   149 km (address)\n  Listed:     N/A\n  Score:      0.6081\n  URL:        https://www.kijiji.ca/v-cars-trucks/calgary/honda-odyssey/1737132165\n\n  Archived: data/honda_odyssey/kijiji/honda_odyssey_kijiji_2026-07-21_17-15.csv\n  Latest:   data/honda_odyssey/latest/honda_odyssey_kijiji_latest.csv\n\nUpdating location list...\n\n  Location summary (Kijiji \u2014 honda_odyssey):\n    Active cities: 45\n",
+  "validation_error": null,
+  "vehicle_key": "honda_odyssey"
+}

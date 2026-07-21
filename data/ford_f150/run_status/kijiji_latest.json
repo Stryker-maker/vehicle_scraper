@@ -1,0 +1,27 @@
+{
+  "command": [
+    "python",
+    "kijiji_scraper.py",
+    "--config",
+    "config_f150.json"
+  ],
+  "completed_at_utc": "2026-07-21T16:38:24+00:00",
+  "config_path": "config_f150.json",
+  "execution_status": "success",
+  "exit_code": 0,
+  "expected_output": "data/ford_f150/latest/ford_f150_kijiji_latest.csv",
+  "failure_reasons": [],
+  "missing_columns": [],
+  "output_exists": true,
+  "output_updated_this_run": true,
+  "row_count": 50,
+  "run_id": "29840838725",
+  "schema_valid": true,
+  "schema_version": 1,
+  "source": "kijiji",
+  "started_at_utc": "2026-07-21T15:42:46+00:00",
+  "stderr_tail": "",
+  "stdout_tail": "change noted]\n  Mileage:    154,659 km\n  Accidents:  No accidents reported\n  Trend:      First seen this week\n  Seller:     Unknown (Dealer)\n  Location:   Calgary, AB\n  Distance:   149 km (address)\n  Listed:     N/A\n  Score:      0.2895\n  URL:        https://www.kijiji.ca/v-cars-trucks/calgary/2017-ford-f-150-xlt-302a-sport-3-5l-eco-max-tow-pkg-fx4/1740883970\n\n  Rank 43\n  2017 Ford F-150 xlt\n  Trim tier:  Mid (Tier 2)\n  Price:      $16,900  [No change noted]\n  Mileage:    239,215 km\n  Accidents:  Unknown\n  Trend:      Unchanged for 8 weeks\n  Seller:     Unknown (Dealer)\n  Location:   Edmonton, AB\n  Distance:   154 km (address)\n  Listed:     N/A\n  Score:      0.2896\n  URL:        https://www.kijiji.ca/v-cars-trucks/edmonton/2017-ford-f-150-xlt-4wd-supercrew-5-5-box-ecoboost-brand-new/1738254234\n\n  Rank 44\n  2016 Ford F-150 sport\n  Trim tier:  Mid (Tier 2)\n  Price:      $18,990  [No change noted]\n  Mileage:    216,500 km\n  Accidents:  Unknown\n  Trend:      Unchanged for 3 weeks\n  Seller:     Unknown (Private)\n  Location:   Carstairs, AB\n  Distance:   91 km (address)\n  Listed:     N/A\n  Score:      0.2909\n  URL:        https://www.kijiji.ca/v-cars-trucks/mississauga-peel-region/2016-ford-f-150-v8-sports-4x4-5-5ft-box-supercrew/1739777021\n\n  Rank 45\n  2016 Ford F-150 xlt\n  Trim tier:  Mid (Tier 2)\n  Price:      $17,000  [No change noted]\n  Mileage:    249,000 km\n  Accidents:  Unknown\n  Trend:      First seen this week\n  Seller:     Unknown (Private)\n  Location:   Calgary, AB\n  Distance:   149 km (address)\n  Listed:     N/A\n  Score:      0.2913\n  URL:        https://www.kijiji.ca/v-cars-trucks/calgary/ford-f150-xlt-4x4/1740711227\n\n  Rank 46\n  2016 Ford F-150 xlt\n  Trim tier:  Mid (Tier 2)\n  Price:      $19,995  [No change noted]\n  Mileage:    189,501 km\n  Accidents:  Unknown\n  Trend:      Unchanged for 9 weeks\n  Seller:     Unknown (Private)\n  Location:   Carstairs, AB\n  Distance:   91 km (address)\n  Listed:     N/A\n  Score:      0.2942\n  URL:        https://www.kijiji.ca/v-cars-trucks/ottawa/2016-ford-f-150/1733781408\n\n  Rank 47\n  2019 Ford F-150 xlt\n  Trim tier:  Mid (Tier 2)\n  Price:      $18,990  [No change noted]\n  Mileage:    171,172 km\n  Accidents:  Unknown\n  Trend:      Down $910 over 8 weeks\n  Seller:     Unknown (Dealer)\n  Location:   Edmonton, AB\n  Distance:   154 km (address)\n  Listed:     N/A\n  Score:      0.2943\n  URL:        https://www.kijiji.ca/v-cars-trucks/edmonton/2019-ford-f-150-xlt-4x4-supercab-styleside-6-ft-box-163-in-wb/1734834225\n\n  Rank 48\n  2016 Ford F-150 lariat\n  Trim tier:  Premium (Tier 3)\n  Price:      $27,995  [No change noted]\n  Mileage:    183,554 km\n  Accidents:  Unknown\n  Trend:      Unchanged for 2 weeks\n  Seller:     Unknown (Dealer)\n  Location:   Calgary, AB\n  Distance:   149 km (address)\n  Listed:     N/A\n  Score:      0.2957\n  URL:        https://www.kijiji.ca/v-cars-trucks/calgary/2016-ford-f-150-lariat-sport-3-5l-ecoboost-6-5-ft-box-max-to/1740104891\n\n  Rank 49\n  2017 Ford F-150 xlt\n  Trim tier:  Mid (Tier 2)\n  Price:      $17,998  [No change noted]\n  Mileage:    228,759 km\n  Accidents:  Unknown\n  Trend:      Unchanged for 7 weeks\n  Seller:     Unknown (Dealer)\n  Location:   Calgary, AB\n  Distance:   149 km (address)\n  Listed:     N/A\n  Score:      0.2958\n  URL:        https://www.kijiji.ca/v-cars-trucks/calgary/2017-ford-f-150-4wd-supercrew-145-xlt/1738814767\n\n  Rank 50\n  2020 Ford F-150 lariat\n  Trim tier:  Premium (Tier 3)\n  Price:      $29,000  [No change noted]\n  Mileage:    140,097 km\n  Accidents:  Unknown\n  Trend:      Down $4,000 over 1 weeks\n  Seller:     Unknown (Dealer)\n  Location:   Calgary, AB\n  Distance:   149 km (address)\n  Listed:     N/A\n  Score:      0.2959\n  URL:        https://www.kijiji.ca/v-cars-trucks/calgary/2020-ford-f-150-lariat/1740282673\n\n  Archived: data/ford_f150/kijiji/ford_f150_kijiji_2026-07-21_16-38.csv\n  Latest:   data/ford_f150/latest/ford_f150_kijiji_latest.csv\n\nUpdating location list...\n\n  Location summary (Kijiji \u2014 ford_f150):\n    Active cities: 35\n",
+  "validation_error": null,
+  "vehicle_key": "ford_f150"
+}

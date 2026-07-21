@@ -1,0 +1,27 @@
+{
+  "command": [
+    "python",
+    "kijiji_scraper.py",
+    "--config",
+    "config_carnival.json"
+  ],
+  "completed_at_utc": "2026-07-21T17:20:38+00:00",
+  "config_path": "config_carnival.json",
+  "execution_status": "success",
+  "exit_code": 0,
+  "expected_output": "data/kia_carnival/latest/kia_carnival_kijiji_latest.csv",
+  "failure_reasons": [],
+  "missing_columns": [],
+  "output_exists": true,
+  "output_updated_this_run": true,
+  "row_count": 24,
+  "run_id": "29840838725",
+  "schema_valid": true,
+  "schema_version": 1,
+  "source": "kijiji",
+  "started_at_utc": "2026-07-21T17:15:23+00:00",
+  "stderr_tail": "",
+  "stdout_tail": "\n  Trim tier:  Base (Tier 1)\n  Price:      $27,995  [No change noted]\n  Mileage:    129,116 km\n  Accidents:  Unknown\n  Trend:      Unchanged for 1 weeks\n  Seller:     Unknown (Dealer)\n  Location:   Edmonton, AB\n  Distance:   154 km (address)\n  Listed:     N/A\n  Score:      0.6996\n  URL:        https://www.kijiji.ca/v-cars-trucks/edmonton/2022-kia-carnival-ex/1739262327\n\n  Rank 17\n  2023 Kia Carnival Unknown\n  Trim tier:  Base (Tier 1)\n  Price:      $33,995  [No change noted]\n  Mileage:    81,155 km\n  Accidents:  Unknown\n  Trend:      First seen this week\n  Seller:     Unknown (Private)\n  Location:   Carstairs, AB\n  Distance:   91 km (address)\n  Listed:     N/A\n  Score:      0.7101\n  URL:        https://www.kijiji.ca/v-cars-trucks/shawinigan/kia-carnival-lx-2023-a-vendre/1740562840\n\n  Rank 18\n  2023 Kia Carnival Unknown\n  Trim tier:  Base (Tier 1)\n  Price:      $25,995  [No change noted]\n  Mileage:    171,387 km\n  Accidents:  Unknown\n  Trend:      Down $5,000 over 5 weeks\n  Seller:     Unknown (Private)\n  Location:   Carstairs, AB\n  Distance:   91 km (address)\n  Listed:     N/A\n  Score:      0.7102\n  URL:        https://www.kijiji.ca/v-cars-trucks/hamilton/2023-kia-carnival-sx/1729920824\n\n  Rank 19\n  2022 Kia Carnival Unknown\n  Trim tier:  Base (Tier 1)\n  Price:      $32,690  [No change noted]\n  Mileage:    100,821 km\n  Accidents:  Unknown\n  Trend:      Unchanged for 4 weeks\n  Seller:     Unknown (Private)\n  Location:   Carstairs, AB\n  Distance:   91 km (address)\n  Listed:     N/A\n  Score:      0.7159\n  URL:        https://www.kijiji.ca/v-cars-trucks/bedford/2022-kia-carnival-ex/1738672187\n\n  Rank 20\n  2023 Kia Carnival Unknown\n  Trim tier:  Base (Tier 1)\n  Price:      $34,988  [No change noted]\n  Mileage:    77,107 km\n  Accidents:  Unknown\n  Trend:      Unchanged for 2 weeks\n  Seller:     Unknown (Private)\n  Location:   Carstairs, AB\n  Distance:   91 km (address)\n  Listed:     N/A\n  Score:      0.7185\n  URL:        https://www.kijiji.ca/v-cars-trucks/guelph/2023-kia-carnival-lx-8-passenger-heated-seats/1740012583\n\n  Rank 21\n  2022 Kia Carnival Unknown\n  Trim tier:  Base (Tier 1)\n  Price:      $36,988  [No change noted]\n  Mileage:    62,094 km\n  Accidents:  Unknown\n  Trend:      Unchanged for 3 weeks\n  Seller:     Unknown (Private)\n  Location:   Carstairs, AB\n  Distance:   91 km (address)\n  Listed:     N/A\n  Score:      0.7273\n  URL:        https://www.kijiji.ca/v-cars-trucks/guelph/2022-kia-carnival-ex-leather-power-sliding-doors/1739877076\n\n  Rank 22\n  2022 Kia Carnival Unknown\n  Trim tier:  Base (Tier 1)\n  Price:      $35,988  [No change noted]\n  Mileage:    86,739 km\n  Accidents:  Unknown\n  Trend:      First seen this week\n  Seller:     Unknown (Private)\n  Location:   Carstairs, AB\n  Distance:   91 km (address)\n  Listed:     N/A\n  Score:      0.7429\n  URL:        https://www.kijiji.ca/v-cars-trucks/guelph/2022-kia-carnival-ex-leather-nav-360-camera/1740883945\n\n  Rank 23\n  2022 Kia Carnival Unknown\n  Trim tier:  Base (Tier 1)\n  Price:      $36,988  [No change noted]\n  Mileage:    91,503 km\n  Accidents:  Unknown\n  Trend:      Unchanged for 1 weeks\n  Seller:     Unknown (Private)\n  Location:   Carstairs, AB\n  Distance:   91 km (address)\n  Listed:     N/A\n  Score:      0.7616\n  URL:        https://www.kijiji.ca/v-cars-trucks/guelph/2022-kia-carnival-sx-leather-sunroof-cooled/1740471684\n\n  Rank 24\n  2023 Kia Carnival Unknown\n  Trim tier:  Base (Tier 1)\n  Price:      $32,402  [No change noted]\n  Mileage:    72,023 km\n  Accidents:  Unknown\n  Trend:      Unchanged for 2 weeks\n  Seller:     Unknown (Private)\n  Location:   Kamloops, BC\n  Distance:   757 km (address)\n  Listed:     N/A\n  Score:      0.8105\n  URL:        https://www.kijiji.ca/v-cars-trucks/victoria-bc/2023-kia-carnival-lx/1740200197\n\n  Archived: data/kia_carnival/kijiji/kia_carnival_kijiji_2026-07-21_17-20.csv\n  Latest:   data/kia_carnival/latest/kia_carnival_kijiji_latest.csv\n\nUpdating location list...\n\n  Location summary (Kijiji \u2014 kia_carnival):\n    Active cities: 44\n",
+  "validation_error": null,
+  "vehicle_key": "kia_carnival"
+}

@@ -1,0 +1,151 @@
+{
+  "expected_source_runs": 14,
+  "generated_at_utc": "2026-07-21T17:20:38+00:00",
+  "healthy_source_runs": 14,
+  "overall_status": "success",
+  "run_id": "29840838725",
+  "schema_version": 1,
+  "sources": [
+    {
+      "current_run": true,
+      "execution_status": "success",
+      "failure_reasons": [],
+      "healthy": true,
+      "row_count": 21,
+      "source": "autotrader",
+      "status_path": "data/ford_f350/run_status/autotrader_latest.json",
+      "vehicle_key": "ford_f350"
+    },
+    {
+      "current_run": true,
+      "execution_status": "success",
+      "failure_reasons": [],
+      "healthy": true,
+      "row_count": 22,
+      "source": "kijiji",
+      "status_path": "data/ford_f350/run_status/kijiji_latest.json",
+      "vehicle_key": "ford_f350"
+    },
+    {
+      "current_run": true,
+      "execution_status": "success",
+      "failure_reasons": [],
+      "healthy": true,
+      "row_count": 50,
+      "source": "autotrader",
+      "status_path": "data/ford_f150/run_status/autotrader_latest.json",
+      "vehicle_key": "ford_f150"
+    },
+    {
+      "current_run": true,
+      "execution_status": "success",
+      "failure_reasons": [],
+      "healthy": true,
+      "row_count": 50,
+      "source": "kijiji",
+      "status_path": "data/ford_f150/run_status/kijiji_latest.json",
+      "vehicle_key": "ford_f150"
+    },
+    {
+      "current_run": true,
+      "execution_status": "success",
+      "failure_reasons": [],
+      "healthy": true,
+      "row_count": 4,
+      "source": "autotrader",
+      "status_path": "data/ram_3500/run_status/autotrader_latest.json",
+      "vehicle_key": "ram_3500"
+    },
+    {
+      "current_run": true,
+      "execution_status": "success",
+      "failure_reasons": [],
+      "healthy": true,
+      "row_count": 14,
+      "source": "kijiji",
+      "status_path": "data/ram_3500/run_status/kijiji_latest.json",
+      "vehicle_key": "ram_3500"
+    },
+    {
+      "current_run": true,
+      "execution_status": "success",
+      "failure_reasons": [],
+      "healthy": true,
+      "row_count": 2,
+      "source": "autotrader",
+      "status_path": "data/toyota_tundra/run_status/autotrader_latest.json",
+      "vehicle_key": "toyota_tundra"
+    },
+    {
+      "current_run": true,
+      "execution_status": "success",
+      "failure_reasons": [],
+      "healthy": true,
+      "row_count": 4,
+      "source": "kijiji",
+      "status_path": "data/toyota_tundra/run_status/kijiji_latest.json",
+      "vehicle_key": "toyota_tundra"
+    },
+    {
+      "current_run": true,
+      "execution_status": "success",
+      "failure_reasons": [],
+      "healthy": true,
+      "row_count": 32,
+      "source": "autotrader",
+      "status_path": "data/subaru_forester/run_status/autotrader_latest.json",
+      "vehicle_key": "subaru_forester"
+    },
+    {
+      "current_run": true,
+      "execution_status": "success",
+      "failure_reasons": [],
+      "healthy": true,
+      "row_count": 50,
+      "source": "kijiji",
+      "status_path": "data/subaru_forester/run_status/kijiji_latest.json",
+      "vehicle_key": "subaru_forester"
+    },
+    {
+      "current_run": true,
+      "execution_status": "success",
+      "failure_reasons": [],
+      "healthy": true,
+      "row_count": 38,
+      "source": "autotrader",
+      "status_path": "data/honda_odyssey/run_status/autotrader_latest.json",
+      "vehicle_key": "honda_odyssey"
+    },
+    {
+      "current_run": true,
+      "execution_status": "success",
+      "failure_reasons": [],
+      "healthy": true,
+      "row_count": 50,
+      "source": "kijiji",
+      "status_path": "data/honda_odyssey/run_status/kijiji_latest.json",
+      "vehicle_key": "honda_odyssey"
+    },
+    {
+      "current_run": true,
+      "execution_status": "success",
+      "failure_reasons": [],
+      "healthy": true,
+      "row_count": 11,
+      "source": "autotrader",
+      "status_path": "data/kia_carnival/run_status/autotrader_latest.json",
+      "vehicle_key": "kia_carnival"
+    },
+    {
+      "current_run": true,
+      "execution_status": "success",
+      "failure_reasons": [],
+      "healthy": true,
+      "row_count": 24,
+      "source": "kijiji",
+      "status_path": "data/kia_carnival/run_status/kijiji_latest.json",
+      "vehicle_key": "kia_carnival"
+    }
+  ],
+  "unhealthy_source_runs": 0
+}
