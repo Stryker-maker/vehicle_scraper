@@ -1,9 +1,34 @@
 {
   "candidates": {},
   "zero_weeks": {
-    "Grande Prairie, AB": 7,
-    "Prince Albert, SK": 5,
-    "Kamloops, BC": 4,
-    "Kelowna, BC": 3
+    "Prince Albert, SK": 6,
+    "Kamloops, BC": 5,
+    "Kelowna, BC": 4,
+    "Fort Mcmurray, AB": 1,
+    "Lloydminster, AB": 1,
+    "Camrose, AB": 1,
+    "Lacombe, AB": 1,
+    "Ponoka, AB": 1,
+    "Sylvan Lake, AB": 1,
+    "Innisfail, AB": 1,
+    "Olds, AB": 1,
+    "Didsbury, AB": 1,
+    "Cochrane, AB": 1,
+    "Okotoks, AB": 1,
+    "High River, AB": 1,
+    "Drumheller, AB": 1,
+    "Stettler, AB": 1,
+    "Wainwright, AB": 1,
+    "Saskatoon, SK": 1,
+    "Swift Current, SK": 1,
+    "Carstairs, AB": 1,
+    "Lloydminster, SK": 1,
+    "Melfort, SK": 1,
+    "Strathmore, AB": 1,
+    "Tsuu T'Ina Nation, AB": 1,
+    "Vernon Bc, BC": 1,
+    "West Kelowna, BC": 1,
+    "Taber, AB": 1,
+    "Salmon Arm, BC": 1
   }
 }

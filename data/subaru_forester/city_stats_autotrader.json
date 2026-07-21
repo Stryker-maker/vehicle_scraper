@@ -3,12 +3,11 @@
     "St Albert, AB": 1,
     "Peace River, AB": 1,
     "Vernon, BC": 1,
-    "Nisku, AB": 1,
-    "Red Deer, AB": 1,
-    "Sherwood Park, AB": 2
+    "Nisku, AB": 2,
+    "Red Deer, AB": 2
   },
   "zero_weeks": {
     "Spruce Grove, AB": 2,
-    "Canmore, AB": 1
+    "Canmore, AB": 2
   }
 }

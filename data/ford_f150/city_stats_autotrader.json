@@ -5,15 +5,13 @@
     "Peace River, AB": 1,
     "Fort Saskatchewan, AB": 1,
     "Prince George, BC": 1,
-    "Kimberley, BC": 2,
-    "Hussar, AB": 2,
     "Canmore, AB": 2,
     "Cranbrook, BC": 2,
-    "Nelson, BC": 1
+    "Nelson, BC": 2,
+    "Taber, AB": 2,
+    "Blairmore, AB": 1
   },
   "zero_weeks": {
-    "Vernon, BC": 3,
-    "Rimbey, AB": 2,
-    "Innisfail, AB": 2
+    "Vernon, BC": 4
   }
 }
