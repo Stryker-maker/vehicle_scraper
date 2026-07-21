@@ -2,6 +2,8 @@ name: Weekly Vehicle Scrape
 
 on:
   pull_request:
+    paths-ignore:
+      - 'data/**'
   schedule:
     # Every Monday at 8:00 AM UTC (2:00 AM MDT)
     - cron: '0 8 * * 1'
@@ -55,7 +57,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install requests beautifulsoup4 geopy
 
-      - name: Collect AutoTrader and Kijiji data with status evidence
+      - name: Collect uncapped AutoTrader and Kijiji data with status evidence
         env:
           ORS_API_KEY: ${{ secrets.ORS_API_KEY }}
         run: |
@@ -73,6 +75,7 @@ jobs:
             python phase1_pipeline.py run-source \
               --source autotrader \
               --config "$config" \
+              --timeout-seconds 4500 \
               -- python scraper.py --config "$config"
           done
 
@@ -80,6 +83,7 @@ jobs:
             python phase1_pipeline.py run-source \
               --source kijiji \
               --config "$config" \
+              --timeout-seconds 4500 \
               -- python kijiji_scraper.py --config "$config"
           done
 
@@ -110,8 +114,8 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          # Source scrapers may alter config files, but Phase 1 does not persist
-          # automatic search-policy changes. Only collected data and evidence are committed.
+          # Collectors run against temporary uncapped configs. Approved repository
+          # configuration remains unchanged; only data and evidence are committed.
           git add data/
           git diff --staged --quiet || git commit -m "Weekly scrape $(date +'%Y-%m-%d')"
           git push
