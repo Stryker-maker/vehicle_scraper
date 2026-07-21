@@ -57,7 +57,31 @@ with out.open('w',newline='',encoding='utf-8') as h:
         self.assertEqual(self.config_path.read_bytes(), original)
         self.assertTrue(status["config_isolated"])
 
-    def test_stale_output_is_degraded(self):
+    def test_kijiji_runtime_records_distance_bypass_and_3000_rows(self):
+        script = self.root / "kijiji_collector.py"
+        script.write_text("""
+import argparse,csv,json,os
+from pathlib import Path
+p=argparse.ArgumentParser();p.add_argument('--config',required=True);a=p.parse_args()
+assert os.environ['PHASE1_KIJIJI_DISTANCE_DISABLED']=='1'
+cfg=json.loads(Path(a.config).read_text())
+out=Path('data')/cfg['vehicle_key']/'latest'/f"{cfg['vehicle_key']}_kijiji_latest.csv";out.parent.mkdir(parents=True,exist_ok=True)
+f=['listing_id','url','source','price','mileage','location','distance_km']
+with out.open('w',newline='',encoding='utf-8') as h:
+ w=csv.DictWriter(h,fieldnames=f);w.writeheader()
+ for i in range(3000): w.writerow({'listing_id':str(i),'url':f'https://www.kijiji.ca/v-cars-trucks/calgary/x/{i}','source':'Kijiji','price':'1','mileage':'1','location':'Search Origin','distance_km':''})
+""", encoding="utf-8")
+        status = run_source(
+            root=self.root, source="kijiji", config_path=self.config_path,
+            command=[sys.executable, str(script), "--config", "config_test.json"],
+            run_id="run-1",
+        )
+        self.assertEqual(status["current_row_count"], 3000)
+        self.assertTrue(status["distance_processing_disabled"])
+        self.assertTrue(status["distance_filter_disabled"])
+        self.assertTrue(status["legacy_source_ranking_disabled"])
+
+    def test_stale_output_is_degraded_and_not_current(self):
         out = expected_output_path(self.root, self.config, "autotrader")
         out.parent.mkdir(parents=True)
         out.write_text("listing_id,url,source,price,mileage,location,distance_km\n1,u,s,1,1,a,1\n")
@@ -67,6 +91,9 @@ with out.open('w',newline='',encoding='utf-8') as h:
         )
         self.assertEqual(status["execution_status"], "degraded")
         self.assertIn("no_fresh_output", status["failure_reasons"])
+        self.assertEqual(status["current_row_count"], 0)
+        self.assertEqual(status["stale_row_count"], 1)
+        self.assertEqual(status["data_quality_status"], "not_evaluated_stale_output")
 
     def test_failure_is_recorded(self):
         status = run_source(
