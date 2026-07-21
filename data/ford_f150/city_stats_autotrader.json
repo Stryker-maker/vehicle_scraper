@@ -6,16 +6,14 @@
     "Fort Saskatchewan, AB": 1,
     "Prince George, BC": 1,
     "Kimberley, BC": 2,
-    "Blairmore, AB": 2,
-    "Vegreville, AB": 2,
-    "Taber, AB": 2,
-    "Hussar, AB": 1,
-    "Canmore, AB": 1,
-    "Cranbrook, BC": 1
+    "Hussar, AB": 2,
+    "Canmore, AB": 2,
+    "Cranbrook, BC": 2,
+    "Nelson, BC": 1
   },
   "zero_weeks": {
-    "Vernon, BC": 2,
-    "Rimbey, AB": 1,
-    "Innisfail, AB": 1
+    "Vernon, BC": 3,
+    "Rimbey, AB": 2,
+    "Innisfail, AB": 2
   }
 }

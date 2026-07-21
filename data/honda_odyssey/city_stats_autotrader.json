@@ -1,34 +1,9 @@
 {
   "candidates": {},
   "zero_weeks": {
-    "Fort Mcmurray, AB": 7,
-    "Lloydminster, AB": 7,
-    "Camrose, AB": 7,
-    "Lacombe, AB": 7,
-    "Ponoka, AB": 7,
-    "Sylvan Lake, AB": 7,
-    "Innisfail, AB": 7,
-    "Olds, AB": 7,
-    "Didsbury, AB": 7,
-    "Cochrane, AB": 7,
-    "Okotoks, AB": 7,
-    "High River, AB": 7,
-    "Drumheller, AB": 7,
-    "Stettler, AB": 7,
-    "Wainwright, AB": 7,
-    "Swift Current, SK": 7,
-    "Carstairs, AB": 7,
-    "Lloydminster, SK": 7,
-    "Melfort, SK": 7,
-    "Strathmore, AB": 7,
-    "Tsuu T'Ina Nation, AB": 7,
-    "Vernon Bc, BC": 7,
-    "West Kelowna, BC": 7,
-    "Taber, AB": 7,
-    "Salmon Arm, BC": 7,
-    "Grande Prairie, AB": 6,
-    "Prince Albert, SK": 4,
-    "Kamloops, BC": 3,
-    "Kelowna, BC": 2
+    "Grande Prairie, AB": 7,
+    "Prince Albert, SK": 5,
+    "Kamloops, BC": 4,
+    "Kelowna, BC": 3
   }
 }

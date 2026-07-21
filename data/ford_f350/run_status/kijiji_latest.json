@@ -1,12 +1,17 @@
 {
+  "collection_status": "success",
   "command": [
     "python",
     "kijiji_scraper.py",
     "--config",
     "config_f350.json"
   ],
-  "completed_at_utc": "2026-07-21T15:42:46+00:00",
+  "completed_at_utc": "2026-07-21T19:01:40+00:00",
+  "config_isolated": true,
   "config_path": "config_f350.json",
+  "configured_max_results": 50,
+  "data_quality_status": "warnings_present",
+  "effective_max_results": "unbounded",
   "execution_status": "success",
   "exit_code": 0,
   "expected_output": "data/ford_f350/latest/ford_f350_kijiji_latest.csv",
@@ -14,14 +19,24 @@
   "missing_columns": [],
   "output_exists": true,
   "output_updated_this_run": true,
-  "row_count": 22,
-  "run_id": "29840838725",
+  "quality_warning_count": 20,
+  "quality_warning_rows": 20,
+  "quality_warning_summary": {
+    "unverified_kijiji_location": 20
+  },
+  "row_cap_disabled": true,
+  "row_count": 20,
+  "run_id": "29855665789",
+  "same_day_history_duplicates_removed_after_run": 0,
+  "same_day_history_removed_before_run": 22,
   "schema_valid": true,
-  "schema_version": 1,
+  "schema_version": 2,
   "source": "kijiji",
-  "started_at_utc": "2026-07-21T15:18:35+00:00",
+  "started_at_utc": "2026-07-21T18:36:39+00:00",
   "stderr_tail": "",
-  "stdout_tail": "N/A\n  Score:      0.5794\n  URL:        https://www.kijiji.ca/v-cars-trucks/kamloops/well-kept-2020-ford-f350-6-7l-diesel-dually-xlt/1740180304\n\n  Rank 15\n  2022 Ford F-350 fx4\n  Trim tier:  Premium (Tier 3)\n  Price:      $59,990  [No change noted]\n  Mileage:    59,505 km\n  Accidents:  Unknown\n  Trend:      Down $5 over 2 weeks\n  Seller:     Unknown (Dealer)\n  Location:   Claresholm, AB\n  Distance:   274 km (address)\n  Listed:     N/A\n  Score:      0.5819\n  URL:        https://www.kijiji.ca/v-cars-trucks/lloydminster-ab/2022-ford-f-350-xlt-premium-fx4-6-7l-diesel/1736861477\n\n  Rank 16\n  2020 Ford F-350 fx4\n  Trim tier:  Premium (Tier 3)\n  Price:      $54,900  [No change noted]\n  Mileage:    198,000 km\n  Accidents:  Unknown\n  Trend:      Unchanged for 11 weeks\n  Seller:     Unknown (Dealer)\n  Location:   Edmonton, AB\n  Distance:   154 km (address)\n  Listed:     N/A\n  Score:      0.5855\n  URL:        https://www.kijiji.ca/v-cars-trucks/edmonton/2020-ford-f-350-fx4-offroad-package-4x4-6-7l-diesel/1724509335\n\n  Rank 17\n  2020 Ford F-350 lariat\n  Trim tier:  Premium (Tier 3)\n  Price:      $41,995  [No change noted]\n  Mileage:    351,358 km\n  Accidents:  Unknown\n  Trend:      Down $1,000 over 3 weeks\n  Seller:     Unknown (Private)\n  Location:   Saskatoon, SK\n  Distance:   538 km (address)\n  Listed:     N/A\n  Score:      0.6276\n  URL:        https://www.kijiji.ca/v-cars-trucks/saskatoon/2020-ford-super-duty-f-350-drw-lariat-crew-cab-6-7l-v8-diesel/1739969913\n\n  Rank 18\n  2020 Ford F-350 xlt\n  Trim tier:  Mid (Tier 2)\n  Price:      $59,995  [No change noted]\n  Mileage:    86,440 km\n  Accidents:  Unknown\n  Trend:      First seen this week\n  Seller:     Unknown (Dealer)\n  Location:   Calgary, AB\n  Distance:   149 km (address)\n  Listed:     N/A\n  Score:      0.6465\n  URL:        https://www.kijiji.ca/v-cars-trucks/calgary/2020-ford-f-350-xlt-value-613a-6-7l-powerstroke-diesel/1740698493\n\n  Rank 19\n  2017 Ford F-350 xlt\n  Trim tier:  Mid (Tier 2)\n  Price:      $55,990  [No change noted]\n  Mileage:    170,658 km\n  Accidents:  Unknown\n  Trend:      Unchanged for 2 weeks\n  Seller:     Unknown (Dealer)\n  Location:   Calgary, AB\n  Distance:   149 km (address)\n  Listed:     N/A\n  Score:      0.655\n  URL:        https://www.kijiji.ca/v-cars-trucks/calgary/2017-ford-super-duty-f-350-srw-xlt-160-wheel-base-6-7-l/1740150969\n\n  Rank 20\n  2017 Ford F-350 xlt\n  Trim tier:  Mid (Tier 2)\n  Price:      $35,799  [No change noted]\n  Mileage:    295,612 km\n  Accidents:  Unknown\n  Trend:      Unchanged for 11 weeks\n  Seller:     Unknown (Unknown)\n  Location:   Regina, SK\n  Distance:   786 km (address)\n  Listed:     N/A\n  Score:      0.6705\n  URL:        https://www.kijiji.ca/v-cars-trucks/winnipeg/2017-ford-super-duty-f-350-srw-xlt-6-7l-powerstroke-bc-truck/1729154956\n\n  Rank 21\n  2017 Ford F-350 Unknown\n  Trim tier:  Base (Tier 1)\n  Price:      $43,999  [No change noted]\n  Mileage:    249,322 km\n  Accidents:  Unknown\n  Trend:      Unchanged for 2 weeks\n  Seller:     Unknown (Dealer)\n  Location:   Claresholm, AB\n  Distance:   274 km (address)\n  Listed:     N/A\n  Score:      0.6931\n  URL:        https://www.kijiji.ca/v-cars-trucks/mississauga-peel-region/2017-ford-f-350-super-duty-8ft-long-box-6-7l-diesel-matching-c/1740057476\n\n  Rank 22\n  2018 Ford F-350 Unknown\n  Trim tier:  Base (Tier 1)\n  Price:      $43,995  [No change noted]\n  Mileage:    274,000 km\n  Accidents:  Unknown\n  Trend:      Unchanged for 2 weeks\n  Seller:     Unknown (Private)\n  Location:   Claresholm, AB\n  Distance:   274 km (address)\n  Listed:     N/A\n  Score:      0.7054\n  URL:        https://www.kijiji.ca/v-cars-trucks/laval-rive-nord/2018-ford-f-350-vanair-air-n-arc-250-diesel-6-7l-4x4-marand/1740429976\n\n  Archived: data/ford_f350/kijiji/ford_f350_kijiji_2026-07-21_15-42.csv\n  Latest:   data/ford_f350/latest/ford_f350_kijiji_latest.csv\n\nUpdating location list...\n  [AUTO-REMOVE] 'Prince George, BC' removed after 8 empty weeks\n\n  Location summary (Kijiji \u2014 ford_f350):\n    Active cities: 9\n",
+  "stdout_tail": "  N/A\n  Score:      0.5635\n  URL:        https://www.kijiji.ca/v-cars-trucks/mississauga-peel-region/2018-ford-super-duty-f-350-srw-xlt-6-7-litre-power-stroke-v8-tur/1739048377\n\n  Rank 13\n  2020 Ford F-350 xlt\n  Trim tier:  Mid (Tier 2)\n  Price:      $39,500  [No change noted]\n  Mileage:    246,940 km\n  Accidents:  Unknown\n  Trend:      Unchanged for 3 weeks\n  Seller:     Unknown (Private)\n  Location:   Claresholm, AB\n  Distance:   274 km (address)\n  Listed:     N/A\n  Score:      0.5794\n  URL:        https://www.kijiji.ca/v-cars-trucks/kamloops/well-kept-2020-ford-f350-6-7l-diesel-dually-xlt/1740180304\n\n  Rank 14\n  2022 Ford F-350 fx4\n  Trim tier:  Premium (Tier 3)\n  Price:      $59,990  [No change noted]\n  Mileage:    59,505 km\n  Accidents:  Unknown\n  Trend:      Down $5 over 2 weeks\n  Seller:     Unknown (Dealer)\n  Location:   Claresholm, AB\n  Distance:   274 km (address)\n  Listed:     N/A\n  Score:      0.5819\n  URL:        https://www.kijiji.ca/v-cars-trucks/lloydminster-ab/2022-ford-f-350-xlt-premium-fx4-6-7l-diesel/1736861477\n\n  Rank 15\n  2020 Ford F-350 fx4\n  Trim tier:  Premium (Tier 3)\n  Price:      $54,900  [No change noted]\n  Mileage:    198,000 km\n  Accidents:  Unknown\n  Trend:      Unchanged for 11 weeks\n  Seller:     Unknown (Dealer)\n  Location:   Claresholm, AB\n  Distance:   274 km (address)\n  Listed:     N/A\n  Score:      0.6084\n  URL:        https://www.kijiji.ca/v-cars-trucks/edmonton/2020-ford-f-350-fx4-offroad-package-4x4-6-7l-diesel/1724509335\n\n  Rank 16\n  2020 Ford F-350 lariat\n  Trim tier:  Premium (Tier 3)\n  Price:      $41,995  [No change noted]\n  Mileage:    351,358 km\n  Accidents:  Unknown\n  Trend:      Down $1,000 over 3 weeks\n  Seller:     Unknown (Private)\n  Location:   Saskatoon, SK\n  Distance:   538 km (address)\n  Listed:     N/A\n  Score:      0.6276\n  URL:        https://www.kijiji.ca/v-cars-trucks/saskatoon/2020-ford-super-duty-f-350-drw-lariat-crew-cab-6-7l-v8-diesel/1739969913\n\n  Rank 17\n  2020 Ford F-350 xlt\n  Trim tier:  Mid (Tier 2)\n  Price:      $59,995  [No change noted]\n  Mileage:    86,440 km\n  Accidents:  Unknown\n  Trend:      First seen this week\n  Seller:     Unknown (Dealer)\n  Location:   Calgary, AB\n  Distance:   149 km (address)\n  Listed:     N/A\n  Score:      0.6465\n  URL:        https://www.kijiji.ca/v-cars-trucks/calgary/2020-ford-f-350-xlt-value-613a-6-7l-powerstroke-diesel/1740698493\n\n  Rank 18\n  2017 Ford F-350 xlt\n  Trim tier:  Mid (Tier 2)\n  Price:      $55,990  [No change noted]\n  Mileage:    170,658 km\n  Accidents:  Unknown\n  Trend:      Unchanged for 2 weeks\n  Seller:     Unknown (Dealer)\n  Location:   Calgary, AB\n  Distance:   149 km (address)\n  Listed:     N/A\n  Score:      0.655\n  URL:        https://www.kijiji.ca/v-cars-trucks/calgary/2017-ford-super-duty-f-350-srw-xlt-160-wheel-base-6-7-l/1740150969\n\n  Rank 19\n  2017 Ford F-350 xlt\n  Trim tier:  Mid (Tier 2)\n  Price:      $35,799  [No change noted]\n  Mileage:    295,612 km\n  Accidents:  Unknown\n  Trend:      Unchanged for 11 weeks\n  Seller:     Unknown (Unknown)\n  Location:   Regina, SK\n  Distance:   786 km (address)\n  Listed:     N/A\n  Score:      0.6705\n  URL:        https://www.kijiji.ca/v-cars-trucks/winnipeg/2017-ford-super-duty-f-350-srw-xlt-6-7l-powerstroke-bc-truck/1729154956\n\n  Rank 20\n  2018 Ford F-350 Unknown\n  Trim tier:  Base (Tier 1)\n  Price:      $43,995  [No change noted]\n  Mileage:    274,000 km\n  Accidents:  Unknown\n  Trend:      Unchanged for 2 weeks\n  Seller:     Unknown (Private)\n  Location:   Claresholm, AB\n  Distance:   274 km (address)\n  Listed:     N/A\n  Score:      0.7054\n  URL:        https://www.kijiji.ca/v-cars-trucks/laval-rive-nord/2018-ford-f-350-vanair-air-n-arc-250-diesel-6-7l-4x4-marand/1740429976\n\n  Archived: data/ford_f350/kijiji/ford_f350_kijiji_2026-07-21_19-01.csv\n  Latest:   data/ford_f350/latest/ford_f350_kijiji_latest.csv\n\nUpdating location list...\n  [AUTO-REMOVE] 'Maple Creek, SK' removed after 8 empty weeks\n\n  Location summary (Kijiji \u2014 ford_f350):\n    Active cities: 9\n",
+  "timed_out": false,
+  "timeout_seconds": 4500.0,
   "validation_error": null,
   "vehicle_key": "ford_f350"
 }

@@ -1,12 +1,17 @@
 {
+  "collection_status": "success",
   "command": [
     "python",
     "kijiji_scraper.py",
     "--config",
     "config_forester.json"
   ],
-  "completed_at_utc": "2026-07-21T17:03:45+00:00",
+  "completed_at_utc": "2026-07-21T20:40:29+00:00",
+  "config_isolated": true,
   "config_path": "config_forester.json",
+  "configured_max_results": 50,
+  "data_quality_status": "warnings_present",
+  "effective_max_results": "unbounded",
   "execution_status": "success",
   "exit_code": 0,
   "expected_output": "data/subaru_forester/latest/subaru_forester_kijiji_latest.csv",
@@ -14,14 +19,24 @@
   "missing_columns": [],
   "output_exists": true,
   "output_updated_this_run": true,
-  "row_count": 50,
-  "run_id": "29840838725",
+  "quality_warning_count": 115,
+  "quality_warning_rows": 115,
+  "quality_warning_summary": {
+    "unverified_kijiji_location": 115
+  },
+  "row_cap_disabled": true,
+  "row_count": 115,
+  "run_id": "29855665789",
+  "same_day_history_duplicates_removed_after_run": 0,
+  "same_day_history_removed_before_run": 98,
   "schema_valid": true,
-  "schema_version": 1,
+  "schema_version": 2,
   "source": "kijiji",
-  "started_at_utc": "2026-07-21T16:51:20+00:00",
+  "started_at_utc": "2026-07-21T20:29:34+00:00",
   "stderr_tail": "",
-  "stdout_tail": "\n  Distance:   292 km (address)\n  Listed:     N/A\n  Score:      0.5341\n  URL:        https://www.kijiji.ca/v-cars-trucks/bridgewater/2020-subaru-forester-sport/1739597463\n\n  Rank 43\n  2020 Subaru Forester limited\n  Trim tier:  Mid (Tier 2)\n  Price:      $28,788  [No change noted]\n  Mileage:    77,817 km\n  Accidents:  No accidents reported\n  Trend:      Down $100 over 3 weeks\n  Seller:     Unknown (Private)\n  Location:   Taber, AB\n  Distance:   292 km (address)\n  Listed:     N/A\n  Score:      0.5343\n  URL:        https://www.kijiji.ca/v-cars-trucks/mississauga-peel-region/2020-subaru-forester-limited-limited-2-set-rims-tires-cle/1739827880\n\n  Rank 44\n  2023 Subaru Forester limited\n  Trim tier:  Mid (Tier 2)\n  Price:      $29,688  [No change noted]\n  Mileage:    69,710 km\n  Accidents:  Unknown\n  Trend:      Down $200 over 1 weeks\n  Seller:     Unknown (Private)\n  Location:   Taber, AB\n  Distance:   292 km (address)\n  Listed:     N/A\n  Score:      0.5376\n  URL:        https://www.kijiji.ca/v-cars-trucks/mississauga-peel-region/2023-subaru-forester-limited-limited-awd-1-owner-leather/1740422757\n\n  Rank 45\n  2021 Subaru Forester Unknown\n  Trim tier:  Base (Tier 1)\n  Price:      $24,998  [No change noted]\n  Mileage:    48,009 km\n  Accidents:  Unknown\n  Trend:      Unchanged for 3 weeks\n  Seller:     Unknown (Private)\n  Location:   Taber, AB\n  Distance:   292 km (address)\n  Listed:     N/A\n  Score:      0.5389\n  URL:        https://www.kijiji.ca/v-cars-trucks/annapolis-valley/2021-subaru-forester-priced-to-move-backup-cam-call-now/1739685053\n\n  Rank 46\n  2022 Subaru Forester Unknown\n  Trim tier:  Base (Tier 1)\n  Price:      $24,995  [No change noted]\n  Mileage:    49,187 km\n  Accidents:  Unknown\n  Trend:      Down $1,000 over 10 weeks\n  Seller:     Unknown (Private)\n  Location:   Taber, AB\n  Distance:   292 km (address)\n  Listed:     N/A\n  Score:      0.5399\n  URL:        https://www.kijiji.ca/v-cars-trucks/longueuil-rive-sud/2022-subaru-forester-2-5l-bancs-chauffants-carplay/1730092326\n\n  Rank 47\n  2021 Subaru Forester Unknown\n  Trim tier:  Base (Tier 1)\n  Price:      $24,998  [No change noted]\n  Mileage:    80,534 km\n  Accidents:  Unknown\n  Trend:      Unchanged for 10 weeks\n  Seller:     Unknown (Dealer)\n  Location:   Calgary, AB\n  Distance:   149 km (address)\n  Listed:     N/A\n  Score:      0.5403\n  URL:        https://www.kijiji.ca/v-cars-trucks/calgary/2021-subaru-forester-premier/1736516658\n\n  Rank 48\n  2019 Subaru Forester limited\n  Trim tier:  Mid (Tier 2)\n  Price:      $21,995  [No change noted]\n  Mileage:    174,000 km\n  Accidents:  Unknown\n  Trend:      Unchanged for 10 weeks\n  Seller:     Unknown (Private)\n  Location:   Taber, AB\n  Distance:   292 km (address)\n  Listed:     N/A\n  Score:      0.5403\n  URL:        https://www.kijiji.ca/v-cars-trucks/fredericton/2019-subaru-forester-limited/1733311836\n\n  Rank 49\n  2019 Subaru Forester convenience\n  Trim tier:  Base (Tier 1)\n  Price:      $15,995  [No change noted]\n  Mileage:    169,000 km\n  Accidents:  Unknown\n  Trend:      Unchanged for 7 weeks\n  Seller:     Unknown (Dealer)\n  Location:   Taber, AB\n  Distance:   292 km (address)\n  Listed:     N/A\n  Score:      0.5411\n  URL:        https://www.kijiji.ca/v-cars-trucks/fredericton/2019-subaru-forester-2-5i-convenience-heated-seats-backup-ca/1738599500\n\n  Rank 50\n  2019 Subaru Forester convenience\n  Trim tier:  Base (Tier 1)\n  Price:      $21,190  [No change noted]\n  Mileage:    102,401 km\n  Accidents:  Unknown\n  Trend:      Down $200 over 1 weeks\n  Seller:     Unknown (Private)\n  Location:   Taber, AB\n  Distance:   292 km (address)\n  Listed:     N/A\n  Score:      0.5427\n  URL:        https://www.kijiji.ca/v-cars-trucks/bedford/2019-subaru-forester-2-5i-convenience/1738419499\n\n  Archived: data/subaru_forester/kijiji/subaru_forester_kijiji_2026-07-21_17-03.csv\n  Latest:   data/subaru_forester/latest/subaru_forester_kijiji_latest.csv\n\nUpdating location list...\n\n  Location summary (Kijiji \u2014 subaru_forester):\n    Active cities: 5\n",
+  "stdout_tail": "SK\n  Distance:   538 km (address)\n  Listed:     N/A\n  Score:      0.6331\n  URL:        https://www.kijiji.ca/v-cars-trucks/saskatoon/2022-subaru-forester-sport-awd-heated-seats-wheel/1740704458\n\n  Rank 108\n  2024 Subaru Forester Unknown\n  Trim tier:  Base (Tier 1)\n  Price:      $35,495  [No change noted]\n  Mileage:    31,251 km\n  Accidents:  Unknown\n  Trend:      Unchanged for 3 weeks\n  Seller:     Unknown (Private)\n  Location:   Canmore, AB\n  Distance:   242 km (address)\n  Listed:     N/A\n  Score:      0.6366\n  URL:        https://www.kijiji.ca/v-cars-trucks/longueuil-rive-sud/2024-subaru-forester/1739723337\n\n  Rank 109\n  2023 Subaru Forester Unknown\n  Trim tier:  Base (Tier 1)\n  Price:      $37,733  [No change noted]\n  Mileage:    16,316 km\n  Accidents:  Unknown\n  Trend:      Unchanged for 1 weeks\n  Seller:     Unknown (Private)\n  Location:   Canmore, AB\n  Distance:   242 km (address)\n  Listed:     N/A\n  Score:      0.6494\n  URL:        https://www.kijiji.ca/v-cars-trucks/thunder-bay/2023-subaru-forester-premier/1740420420\n\n  Rank 110\n  2024 Subaru Forester sport\n  Trim tier:  Mid (Tier 2)\n  Price:      $36,000  [No change noted]\n  Mileage:    15,612 km\n  Accidents:  Unknown\n  Trend:      Down $1,498 over 10 weeks\n  Seller:     Unknown (Private)\n  Location:   Regina, SK\n  Distance:   786 km (address)\n  Listed:     N/A\n  Score:      0.6574\n  URL:        https://www.kijiji.ca/v-cars-trucks/winnipeg/2024-subaru-forester-sport-local-one-owner-smartph/1734645901\n\n  Rank 111\n  2022 Subaru Forester Unknown\n  Trim tier:  Base (Tier 1)\n  Price:      $36,495  [No change noted]\n  Mileage:    66,196 km\n  Accidents:  Unknown\n  Trend:      Down $1,500 over 2 weeks\n  Seller:     Unknown (Unknown)\n  Location:   Calgary, AB\n  Distance:   149 km (address)\n  Listed:     N/A\n  Score:      0.6613\n  URL:        https://www.kijiji.ca/v-cars-trucks/calgary/2022-subaru-forester-premier-cvt-one-owner/1740097843\n\n  Rank 112\n  2024 Subaru Forester Unknown\n  Trim tier:  Base (Tier 1)\n  Price:      $38,988  [No change noted]\n  Mileage:    38,623 km\n  Accidents:  No accidents reported\n  Trend:      Up $100 over 3 weeks\n  Seller:     Unknown (Private)\n  Location:   Canmore, AB\n  Distance:   242 km (address)\n  Listed:     N/A\n  Score:      0.6837\n  URL:        https://www.kijiji.ca/v-cars-trucks/mississauga-peel-region/2024-subaru-forester-premier-premier-awd-1owner-clean-carfa/1739404982\n\n  Rank 113\n  2024 Subaru Forester Unknown\n  Trim tier:  Base (Tier 1)\n  Price:      $42,888  [No change noted]\n  Mileage:    11,706 km\n  Accidents:  No accidents reported\n  Trend:      Unchanged for 1 weeks\n  Seller:     Unknown (Private)\n  Location:   Canmore, AB\n  Distance:   242 km (address)\n  Listed:     N/A\n  Score:      0.7052\n  URL:        https://www.kijiji.ca/v-cars-trucks/mississauga-peel-region/2024-subaru-forester-premier-premier-clean-carfax-1owner/1740471600\n\n  Rank 114\n  2022 Subaru Forester Unknown\n  Trim tier:  Base (Tier 1)\n  Price:      $24,995  [No change noted]\n  Mileage:    140,000 km\n  Accidents:  Unknown\n  Trend:      Unchanged for 10 weeks\n  Seller:     Unknown (Private)\n  Location:   Regina, SK\n  Distance:   786 km (address)\n  Listed:     N/A\n  Score:      0.7144\n  URL:        https://www.kijiji.ca/v-cars-trucks/winnipeg/2022-subaru-forester-cvt/1735016745\n\n  Rank 115\n  2024 Subaru Forester Unknown\n  Trim tier:  Base (Tier 1)\n  Price:      $42,991  [No change noted]\n  Mileage:    16,663 km\n  Accidents:  Unknown\n  Trend:      Up $991 over 10 weeks\n  Seller:     Unknown (Private)\n  Location:   Regina, SK\n  Distance:   786 km (address)\n  Listed:     N/A\n  Score:      0.8146\n  URL:        https://www.kijiji.ca/v-cars-trucks/winnipeg/2024-subaru-forester-premier-navigation-two-tone-leather/1737248552\n\n  Archived: data/subaru_forester/kijiji/subaru_forester_kijiji_2026-07-21_20-40.csv\n  Latest:   data/subaru_forester/latest/subaru_forester_kijiji_latest.csv\n\nUpdating location list...\n\n  Location summary (Kijiji \u2014 subaru_forester):\n    Active cities: 6\n",
+  "timed_out": false,
+  "timeout_seconds": 4500.0,
   "validation_error": null,
   "vehicle_key": "subaru_forester"
 }
