@@ -30,7 +30,15 @@ jobs:
           python-version: '3.11'
 
       - name: Compile Python sources
-        run: python -m py_compile phase1_pipeline.py scraper.py kijiji_scraper.py merge.py
+        run: >-
+          python -m py_compile
+          phase1_common.py
+          phase1_runtime.py
+          phase1_reporting.py
+          phase1_pipeline.py
+          scraper.py
+          kijiji_scraper.py
+          merge.py
 
       - name: Run structured tests
         run: python -m unittest discover -s tests -v
