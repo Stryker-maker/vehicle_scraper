@@ -1,10 +1,10 @@
-"""Compatibility entry point for the direct AutoTrader adapter.
+"""Compatibility entry point for governed AutoTrader collection.
 
-The active workflow calls ``autotrader_run.py``. This module remains only so older
-manual commands fail forward into the governed schema-v2 adapter rather than the
-retired ranking/config-mutation implementation.
+The active workflow calls ``autotrader_run.py`` directly. Older manual commands that
+still invoke ``scraper.py`` are forwarded through the same bounded runtime, source
+status, and canonical-evidence path rather than bypassing those controls.
 """
-from autotrader_adapter import main
+from autotrader_run import main
 
 
 if __name__ == "__main__":
