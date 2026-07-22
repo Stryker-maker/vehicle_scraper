@@ -15,7 +15,7 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertNotIn("paths-ignore", self.workflow)
         self.assertIn("acknowledge-generated-data", self.workflow)
         self.assertIn("github.actor == 'github-actions[bot]'", self.workflow)
-        self.assertIn("phase1_kijiji_runner.py --config", self.workflow)
+        self.assertNotIn("phase1_kijiji_runner.py", self.workflow)
         self.assertIn("--timeout-seconds 4500", self.workflow)
 
     def test_full_workflow_keeps_authoritative_registry_plan(self):
@@ -56,6 +56,17 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertNotIn("python scraper.py --config", self.workflow)
         self.assertIn("direct_schema_v2", self.workflow)
         self.assertIn("pagination_complete", self.workflow)
+
+    def test_kijiji_uses_direct_adapter_runtime(self):
+        self.assertIn("kijiji_run.py", self.workflow)
+        self.assertIn("kijiji_adapter.py", self.workflow)
+        self.assertIn("kijiji_canonical.py", self.workflow)
+        self.assertIn("kijiji_locations.py", self.workflow)
+        self.assertIn("kijiji_history.py", self.workflow)
+        self.assertNotIn("phase1_kijiji_runner.py", self.workflow)
+        self.assertNotIn("python kijiji_scraper.py --config", self.workflow)
+        self.assertIn("location_registry_version", self.workflow)
+        self.assertIn("query_origin_never_location", self.workflow)
 
     def test_pull_requests_do_not_run_collectors(self):
         self.assertIn("if: github.event_name != 'pull_request'", self.workflow)
