@@ -72,10 +72,10 @@ class VehicleConfigTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "unsupported field"):
             validate_vehicle_config(config)
 
-    def test_rejects_duplicate_locations(self):
+    def test_rejects_duplicate_locations_case_insensitively(self):
         config = config_fixture()
         config["sources"]["kijiji"]["search_locations"] = [
-            "Edmonton, AB", "Edmonton, AB"
+            "Edmonton, AB", "EDMONTON, AB"
         ]
         with self.assertRaisesRegex(ValueError, "duplicate"):
             validate_vehicle_config(config)
@@ -84,6 +84,12 @@ class VehicleConfigTests(unittest.TestCase):
         config = config_fixture()
         config["sources"]["autotrader"]["search_locations"] = ["Calgary Alberta"]
         with self.assertRaisesRegex(ValueError, "City, PROVINCE"):
+            validate_vehicle_config(config)
+
+    def test_rejects_repeated_province_in_city_name(self):
+        config = config_fixture()
+        config["sources"]["autotrader"]["search_locations"] = ["Vernon Bc, BC"]
+        with self.assertRaisesRegex(ValueError, "repeats the province"):
             validate_vehicle_config(config)
 
     def test_rejects_invalid_ranges_and_coordinates(self):
