@@ -8,8 +8,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from canonical_evidence import build_canonical_evidence
 from phase1_pipeline import (
-    MANUAL_REVIEW_FIELDS, build_manual_review, collect_health,
-    expected_output_path, source_status_path, write_json,
+    MANUAL_REVIEW_FIELDS, _raise_for_canonical_review_exclusions,
+    build_manual_review, collect_health, expected_output_path,
+    source_status_path, write_json,
 )
 
 FIELDS=["rank","year","make","model","trim","trim_tier","price","price_history","trend","weeks_tracked","price_first_seen","price_last_week","price_change_week","price_change_total","mileage","engine","fuel","accident_flag","days_on_market","dealer","seller_type","dealer_address","location","distance_km","distance_method","listing_id","url_region_hint","url_region_status","url","score","source"]
@@ -150,7 +151,7 @@ class ReportingTests(unittest.TestCase):
         self.assertEqual(report["rejected_record_count"], 0)
         self.assertEqual(report["parse_failure_count"], 0)
 
-    def test_evidence_run_mismatch_excludes_source(self):
+    def test_evidence_run_mismatch_excludes_source_and_cli_guard_fails(self):
         self.success("autotrader")
         status_path = source_status_path(self.root, self.config, "autotrader")
         status = json.loads(status_path.read_text())
@@ -158,14 +159,17 @@ class ReportingTests(unittest.TestCase):
         line = json.loads(accepted_path.read_text().splitlines()[0])
         line["run_id"] = "other-run"
         accepted_path.write_text(json.dumps(line) + "\n")
-        result = build_manual_review(
+        summary = build_manual_review(
             root=self.root, config_paths=[self.config_path], run_id="run-1"
-        )["vehicles"][0]
+        )
+        result = summary["vehicles"][0]
         self.assertEqual(result["included_sources"], [])
         self.assertEqual(
             result["excluded_sources"]["autotrader"],
             "accepted_evidence_run_id_mismatch",
         )
+        with self.assertRaisesRegex(RuntimeError, "Canonical evidence integrity"):
+            _raise_for_canonical_review_exclusions(summary)
 
 
 if __name__ == "__main__":
