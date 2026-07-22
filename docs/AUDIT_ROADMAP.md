@@ -8,18 +8,18 @@ This document preserves the owner-approved sequence for turning the repository i
 
 | Package | Name | Status |
 |---|---|---|
-| Audit 00 | Scope Freeze and Runtime Reduction | Complete and merged |
-| Audit 01 | Repository Baseline and Project Truth | Complete and merged |
-| Audit 02 | Vehicle Registry and Configuration Governance | Implemented; validation and owner merge pending |
-| Audit 03 | Canonical Listing Schema and Evidence Model | Approved, not started |
-| Audit 04 | AutoTrader Collector Audit and Refactor | Approved, not started |
-| Audit 05 | Kijiji Collector Replacement | Approved, not started |
-| Audit 06 | Identity, Deduplication and Listing Lifecycle | Approved, not started |
-| Audit 07 | Storage, Retention and Repository Hygiene | Approved, not started |
-| Audit 08 | CI and Workflow Hardening | Approved, not started |
-| Audit 09 | F-350 Buyer Intelligence | Approved, not started |
-| Audit 10 | Secondary Purpose Outputs | Approved, not started |
-| Audit 11 | Optional Search Reintroduction | Approved final stage |
+| 00 | Scope Freeze and Runtime Reduction | Complete and merged |
+| 01 | Repository Baseline and Project Truth | Complete and merged |
+| 02 | Vehicle Registry and Configuration Governance | Implemented; validation and owner merge pending |
+| 03 | Canonical Listing Schema and Evidence Model | Approved, not started |
+| 04 | AutoTrader Collector Audit and Refactor | Approved, not started |
+| 05 | Kijiji Collector Replacement | Approved, not started |
+| 06 | Identity, Deduplication and Listing Lifecycle | Approved, not started |
+| 07 | Storage, Retention and Repository Hygiene | Approved, not started |
+| 08 | CI and Workflow Hardening | Approved, not started |
+| 09 | F-350 Buyer Intelligence | Approved, not started |
+| 10 | Secondary Purpose Outputs | Approved, not started |
+| 11 | Optional Search Reintroduction | Approved final stage |
 
 ## Global completion criteria
 
