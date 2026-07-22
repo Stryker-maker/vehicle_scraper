@@ -8,10 +8,9 @@ This document prevents old files, fields, and behaviours from being mistaken for
 
 - **Disabled legacy** — retained for history; excluded from supported workflow
 - **Historical output** — preserved older evidence; not current authority
-- **Compatibility alias** — old entry point redirected into the supported path
-- **Active legacy** — still executes and awaits replacement
-- **Interim safety control** — reduces harm while an upstream defect remains
-- **Runtime compatibility field** — temporary input for a legacy process; never approved authority
+- **Compatibility alias** — old entry point redirected into a supported path
+- **Active supported adapter** — current governed source execution
+- **Runtime compatibility field** — temporary support for historical utilities; never approved authority
 
 ## Disabled legacy
 
@@ -27,72 +26,66 @@ Path: `data/<vehicle>/merged/*.csv`
 
 Do not refresh, recommend from, graph as current market, or infer current availability from these files. `RANKING_DISABLED.md` redirects users to accepted-record manual review.
 
-## AutoTrader replacement state
+### Former Kijiji patcher
+
+`phase1_kijiji_runner.py` has been removed. Its exact text replacement and `exec` strategy is no longer part of the repository or workflow.
+
+The former multi-function Kijiji implementation has also been removed from `kijiji_scraper.py`; its unsafe search-origin geography, distance filtering, ranking, broad exception swallowing, location mutation, and silent duplicate loss no longer execute.
+
+## Compatibility aliases
 
 ### `scraper.py`
 
-Status: **compatibility alias**
-
-The legacy AutoTrader implementation has been removed from this file. Older commands are redirected into `autotrader_run.py`, preserving timeout, source status, canonical evidence, and config isolation.
-
-### `autotrader_adapter.py`
-
-Status: **active supported source adapter**
-
-It directly reads schema-v2 config, preserves request/page and response-object evidence, paginates, retries, records duplicates/rejections/parse failures, emits no rank or score, and does not mutate config or locations.
-
-### AutoTrader flat projection and ranking code
-
-Status: **retired for AutoTrader**
-
-AutoTrader no longer receives `max_results`, `ranking_weights`, flat source aliases, or a mutable shared location list. `runtime_config_projection` is `direct_schema_v2`.
-
-## Kijiji active legacy
+The former AutoTrader implementation is replaced by a compatibility alias into `autotrader_run.py`.
 
 ### `kijiji_scraper.py`
 
-Status: **legacy Kijiji collector still executed**
+The former Kijiji implementation is replaced by a compatibility alias into `kijiji_run.py`. Older manual commands therefore receive the same timeout, source-status, adapter-evidence, canonical-evidence, and config-isolation controls as the workflow.
 
-Do not run it directly for supported collection. Direct execution would restore untrusted geography, distance filtering, ranking, and mutation behaviour.
+## Active supported source adapters
 
-### `phase1_kijiji_runner.py`
+### AutoTrader
 
-Status: **active interim safety control**
+- `autotrader_adapter.py`
+- `autotrader_distance.py`
+- `autotrader_history.py`
+- `autotrader_canonical.py`
+- `autotrader_run.py`
 
-It patches exact source anchors and executes modified Kijiji code. It disables known unsafe geography, distance, ranking, and location mutation but remains fragile. Audit 05 replaces it.
+AutoTrader reads schema-v2 config directly, preserves request/page and response-object evidence, paginates, retries, records duplicates/rejections/parse failures, emits no rank or score, and does not mutate config or locations.
 
-### Governed Kijiji config projection
+### Kijiji
 
-Status: **active compatibility boundary**
+- `kijiji_locations.py`
+- `kijiji_adapter.py`
+- `kijiji_history.py`
+- `kijiji_canonical.py`
+- `kijiji_run.py`
 
-`vehicle_config.py` creates a disposable flat Kijiji projection containing source-selected locations, legacy aliases, effectively unbounded `max_results`, and compatibility `ranking_weights`. It is never approved authority. AutoTrader no longer uses this projection.
+Kijiji reads schema-v2 config directly, validates explicit Cars & Trucks hubs, preserves JSON-LD listing objects and query/page provenance, records duplicates/rejections/parse failures, emits no rank or score, and does not mutate config or locations. Query origin never becomes listing geography.
 
 ## Shared supported controls
 
 ### Canonical evidence
 
-Status: **active supported evidence control**
-
-`canonical_evidence.py` preserves raw, normalized, accepted, rejected, parse-failure, and reconciliation artifacts. AutoTrader now supplies response-object adapter evidence to this layer. Kijiji still supplies emitted CSV rows until Audit 05.
+`canonical_evidence.py` preserves raw, normalized, accepted, rejected, parse-failure, and reconciliation artifacts. Both direct adapters now supply source-boundary records and adapter evidence to this layer.
 
 ### Evidence-backed manual review
 
-Status: **active supported presentation control**
+`phase1_reporting.py` consumes accepted canonical evidence, excludes rank/score, uses observation-based history names, and exposes evidence statuses. Accepted does not mean verified or recommended.
 
-`phase1_reporting.py` consumes accepted canonical evidence, excludes rank/score, uses observation-based history names, exposes evidence statuses, and quarantines Kijiji geography. Accepted does not mean verified or recommended.
-
-## Remaining legacy fields
+## Remaining compatibility fields
 
 ### `max_results` and `ranking_weights`
 
 - prohibited in approved configs
-- no longer used by AutoTrader
-- generated only for the Kijiji legacy compatibility path
+- not used by either active source adapter
+- may still be produced by `legacy_runtime_config()` for historical utilities/tests
 - never represent owner-approved ranking or result scope
 
 ### Source `rank` and `score`
 
-AutoTrader no longer emits these. Kijiji legacy source artifacts may still contain them. Canonical accepted evidence and supported manual review exclude both.
+Neither active source adapter emits these. Canonical accepted evidence and supported manual review exclude both.
 
 ### `weeks_tracked`, `price_last_week`, `price_change_week`
 
@@ -110,8 +103,8 @@ Keyword tiers may support descriptive normalization but are not recommendation w
 
 ## Paused vehicle data
 
-F-150 and Tundra are paused, not legacy. Their criteria and historical data remain for Audit 11; no current source, evidence, review, or status data should change while disabled.
+F-150 and Tundra are paused, not legacy. Their criteria and historical data remain for Audit 11. Audit 05 normalizes their dormant Kijiji hub labels only; no current source, evidence, review, or status data is produced while disabled.
 
 ## Removal rule
 
-Remove a legacy component only after replacement/abandonment is approved, historical evidence needs are assessed, tests/docs no longer depend on it, and the owner approves deletion.
+Remove a legacy component only after replacement or abandonment is approved, historical evidence needs are assessed, tests and documents no longer depend on it, and the owner approves deletion.
