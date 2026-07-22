@@ -52,8 +52,8 @@ class DocumentationContractTests(unittest.TestCase):
         roadmap = self.read("docs/AUDIT_ROADMAP.md")
         for number in range(12):
             self.assertRegex(roadmap, rf"## Audit {number:02d} — ")
-        self.assertIn("Audit 00 | Scope Freeze and Runtime Reduction | Complete and merged", roadmap)
-        self.assertIn("Audit 11 | Optional Search Reintroduction | Approved final stage", roadmap)
+        self.assertIn("| 00 | Scope Freeze and Runtime Reduction | Complete and merged |", roadmap)
+        self.assertIn("| 11 | Optional Search Reintroduction | Approved final stage |", roadmap)
 
     def test_limitations_have_unique_identifiers(self):
         register = self.read("docs/LIMITATIONS_REGISTER.md")
