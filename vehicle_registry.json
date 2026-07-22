@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "profile": "audit_active",
+  "vehicles": [
+    {
+      "vehicle_key": "ford_f350",
+      "config_path": "config_f350.json",
+      "enabled": true,
+      "purpose": "primary_purchase",
+      "priority": 1
+    },
+    {
+      "vehicle_key": "ram_3500",
+      "config_path": "config_ram3500.json",
+      "enabled": true,
+      "purpose": "owned_vehicle_value_monitoring",
+      "priority": 2
+    },
+    {
+      "vehicle_key": "subaru_forester",
+      "config_path": "config_forester.json",
+      "enabled": true,
+      "purpose": "owned_vehicle_value_monitoring",
+      "priority": 2
+    },
+    {
+      "vehicle_key": "honda_odyssey",
+      "config_path": "config_odyssey.json",
+      "enabled": true,
+      "purpose": "family_friend_purchase_search",
+      "priority": 3
+    },
+    {
+      "vehicle_key": "kia_carnival",
+      "config_path": "config_carnival.json",
+      "enabled": true,
+      "purpose": "family_friend_purchase_search",
+      "priority": 3
+    },
+    {
+      "vehicle_key": "ford_f150",
+      "config_path": "config_f150.json",
+      "enabled": false,
+      "purpose": "optional_curiosity",
+      "priority": 4,
+      "pause_reason": "Paused during the repository audit to reduce runtime and generated-data volume."
+    },
+    {
+      "vehicle_key": "toyota_tundra",
+      "config_path": "config_tundra.json",
+      "enabled": false,
+      "purpose": "optional_curiosity",
+      "priority": 4,
+      "pause_reason": "Paused during the repository audit to reduce runtime and generated-data volume."
+    }
+  ]
+}
