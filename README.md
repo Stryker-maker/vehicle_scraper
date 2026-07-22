@@ -62,15 +62,16 @@ Do not use files under `data/<vehicle>/merged/` as current recommendations. They
 
 ## How the system currently works
 
-1. GitHub Actions validates the vehicle registry.
-2. The registry supplies one authoritative list of enabled configuration files.
+1. GitHub Actions validates registry schema v2 and every referenced configuration schema v2.
+2. The registry supplies one authoritative plan of enabled vehicle/source runs.
 3. Tests run before collection.
-4. AutoTrader and Kijiji are attempted independently for every enabled vehicle.
-5. Each source runs with an isolated temporary configuration and a 75-minute timeout.
-6. Freshness, minimum schema, row count, warnings, failures, and stale output are recorded per source.
-7. Current successful source rows are transformed into an unranked manual-review CSV.
-8. A consolidated health report verifies every expected enabled source run.
-9. Generated data and evidence are committed by GitHub Actions.
+4. Each enabled source is attempted independently according to that plan.
+5. The governed source-specific config is projected into a temporary flat compatibility file for the legacy collector.
+6. Each collector runs with a 75-minute timeout; the approved registry and configs are never passed for mutation.
+7. Freshness, minimum schema, row count, warnings, failures, and stale output are recorded per source.
+8. Current successful source rows are transformed into an unranked manual-review CSV.
+9. A consolidated health report verifies exactly the source runs enabled in the registry.
+10. Generated data and evidence are committed by GitHub Actions.
 
 Kijiji currently runs through an interim safety adapter that disables location-based filtering, distance processing, source ranking, and automatic search-location mutation. This prevents known unsafe geography from influencing the review dataset, but it does not repair the underlying Kijiji collector.
 
@@ -82,7 +83,7 @@ The workflow is defined in `.github/workflows/scrape.yml`.
 
 - Scheduled: Mondays at 08:00 UTC
 - Manual: **Actions → Weekly Vehicle Scrape → Run workflow**
-- Pull requests: compilation, registry validation, and structured tests only
+- Pull requests: compilation, governed registry/config validation, and structured tests only
 - Generated-data follow-up commits: acknowledgement check only; collectors are not rerun
 
 ## Local validation
@@ -95,12 +96,13 @@ Install collector dependencies:
 python -m pip install requests beautifulsoup4 geopy
 ```
 
-Validate the active scope:
+Validate scope, operational metadata and source-specific criteria:
 
 ```bash
 python vehicle_registry.py validate
 python vehicle_registry.py summary
 python vehicle_registry.py active-configs
+python vehicle_registry.py active-runs
 ```
 
 Run the structured tests:
@@ -131,25 +133,40 @@ python phase1_pipeline.py run-source \
 
 Do not run `merge.py` to create a recommendation set. It is disabled legacy code retained for audit history.
 
-## Configuration
+## Configuration governance
 
-Each vehicle has its own `config_*.json` file containing source query and filter settings. Operational enablement is not controlled in those files; it is controlled only through `vehicle_registry.json`.
+Operational state belongs only in `vehicle_registry.json`:
 
-Some configuration fields, including `max_results` and `ranking_weights`, remain from the legacy implementation. The Phase 1 workflow overrides the result cap and does not use automated ranking for the supported manual-review output. Their final disposition is tracked in the audit roadmap.
+- `enabled`
+- `purpose`
+- `priority`
+- `cadence`
+- `enabled_sources`
+- `analysis_profile`
+- `pause_reason` when disabled
+
+Each `config_*.json` file uses schema version 2 and contains only approved vehicle criteria, origin settings and separate AutoTrader/Kijiji query settings.
+
+Legacy flat fields such as `max_results`, `ranking_weights`, shared `search_locations`, `autotrader_make` and `kijiji_make` are not allowed in approved configs. `vehicle_config.py` creates those compatibility values only inside the temporary runtime file required by the current collectors. The result cap is injected as effectively unbounded; legacy ranking weights exist only to keep the collector process compatible and do not govern supported output.
+
+Toggling a vehicle between active and paused remains a single `enabled` change. Source enablement is controlled by `enabled_sources`, and collection, manual-review generation and health reporting all use the same registry source plan.
 
 `ORS_API_KEY` may be configured as a GitHub Actions repository secret. When unavailable or when routing fails, the legacy AutoTrader collector may fall back to straight-line distance; current evidence does not yet distinguish that fallback reliably in every row.
+
+See [Audit 02 Configuration Governance](AUDIT_02_CONFIG_GOVERNANCE.md) for the package contract and validation evidence.
 
 ## Repository map
 
 ```text
-.github/workflows/scrape.yml   GitHub Actions tests and collection workflow
-vehicle_registry.json          Authoritative active/paused vehicle scope
-vehicle_registry.py            Registry validation and active-config selection
-config_*.json                  Per-vehicle source criteria
+.github/workflows/scrape.yml   GitHub Actions tests and registry-driven collection
+vehicle_registry.json          Authoritative operational scope and source plan
+vehicle_registry.py            Registry/config validation and run-plan selection
+vehicle_config.py              Config schema validation and temporary legacy projection
+config_*.json                  Governed per-vehicle and per-source search criteria
 phase1_pipeline.py             Command-line orchestration entry point
-phase1_runtime.py              Timeout, isolation, freshness, status and history protection
-phase1_reporting.py            Manual-review and consolidated health outputs
-phase1_common.py               Shared schemas, paths and warning rules
+phase1_runtime.py              Projection, timeout, isolation, freshness, status and history protection
+phase1_reporting.py            Registry-source-aware manual-review and health outputs
+phase1_common.py               Shared output schemas, paths and warning rules
 scraper.py                     Active legacy AutoTrader collector
 kijiji_scraper.py              Legacy Kijiji collector executed through the safety adapter
 phase1_kijiji_runner.py         Interim Kijiji runtime safety adapter
@@ -170,6 +187,7 @@ docs/                          Repository baseline, architecture, dictionary, li
 - [Approved Audit Roadmap](docs/AUDIT_ROADMAP.md) — Audit 00 through Audit 11 sequence
 - [Phase 1 Manual Review](PHASE1_MANUAL_REVIEW.md) — current operating safeguards and files to use
 - [Audit 00 Scope Freeze](AUDIT_00_SCOPE_FREEZE.md) — completed runtime-reduction package
+- [Audit 02 Configuration Governance](AUDIT_02_CONFIG_GOVERNANCE.md) — governed registry/config contract
 
 ## Change workflow
 
