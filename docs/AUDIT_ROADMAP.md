@@ -12,8 +12,8 @@ This document preserves the owner-approved sequence for turning the repository i
 | 01 | Repository Baseline and Project Truth | Complete and merged |
 | 02 | Vehicle Registry and Configuration Governance | Complete and merged |
 | 03 | Canonical Listing Schema and Evidence Model | Complete and merged |
-| 04 | AutoTrader Collector Audit and Refactor | Implemented; narrow validation and owner merge pending |
-| 05 | Kijiji Collector Replacement | Approved, not started |
+| 04 | AutoTrader Collector Audit and Refactor | Complete and merged |
+| 05 | Kijiji Collector Replacement | Implemented; narrow validation and owner merge pending |
 | 06 | Identity, Deduplication and Listing Lifecycle | Approved, not started |
 | 07 | Storage, Retention and Repository Hygiene | Approved, not started |
 | 08 | CI and Workflow Hardening | Approved, not started |
@@ -23,7 +23,7 @@ This document preserves the owner-approved sequence for turning the repository i
 
 ## Global completion criteria
 
-The audit is not complete until optional vehicles remain paused unless explicitly approved; one registry controls enabled vehicles and sources; approved configs are validated and source-specific; runtime source rewriting is removed; raw/accepted/rejected/parse-failure counts reconcile from both source adapters; parsing failures and exclusions are visible; Kijiji geography is verified or unknown; AutoTrader pagination is tested; distance methods are truthful; provenance is available; listing IDs are not confused with VINs; lifecycle/history semantics are correct; dependencies are locked; repository growth is bounded; documentation matches code; F-350 evidence supports real investigation; and three consecutive scheduled active-profile runs complete without manual repair.
+The audit is not complete until optional vehicles remain paused unless explicitly approved; one registry controls enabled vehicles and sources; approved configs are validated and source-specific; runtime source rewriting is removed; raw/accepted/rejected/parse-failure counts reconcile from both source adapters; parsing failures and exclusions are visible; Kijiji geography is listing-specific source evidence or unknown; AutoTrader pagination is tested; distance methods are truthful; provenance is available; listing IDs are not confused with VINs; lifecycle/history semantics are correct; dependencies are locked; repository growth is bounded; documentation matches code; F-350 evidence supports real investigation; and three consecutive scheduled active-profile runs complete without manual repair.
 
 ---
 
@@ -51,7 +51,7 @@ Delivered the current README, repository baseline, architecture/data flow, vehic
 
 Delivered registry schema v2, config schema v2, validated operational metadata, source-specific criteria, canonical location naming, disposable legacy projection, registry-driven source planning, config-isolation evidence, structured tests, and successful ten-source validation.
 
-Continuing boundary: Kijiji retains its compatibility projection and interim source patching until Audit 05. AutoTrader no longer uses that path after Audit 04.
+The disposable compatibility projection now remains only for historical/legacy utilities; both active source adapters read governed schema v2 directly after Audits 04–05.
 
 ---
 
@@ -59,7 +59,7 @@ Continuing boundary: Kijiji retains its compatibility projection and interim sou
 
 **Status:** complete and merged through PR #5.
 
-Delivered canonical evidence schema v1, stable source-scoped listing IDs, observation IDs, exact raw-value preservation, typed/null-safe normalized values, per-field evidence status, accepted/rejected/parse-failure artifacts, reason codes, source/health schema v5, count reconciliation, decision-safe manual review, and Kijiji geography quarantine.
+Delivered canonical evidence schema v1, stable source-scoped listing IDs, observation IDs, exact raw-value preservation, typed/null-safe normalized values, per-field evidence status, accepted/rejected/parse-failure artifacts, reason codes, source/health schema v5, count reconciliation, decision-safe manual review, and the initial Kijiji search-origin quarantine.
 
 The Audit 03 boundary was:
 
@@ -74,30 +74,46 @@ Audits 04 and 05 move that boundary into their source adapters.
 
 ## Audit 04 — AutoTrader Collector Audit and Refactor
 
-**Status:** implemented on `ai/audit-04-autotrader-adapter`; pull-request checks and one narrow F-350 AutoTrader smoke run are required before owner merge.
+**Status:** complete and merged through PR #6.
+
+Delivered direct schema-v2 execution, explicit requests and pagination, bounded retry evidence, response-object reconciliation, duplicate and parse-failure preservation, truthful route/geodesic/unavailable distance evidence, unranked output, adapter evidence schema v1, source status schema v6, fixtures/hostile tests, and narrow single-pair validation without generated-data commits.
+
+For AutoTrader, `fetched_records` means `autotrader_adapter_response_listing_objects`.
+
+```text
+fetched_records = accepted_records + rejected_records + parse_failures
+```
+
+---
+
+## Audit 05 — Kijiji Collector Replacement
+
+**Status:** implemented on `ai/audit-05-kijiji-adapter`; pull-request checks and one narrow F-350 Kijiji smoke run are required before owner merge.
 
 ### Purpose
 
-Replace the legacy AutoTrader script with a directly testable source adapter and preserve every response listing object through request, parse, rejection, acceptance, and canonical evidence stages.
+Replace the runtime-patched Kijiji script with a directly testable adapter that preserves every JSON-LD listing object, validates query hubs, and never represents query origin as listing geography.
 
 ### Scope
 
-- governed config schema v2 used directly
-- explicit AutoTrader request contract
-- pagination by page size and offset
-- retry/backoff with request-attempt evidence
-- per-page request provenance
-- response listing-object fetched boundary
-- duplicate records preserved as explicit rejections
-- parse failures preserved with machine-readable reasons
-- criteria exclusions preserved with reasons
-- truthful route/geodesic/unavailable distance evidence
-- unranked output with no score
-- AutoTrader adapter evidence schema v1
-- AutoTrader source status schema v6
-- adapter-to-canonical reconciliation
-- fixtures and hostile tests
-- narrow single-pair validation mode with artifact upload and no generated-data commit
+- remove runtime text replacement and `exec`
+- use governed config schema v2 directly
+- validate Kijiji Cars & Trucks hub labels, slugs, and location IDs
+- reduce overlapping city queries to six validated regional hubs
+- preserve request attempts, page outcomes, query hub, URL, and item index
+- parse JSON-LD `ItemList`, `Vehicle`, `Car`, and `Product` records
+- preserve duplicates as explicit rejections
+- preserve malformed listing objects and parser failures with reasons
+- retain actual listing-specific source geography when present
+- set location/address to unknown when listing-specific evidence is absent
+- keep URL region and query origin as separate provenance
+- keep distance processing/filtering disabled pending trustworthy routable geography
+- remove rank/score and config mutation
+- write Kijiji adapter evidence schema v1
+- write Kijiji source status schema v7
+- reconcile adapter objects into canonical evidence schema v1
+- add fixtures and hostile geography tests
+- validate with one non-committing single-pair smoke run
 
 ### Required reconciliation
 
@@ -105,33 +121,27 @@ Replace the legacy AutoTrader script with a directly testable source adapter and
 fetched_records = accepted_records + rejected_records + parse_failures
 ```
 
-For AutoTrader, `fetched_records` means `autotrader_adapter_response_listing_objects`.
+For Kijiji, `fetched_records` means `kijiji_adapter_json_ld_listing_objects` returned to the configured validated hub queries. This does not prove marketplace-wide completeness.
 
 ### Acceptance gate
 
-- request and two-page fixture tests pass
-- retries and pagination are visible and bounded
-- no response listing object disappears
-- every rejection and parse failure has reasons
-- distance method is explicit and truthful
-- no internal rank/score or config mutation remains
+- no runtime patcher or `exec` path remains
+- unsupported hub labels fail rather than falling back to `l0`
+- request and pagination evidence is visible and bounded
+- every returned listing object is accepted, rejected, or a parse failure
+- duplicate and parser reasons are machine-readable
+- a Toronto listing returned through an Edmonton query remains Toronto
+- missing listing geography remains unknown
+- query origin never populates location, address, or distance
+- URL region remains separate unverified evidence
+- no Kijiji rank/score or config mutation remains
 - adapter and canonical counts reconcile
-- one narrow F-350 AutoTrader smoke run passes without a data commit
-- F-150/Tundra and Kijiji implementation remain untouched
+- one narrow F-350 Kijiji smoke run passes without a data commit
+- F-150 and Tundra remain paused
 
 ### Non-scope
 
-No Kijiji replacement, VIN/dedup/lifecycle model, retention policy, F-350 enrichment, purpose-specific analysis, ranking, criteria change, or optional-vehicle reintroduction.
-
----
-
-## Audit 05 — Kijiji Collector Replacement
-
-**Status:** approved, not started.
-
-Eliminate runtime text patching/`exec`; validate location identifiers; extract actual location or unknown; keep URL region as separate evidence; reduce overlapping searches; preserve query/page provenance; add fixtures; and reconcile raw/rejected/parse-failure records from the adapter.
-
-Acceptance: no Toronto record is represented as Alberta because of search origin; no runtime patching remains; geography is verified or explicitly unknown.
+No VIN/dedup/lifecycle model, retention policy, F-350 enrichment, purpose-specific analysis, recommendation ranking, vehicle-criteria change, AutoTrader refactor, or optional-vehicle reintroduction.
 
 ---
 
@@ -161,7 +171,7 @@ Acceptance: `main` remains reviewable; retention is explicit; required evidence 
 
 Lock dependencies; separate tests from collection; complete profile/vehicle/source inputs; implement cadence; add anomaly detection and diagnostics; avoid multi-hour PR collection; and improve generated-data discipline.
 
-Audit 04 introduces a limited single-pair validation input only to support time-sensitive source-adapter validation. Audit 08 owns the final workflow architecture.
+Audits 04–05 introduce a limited single-pair validation input only to support time-sensitive source-adapter validation. Audit 08 owns the final workflow architecture.
 
 Acceptance: PR checks are fast/deterministic; scheduling is explicit; dependencies are reproducible; failures are actionable.
 
