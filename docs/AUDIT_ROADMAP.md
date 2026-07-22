@@ -1,38 +1,47 @@
 # Approved Repository Audit Roadmap
 
-## Authority and purpose
+## Purpose
 
-This roadmap preserves the repository-owner-approved sequence for turning the current prototype into a dependable, continuously usable information-gathering tool.
+This document preserves the owner-approved sequence for turning the repository into a continuously usable, evidence-aware vehicle-market information tool. Packages must stay within scope unless the owner approves a roadmap revision.
 
-The sequence is deliberate:
+## Package status
 
-1. reduce unnecessary runtime
-2. establish project truth
-3. govern configuration and data contracts
-4. repair source collection
-5. add identity, lifecycle and retention
-6. harden operations
-7. build decision outputs only after collection evidence is trustworthy
-8. reintroduce optional searches last
+| Package | Name | Status |
+|---|---|---|
+| Audit 00 | Scope Freeze and Runtime Reduction | Complete and merged |
+| Audit 01 | Repository Baseline and Project Truth | Complete and merged |
+| Audit 02 | Vehicle Registry and Configuration Governance | Implemented; validation and owner merge pending |
+| Audit 03 | Canonical Listing Schema and Evidence Model | Approved, not started |
+| Audit 04 | AutoTrader Collector Audit and Refactor | Approved, not started |
+| Audit 05 | Kijiji Collector Replacement | Approved, not started |
+| Audit 06 | Identity, Deduplication and Listing Lifecycle | Approved, not started |
+| Audit 07 | Storage, Retention and Repository Hygiene | Approved, not started |
+| Audit 08 | CI and Workflow Hardening | Approved, not started |
+| Audit 09 | F-350 Buyer Intelligence | Approved, not started |
+| Audit 10 | Secondary Purpose Outputs | Approved, not started |
+| Audit 11 | Optional Search Reintroduction | Approved final stage |
 
-Scope changes require repository-owner approval. A later package may add a newly discovered limitation to the register without expanding its own implementation scope.
+## Global completion criteria
 
-## Status summary
+The audit is not complete until:
 
-| Audit | Package | Status |
-|---:|---|---|
-| 00 | Scope Freeze and Runtime Reduction | Complete and merged |
-| 01 | Repository Baseline and Project Truth | Current package |
-| 02 | Vehicle Registry and Configuration Governance | Approved, not started |
-| 03 | Canonical Listing Schema and Evidence Model | Approved, not started |
-| 04 | AutoTrader Collector Audit and Refactor | Approved, not started |
-| 05 | Kijiji Collector Replacement | Approved, not started |
-| 06 | Identity, Deduplication and Listing Lifecycle | Approved, not started |
-| 07 | Storage, Retention and Repository Hygiene | Approved, not started |
-| 08 | CI and Operational Workflow Hardening | Approved, not started |
-| 09 | F-350 Buyer Intelligence Foundation | Approved, not started |
-| 10 | Secondary Use-Case Outputs | Approved, not started |
-| 11 | Optional Search Reintroduction | Approved final stage |
+- optional vehicles remain paused unless explicitly approved
+- one registry controls enabled vehicles and sources
+- approved configs are validated and source-specific
+- runtime source rewriting is removed
+- raw/accepted/rejected/parse-failure counts reconcile
+- parsing failures and exclusion reasons are visible
+- Kijiji location is verified or explicitly unknown
+- AutoTrader pagination is tested
+- distance methods are truthful
+- provenance is available
+- listing IDs are not confused with VINs
+- lifecycle/history semantics are correct
+- dependencies are locked
+- repository growth is bounded
+- documentation matches code
+- F-350 criteria/enrichment support real investigation
+- three consecutive scheduled active-profile runs complete without manual repair
 
 ---
 
@@ -42,95 +51,80 @@ Scope changes require repository-owner approval. A later package may add a newly
 
 ### Purpose
 
-Stop unnecessary F-150 and Tundra collection while preserving useful active data gathering during the audit.
+Reduce runtime and generated-data growth during the core audit.
 
 ### Delivered
 
-- one authoritative vehicle registry
-- five enabled vehicles
-- F-150 and Tundra paused
-- collection, manual review and health reporting derived from the same registry
-- exact active/paused scope tests
-- live validation of 10/10 healthy source runs
-- no paused-vehicle data changes
-- active-scope runtime reduced to approximately 31 minutes in the validation run
+- authoritative active/paused vehicle registry
+- five active vehicles and two paused optional vehicles
+- collection, review generation and health derived from the same registry
+- ten expected source runs instead of fourteen
+- live proof that F-150/Tundra data remained unchanged
 
-### Continuing contract
+### Continuing rule
 
-- two sources for each of five enabled vehicles
-- paused data retained unchanged
-- optional vehicles remain off until Audit 11 unless the owner revises scope
+F-150 and Tundra remain paused until Audit 11 unless the owner approves revision.
 
 ---
 
 ## Audit 01 — Repository Baseline and Project Truth
 
-**Status:** current package.
+**Status:** complete and merged through PR #3.
 
 ### Purpose
 
-Replace obsolete documentation and create a trustworthy map of what the repository currently does, does not do and plans to correct.
+Replace obsolete documentation and establish trustworthy project authorities.
 
-### Scope
+### Delivered
 
-- replace obsolete README
-- document project purpose and vehicle priorities
-- inventory authoritative, active, interim, legacy and historical components
-- document present architecture and data flow
-- create a current data dictionary
-- create a tracked limitations register
-- clearly mark `merge.py` and historical merged output as disabled legacy
-- preserve Audit 00–11 package sequence and acceptance intent
-- add documentation-contract tests
-
-### Non-scope
-
-- no collector refactor
-- no source filter change
-- no schema redesign
-- no Kijiji geography repair
-- no AutoTrader pagination
-- no ranking or candidate model
-- no storage deletion
-
-### Acceptance gate
-
-- README matches actual operating behaviour
-- a new user can identify supported outputs and unsafe/historical files
-- every current component has a documented status
-- current field semantics and evidence limitations are documented
-- known weaknesses are assigned IDs and future packages
-- all approved packages are preserved in repository documentation
-- documentation-contract and existing structured tests pass
+- current README
+- repository baseline
+- architecture/data flow
+- vehicle purposes
+- data dictionary
+- limitations register
+- legacy-component classification
+- complete package roadmap
+- documentation-contract tests
 
 ---
 
 ## Audit 02 — Vehicle Registry and Configuration Governance
 
-**Status:** approved, not started.
+**Status:** implemented on `ai/audit-02-config-governance`; tests and live branch validation required before owner merge.
 
 ### Purpose
 
-Replace ambiguous and scattered legacy configuration with validated, source-aware governance.
+Replace ambiguous/scattered legacy configuration with validated operational governance and source-specific criteria.
 
-### Planned scope
+### Scope
 
-- formal registry/config schema validation
-- source-specific configuration structure where required
-- validate purpose, priority, cadence and enabled sources
-- validate search locations and naming consistency
-- remove all collector authority to mutate approved config
-- decide disposition of `max_results` and `ranking_weights`
-- distinguish operational state from source search criteria
-- preserve one-change enable/pause behaviour
+- registry schema v2
+- validated purpose, priority, cadence, enabled sources and analysis profile
+- config schema v2
+- separate shared criteria, origin and source query settings
+- formatted, duplicate-free search locations
+- removal of `max_results`, `ranking_weights` and flat source aliases from approved configs
+- temporary source-specific legacy projection for current collectors
+- registry source plan used by collection, manual review and health
+- byte-for-byte approved-config isolation evidence
+- one-change vehicle pause/re-enable behaviour
 
 ### Acceptance gate
 
-- one validated registry governs workflow scope
-- invalid or conflicting config fails before collection
-- collector execution cannot alter approved configuration
-- obsolete compatibility fields are removed or explicitly governed
-- source-specific criteria are no longer ambiguous
+- one validated registry governs operational scope and source pairs
+- invalid/conflicting registry or config fails before collection
+- approved configs cannot be altered by collector execution
+- obsolete controls exist only in disposable compatibility projection
+- source-specific criteria are unambiguous
+- exactly ten current active source runs remain planned
+- F-150/Tundra remain untouched
+- structured tests pass
+- one live branch run passes with schema/projection/isolation evidence
+
+### Non-scope
+
+No collector parsing repair, Kijiji geography repair, AutoTrader pagination, canonical evidence stages, ranking, storage policy, F-350 enrichment or optional-vehicle reintroduction.
 
 ---
 
@@ -142,14 +136,14 @@ Replace ambiguous and scattered legacy configuration with validated, source-awar
 
 Make every record traceable through raw, normalized, accepted, rejected and manual-review stages.
 
-### Planned scope
+### Scope
 
-- canonical listing and observation identifiers
+- canonical listing/observation IDs
 - schema versioning
-- raw source-value preservation
-- field provenance and evidence status
+- raw value preservation
+- field provenance/evidence status
 - explicit null/unknown handling
-- accepted and rejected artifacts
+- accepted/rejected artifacts
 - machine-readable rejection reasons
 - parse-failure evidence
 - count reconciliation
@@ -163,11 +157,7 @@ fetched records = accepted records + rejected records + parse failures
 
 ### Acceptance gate
 
-- no record disappears without evidence
-- raw and normalized values are distinguishable
-- every exclusion has one or more reasons
-- source claims are not presented as verified truth
-- unknown values are not replaced by misleading sentinels
+No record disappears without evidence; raw and normalized values are distinguishable; every exclusion has reasons; source claims remain claims; unknowns are not replaced by misleading sentinels.
 
 ---
 
@@ -177,29 +167,22 @@ fetched records = accepted records + rejected records + parse failures
 
 ### Purpose
 
-Make AutoTrader collection directly testable, paginated, measurable and honest about parsing and distance evidence.
+Replace the legacy AutoTrader script with a directly testable source adapter.
 
-### Planned scope
+### Scope
 
-- separate source adapter from CLI orchestration
-- remove module-level mutable execution where practical
-- implement and test pagination
-- validate HTTP status behaviour
-- bounded retry/backoff
-- preserve request, fetched, parsed and failed counts
-- make individual parse failures visible
-- replace broad silent record skipping
-- distinguish route distance from geodesic fallback
-- verify seller and accident-claim parsing semantics
-- add stored source fixtures and parser-contract tests
+- explicit request contract and pagination
+- status/retry/backoff handling
+- request/fetch/parse/accept/reject counts
+- parse failures preserved
+- source fixtures and parser tests
+- truthful route/geodesic/unavailable distance evidence
+- no internal recommendation ranking
+- no config mutation
 
 ### Acceptance gate
 
-- more-than-one-page fixture proves pagination
-- malformed records produce explicit evidence
-- source counts reconcile under the canonical schema
-- every distance records its actual method
-- F-350 output is reproducible from fixtures
+Pagination and fixture tests pass; no silent per-record loss; distance method is truthful; output reconciles to Audit 03 stages.
 
 ---
 
@@ -209,29 +192,22 @@ Make AutoTrader collection directly testable, paginated, measurable and honest a
 
 ### Purpose
 
-Remove runtime source rewriting and create a directly testable Kijiji adapter with verified or explicitly unknown geography.
+Remove runtime source rewriting and create an ordinary testable Kijiji adapter.
 
-### Planned scope
+### Scope
 
-- replace `phase1_kijiji_runner.py` patch/exec path
-- validate Kijiji query location IDs and URLs
-- remove unvalidated location-ID fallback
-- extract actual listing location where available
-- preserve query origin separately from listing location
-- preserve URL-region evidence separately
-- prevent unverified geography from filtering or ranking
-- reduce redundant overlapping query origins
-- add source query/page provenance
-- add local, out-of-region and unknown-location fixtures
+- eliminate text patching and `exec`
+- validate location identifiers and remove unsafe fallback ID
+- extract actual location or record unknown
+- keep URL region separate as evidence
+- reduce overlapping searches
+- query/page provenance
+- fixtures and parser tests
+- raw/rejected/parse-failure reconciliation
 
 ### Acceptance gate
 
-- no runtime text patching or `exec`
-- query origin can never become listing location
-- out-of-region records cannot appear as local records
-- unknown location remains explicit
-- every query location has a validated mechanism
-- geographic exclusions have recorded reasons
+No Toronto record is represented as Alberta because of search origin; no runtime patching remains; geography is verified or explicitly unknown.
 
 ---
 
@@ -241,30 +217,22 @@ Remove runtime source rewriting and create a directly testable Kijiji adapter wi
 
 ### Purpose
 
-Track listings and likely duplicate vehicles over time without inventing identity or sale certainty.
+Create transparent source identity, duplicate-candidate and lifecycle evidence.
 
-### Planned scope
+### Scope
 
-- source-specific canonical listing IDs
-- VIN and VIN evidence status when available
-- normalized seller/dealer identity
-- duplicate-candidate fingerprints
-- visible match evidence and confidence
-- no destructive automatic merge of ambiguous candidates
-- first-seen and last-seen timestamps
-- active, missing, reappeared and retired states
-- consecutive missed-run counts
-- relisting evidence
-- price-change events based on actual observation dates
-- replace misleading weekly field semantics
+- source IDs distinct from VIN
+- VIN plus evidence status
+- duplicate fingerprints/confidence
+- no destructive automatic merge
+- first/last seen
+- active/missing/reappeared/retired states
+- actual elapsed durations
+- corrected price-history semantics
 
 ### Acceptance gate
 
-- source listing ID is never called VIN
-- duplicate candidates remain reviewable
-- observation count is not labelled elapsed weeks
-- disappeared listing is not automatically declared sold
-- lifecycle state is reproducible from observations
+Identity evidence is explainable; lifecycle states are run-based and dated; historical merger assumptions cannot influence supported output.
 
 ---
 
@@ -274,145 +242,104 @@ Track listings and likely duplicate vehicles over time without inventing identit
 
 ### Purpose
 
-Bound repository growth while preserving useful history and evidence.
+Bound data growth and separate code review from bulky generated evidence.
 
-### Planned scope
+### Scope
 
-- quantify current and projected growth
-- retention periods for source archives, manual-review archives, logs and inactive listings
-- price-history compaction
-- decide whether raw data belongs in workflow artifacts or a data branch
-- keep code-review diffs readable
-- preserve latest normalized output and required trend history
-- decide historical F-150/Tundra retention handling without re-enabling them
+- archive retention policy
+- raw artifacts or dedicated data branch
+- compact history
+- bounded repository growth
+- deletion/retention evidence
+- generated-data diff strategy
 
 ### Acceptance gate
 
-- repository growth has an approved upper-bound model
-- code PRs are not dominated by generated data
-- historical trends remain recoverable
-- deletion/compaction is tested and documented
+Main remains reviewable; retention is explicit; required evidence survives; growth is measurable and bounded.
 
 ---
 
-## Audit 08 — CI and Operational Workflow Hardening
+## Audit 08 — CI and Workflow Hardening
 
 **Status:** approved, not started.
 
 ### Purpose
 
-Make testing and collection reproducible, diagnosable and operationally efficient.
+Make tests, collection and operational diagnostics reproducible and maintainable.
 
-### Planned scope
+### Scope
 
-- dependency manifest and tested version locking
-- separate code-test and collection responsibilities
-- manual inputs for profile, vehicle and source
+- dependency lock
+- separate test/collection workflows
+- workflow inputs by profile/vehicle/source
 - scheduled active profile
-- per-source runtime telemetry
-- abnormal count-drop and count-spike detection
-- parser-regression signals
-- diagnostic artifacts
-- concurrency and source-limit policy
-- reduce generated-data approval friction without rerunning collectors
+- cadence handling
+- row-count anomaly detection
+- diagnostics artifacts
+- no multi-hour collection on normal PRs
+- generated-data branch/PR discipline
 
 ### Acceptance gate
 
-- normal code PRs never run multi-hour collection
-- scheduled collection uses only enabled scope
-- dependencies are reproducible
-- abnormal source behaviour is visible
-- workflow failures provide actionable evidence
+PR checks are fast and deterministic; scheduled collection is explicit; dependency versions are reproducible; failures provide actionable diagnostics.
 
 ---
 
-## Audit 09 — F-350 Buyer Intelligence Foundation
+## Audit 09 — F-350 Buyer Intelligence
 
 **Status:** approved, not started.
 
 ### Purpose
 
-Build the repository's primary decision-support output after collection and evidence foundations are trustworthy.
+Create transparent purchase-investigation support for the primary F-350 goal after source evidence is trustworthy.
 
-### Planned fields
+### Scope
 
 - target-year status
-- total engine hours
-- idle hours
-- kilometres per engine hour
-- idle-hour percentage
-- cab configuration
-- box length
-- SRW/DRW
-- four-wheel-drive evidence
-- trim and package evidence
-- fleet/commercial evidence
-- service-history evidence
-- accident/title evidence
-- emissions-system history
-- warranty status
-- owner notes
-- investigation status
-- manual classification and override
-
-### Planned outputs
-
-- early-2020s market context
-- price versus mileage
-- year-specific price bands
-- 2023 candidate comparison
-- mileage-discount context
-- projected five-year mileage
-- engine-hour and idle-hour context when verified
-- price-change and listing-lifecycle view
-- immediate-investigation watchlist
-- seller questions and missing-evidence checklist
+- engine/idle hours and derived context
+- cab/box/SRW/DRW/4x4 evidence
+- trim/options
+- fleet/commercial, service, accident/title, emissions and warranty evidence
+- owner notes and investigation state
+- price/mileage/year bands
+- five-year mileage projection
+- price-change and seller-question outputs
+- manual override
 
 ### Acceptance gate
 
-- no opaque best-truck score
-- every classification has visible reasons
-- unknown evidence is not treated as positive or negative
-- owner override is preserved
-- 2023 target is highlighted without discarding useful comparison years
+No opaque score; every candidate state has visible reasons and evidence; output supports real owner investigation.
 
 ---
 
-## Audit 10 — Secondary Use-Case Outputs
+## Audit 10 — Secondary Purpose Outputs
 
 **Status:** approved, not started.
 
 ### Purpose
 
-Create purpose-specific outputs for owned vehicles and the family-friend minivan search without delaying F-350 work.
+Create lightweight outputs appropriate to the non-primary vehicle purposes.
 
-### RAM 3500 and Forester
+### Scope
 
-Planned lightweight monitoring:
+RAM/Forester:
 
 - comparable count
-- asking-price and mileage ranges
-- median asking price
-- trend across observations
-- approximate owner-vehicle market position
-- likely normal asking range and faster-sale context
+- price/mileage ranges
+- median ask
+- trend
+- owner vehicle's market position
 
-### Odyssey and Carnival
+Odyssey/Carnival:
 
-Planned practical review:
-
-- friend-specific requirements
-- relevant candidate set
-- location and availability verification
-- accident/title and service evidence
-- missing-information checklist
-- practical shortlist
+- friend criteria
+- candidate set
+- availability/location/history/condition evidence
+- shortlist with questions
 
 ### Acceptance gate
 
-- output logic matches each actual purpose
-- F-350 assumptions are not applied to minivans
-- lightweight valuation does not become an unsupported appraisal claim
+Outputs remain purpose-specific and do not inherit F-350 assumptions or opaque ranking.
 
 ---
 
@@ -422,58 +349,20 @@ Planned practical review:
 
 ### Purpose
 
-Reintroduce Ford F-150 and Toyota Tundra only after the core system is polished and validated.
+Evaluate F-150 and Tundra only after the core system is trustworthy and efficient.
 
-### Required order
+### Sequence
 
-1. select one optional vehicle
-2. perform a limited manual source run
-3. validate parser, geography and canonical output
-4. measure runtime and generated-data growth
-5. correct newly exposed bugs
-6. obtain owner approval for cadence
-7. enable only after acceptance
-8. repeat for the second optional vehicle
+1. F-150 alone
+2. limited manual validation
+3. parser/geography/performance/growth assessment
+4. owner approval
+5. Tundra alone under the same process
 
 ### Acceptance gate
 
-- optional search cannot degrade primary F-350 operation
-- runtime and storage remain within approved limits
-- source behaviour passes the same evidence contracts as active vehicles
-- cadence may be manual or less frequent rather than weekly
+Each optional vehicle is introduced one at a time, does not destabilize the core profile, and may remain manual/monthly rather than weekly.
 
----
+## Roadmap authority
 
-## Full audit exit criteria
-
-The repository is not fully audited until:
-
-- F-150 and Tundra remain paused unless explicitly reapproved
-- one validated registry governs scope
-- no collector relies on runtime source rewriting
-- raw, accepted, rejected and parse-failure counts reconcile
-- source parsing failures are visible
-- Kijiji geography is verified or explicitly unknown
-- AutoTrader pagination is tested
-- distance methods are truthful
-- field provenance is available
-- source listing IDs are not confused with VIN
-- lifecycle uses accurate time semantics
-- dependency versions are locked
-- storage growth is bounded
-- documentation matches implementation
-- F-350 buyer criteria and enrichment exist
-- three consecutive scheduled active-profile runs complete without manual repair
-- the resulting F-350 candidate set supports real purchase investigation
-
-## Package completion rule
-
-Each audit package is complete only after:
-
-1. approved scope is implemented on an `ai/*` branch
-2. tests pass on the exact final head SHA
-3. live validation is performed when external collection behaviour changed
-4. documentation and limitations register are updated
-5. the owner reviews and merges the PR
-6. the branch is deleted
-7. completion is recorded before the next package begins
+The owner may approve revisions. Without explicit revision, packages execute in order, Audit 11 remains last, and no package absorbs later scope opportunistically.
