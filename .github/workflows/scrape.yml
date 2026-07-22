@@ -41,6 +41,7 @@ jobs:
       - name: Compile Python sources
         run: >-
           python -m py_compile
+          vehicle_config.py
           vehicle_registry.py
           phase1_common.py
           phase1_kijiji_runner.py
@@ -51,7 +52,7 @@ jobs:
           kijiji_scraper.py
           merge.py
 
-      - name: Validate active vehicle registry
+      - name: Validate governed vehicle registry and configurations
         run: python vehicle_registry.py validate --registry vehicle_registry.json
 
       - name: Run structured tests
@@ -79,56 +80,55 @@ jobs:
           python -m pip install --upgrade pip
           pip install requests beautifulsoup4 geopy
 
-      - name: Validate active vehicle registry
+      - name: Validate governed vehicle registry and configurations
         run: |
           python vehicle_registry.py validate --registry vehicle_registry.json
           python vehicle_registry.py summary --registry vehicle_registry.json
 
-      - name: Collect uncapped AutoTrader and Kijiji data with status evidence
+      - name: Collect uncapped source data with status evidence
         env:
           ORS_API_KEY: ${{ secrets.ORS_API_KEY }}
         run: |
           set -euo pipefail
-          active_configs="$(python vehicle_registry.py active-configs --registry vehicle_registry.json)"
-          mapfile -t configs <<< "$active_configs"
-
-          for config in "${configs[@]}"; do
-            python phase1_pipeline.py run-source \
-              --source autotrader \
-              --config "$config" \
-              --timeout-seconds 4500 \
-              -- python scraper.py --config "$config"
-          done
-
-          for config in "${configs[@]}"; do
-            python phase1_pipeline.py run-source \
-              --source kijiji \
-              --config "$config" \
-              --timeout-seconds 4500 \
-              -- python phase1_kijiji_runner.py --config "$config"
-          done
+          while IFS=$'\t' read -r config source; do
+            case "$source" in
+              autotrader)
+                python phase1_pipeline.py run-source \
+                  --source autotrader \
+                  --config "$config" \
+                  --timeout-seconds 4500 \
+                  -- python scraper.py --config "$config"
+                ;;
+              kijiji)
+                python phase1_pipeline.py run-source \
+                  --source kijiji \
+                  --config "$config" \
+                  --timeout-seconds 4500 \
+                  -- python phase1_kijiji_runner.py --config "$config"
+                ;;
+              *)
+                echo "Unsupported source in active run plan: $source" >&2
+                exit 1
+                ;;
+            esac
+          done < <(python vehicle_registry.py active-runs --registry vehicle_registry.json)
 
       - name: Build unranked manual-review files
-        run: |
-          set -euo pipefail
-          active_configs="$(python vehicle_registry.py active-configs --registry vehicle_registry.json)"
-          mapfile -t configs <<< "$active_configs"
-          python phase1_pipeline.py build-manual-review --configs "${configs[@]}"
+        run: >-
+          python phase1_pipeline.py build-manual-review
+          --registry vehicle_registry.json
 
       - name: Write consolidated run-health report
         run: |
-          set -euo pipefail
-          active_configs="$(python vehicle_registry.py active-configs --registry vehicle_registry.json)"
-          mapfile -t configs <<< "$active_configs"
-          python phase1_pipeline.py report-health --configs "${configs[@]}"
+          python phase1_pipeline.py report-health --registry vehicle_registry.json
           cat data/run_status/latest.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Commit and push collected data and evidence
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          # Collectors run against temporary uncapped configs. Approved repository
-          # configuration remains unchanged; only active-scope data and evidence are committed.
+          # Collectors receive temporary compatibility projections. Approved registry and
+          # configuration files remain unchanged; only active-scope data is committed.
           git add data/
           git diff --staged --quiet || git commit -m "Weekly scrape $(date +'%Y-%m-%d')"
           git push

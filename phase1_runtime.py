@@ -6,15 +6,15 @@ import subprocess
 import sys
 import tempfile
 import time
-from copy import deepcopy
 from pathlib import Path
 from typing import Any, Sequence
 
 from phase1_common import (
     DEFAULT_TIMEOUT_SECONDS, UNBOUNDED_MAX_RESULTS, analyze_csv_quality,
-    expected_output_path, file_signature, load_json, price_history_path,
-    source_status_path, utc_date, utc_now, validate_csv, write_json,
+    expected_output_path, file_signature, price_history_path, source_status_path,
+    utc_date, utc_now, validate_csv, write_json,
 )
+from vehicle_config import CONFIG_SCHEMA_VERSION, legacy_runtime_config, load_vehicle_config
 
 
 def history_snapshot(path: Path) -> bytes | None:
@@ -33,8 +33,11 @@ def remove_history_observations_for_date(path: Path, date_value: str) -> int:
     if not path.exists():
         return 0
     try:
-        history = load_json(path)
+        with path.open("r", encoding="utf-8") as handle:
+            history = json.load(handle)
     except (OSError, ValueError, json.JSONDecodeError):
+        return 0
+    if not isinstance(history, dict):
         return 0
     removed = 0
     for listing_id, records in list(history.items()):
@@ -55,8 +58,11 @@ def dedupe_history_observations_for_date(path: Path, date_value: str) -> int:
     if not path.exists():
         return 0
     try:
-        history = load_json(path)
+        with path.open("r", encoding="utf-8") as handle:
+            history = json.load(handle)
     except (OSError, ValueError, json.JSONDecodeError):
+        return 0
+    if not isinstance(history, dict):
         return 0
     removed = 0
     for listing_id, records in list(history.items()):
@@ -104,7 +110,7 @@ def run_source(
     root = root.resolve()
     config_path = config_path if config_path.is_absolute() else root / config_path
     original_config = config_path.read_bytes()
-    config = load_json(config_path)
+    config = load_vehicle_config(config_path)
     output_path = expected_output_path(root, config, source)
     status_path = source_status_path(root, config, source)
     history_path = price_history_path(root, config, source)
@@ -118,8 +124,9 @@ def run_source(
     returncode: int | None = None
     timed_out = False
 
-    runtime_config = deepcopy(config)
-    runtime_config["max_results"] = UNBOUNDED_MAX_RESULTS
+    runtime_config = legacy_runtime_config(
+        config, source=source, max_results=UNBOUNDED_MAX_RESULTS
+    )
     with tempfile.TemporaryDirectory(prefix=".phase1_runtime_", dir=root) as temp_dir:
         runtime_path = Path(temp_dir) / config_path.name
         write_json(runtime_path, runtime_config)
@@ -199,7 +206,11 @@ def run_source(
             status_name = "degraded"
 
     status = {
-        "schema_version": 3, "run_id": run_id or os.environ.get("GITHUB_RUN_ID", "local"),
+        "schema_version": 4,
+        "configuration_schema_version": CONFIG_SCHEMA_VERSION,
+        "runtime_config_projection": "legacy_collector_v1",
+        "approved_config_contains_legacy_controls": False,
+        "run_id": run_id or os.environ.get("GITHUB_RUN_ID", "local"),
         "vehicle_key": config["vehicle_key"], "source": source,
         "config_path": str(config_path.relative_to(root)), "command": list(command),
         "started_at_utc": started_at, "completed_at_utc": utc_now(),
@@ -208,7 +219,7 @@ def run_source(
         "timeout_seconds": timeout_seconds, "failure_reasons": failures,
         "expected_output": str(output_path.relative_to(root)),
         "output_exists": output_path.exists(), "output_updated_this_run": fresh,
-        "configured_max_results": config.get("max_results"),
+        "configured_max_results": None,
         "effective_max_results": "unbounded", "row_cap_disabled": True,
         "config_isolated": config_isolated,
         "distance_processing_disabled": source == "kijiji",
