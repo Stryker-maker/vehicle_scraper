@@ -19,8 +19,28 @@ class RuntimeTests(unittest.TestCase):
         self.root = Path(self.temp.name)
         self.config_path = self.root / "config_test.json"
         self.config = {
-            "vehicle_key": "test_vehicle", "make": "Test", "model": "Vehicle",
-            "max_results": 50, "search_locations": ["Original, AB"],
+            "schema_version": 2,
+            "vehicle_key": "test_vehicle",
+            "make": "Test",
+            "model": "Vehicle",
+            "criteria": {
+                "min_year": 2000, "max_year": 2030, "max_price_cad": 100000,
+                "fuel": "Gas", "engine": "",
+            },
+            "origin": {
+                "home_city": "Red Deer, AB", "home_coords": [52.2681, -113.8112],
+                "max_distance_km": 800,
+            },
+            "sources": {
+                "autotrader": {
+                    "make": "test", "model": "vehicle",
+                    "search_locations": ["Original, AB"],
+                },
+                "kijiji": {
+                    "make": "Test", "model": "Vehicle",
+                    "search_locations": ["Original, AB"],
+                },
+            },
         }
         self.config_path.write_text(json.dumps(self.config, indent=2), encoding="utf-8")
 
@@ -34,6 +54,8 @@ import argparse,csv,json
 from pathlib import Path
 p=argparse.ArgumentParser();p.add_argument('--config',required=True);p.add_argument('--source',required=True);a=p.parse_args()
 c=Path(a.config);cfg=json.loads(c.read_text());assert cfg['max_results']>200
+assert 'ranking_weights' in cfg
+assert cfg['search_locations']==['Original, AB']
 cfg['search_locations']=['Mutated, AB'];c.write_text(json.dumps(cfg))
 out=Path('data')/cfg['vehicle_key']/'latest'/f"{cfg['vehicle_key']}_{a.source}_latest.csv";out.parent.mkdir(parents=True,exist_ok=True)
 f=['listing_id','url','source','price','mileage','location','distance_km']
@@ -54,6 +76,10 @@ with out.open('w',newline='',encoding='utf-8') as h:
         self.assertEqual(status["row_count"], 200)
         self.assertTrue(status["row_cap_disabled"])
         self.assertEqual(status["effective_max_results"], "unbounded")
+        self.assertIsNone(status["configured_max_results"])
+        self.assertEqual(status["configuration_schema_version"], 2)
+        self.assertEqual(status["runtime_config_projection"], "legacy_collector_v1")
+        self.assertFalse(status["approved_config_contains_legacy_controls"])
         self.assertEqual(self.config_path.read_bytes(), original)
         self.assertTrue(status["config_isolated"])
 
@@ -65,6 +91,7 @@ from pathlib import Path
 p=argparse.ArgumentParser();p.add_argument('--config',required=True);a=p.parse_args()
 assert os.environ['PHASE1_KIJIJI_DISTANCE_DISABLED']=='1'
 cfg=json.loads(Path(a.config).read_text())
+assert cfg['search_locations']==['Original, AB']
 out=Path('data')/cfg['vehicle_key']/'latest'/f"{cfg['vehicle_key']}_kijiji_latest.csv";out.parent.mkdir(parents=True,exist_ok=True)
 f=['listing_id','url','source','price','mileage','location','distance_km']
 with out.open('w',newline='',encoding='utf-8') as h:
