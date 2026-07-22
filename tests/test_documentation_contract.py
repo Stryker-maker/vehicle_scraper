@@ -22,6 +22,7 @@ class DocumentationContractTests(unittest.TestCase):
             "docs/LIMITATIONS_REGISTER.md",
             "docs/LEGACY_COMPONENTS.md",
             "docs/AUDIT_ROADMAP.md",
+            "AUDIT_03_CANONICAL_EVIDENCE.md",
         ]
         readme = self.read("README.md")
         for path in required:
@@ -42,25 +43,35 @@ class DocumentationContractTests(unittest.TestCase):
         self.assertIn("vehicle_registry.json", readme)
         self.assertIn("manual_review_latest.csv", readme)
         self.assertIn("Automated cross-source ranking is disabled", readme)
+        self.assertIn("canonical_evidence.py", readme)
+        self.assertIn(
+            "fetched_records = accepted_records + rejected_records + parse_failures",
+            readme,
+        )
 
     def test_data_dictionary_covers_supported_manual_review_fields(self):
         dictionary = self.read("docs/DATA_DICTIONARY.md")
         missing = [field for field in MANUAL_REVIEW_FIELDS if f"`{field}`" not in dictionary]
         self.assertEqual(missing, [])
+        self.assertIn("legacy_collector_emitted_csv_rows", dictionary)
+        self.assertIn("source_identifier_claim_not_vin", dictionary)
 
     def test_approved_roadmap_preserves_every_audit_package(self):
         roadmap = self.read("docs/AUDIT_ROADMAP.md")
         for number in range(12):
             self.assertRegex(roadmap, rf"## Audit {number:02d} — ")
         self.assertIn("| 00 | Scope Freeze and Runtime Reduction | Complete and merged |", roadmap)
+        self.assertIn("| 02 | Vehicle Registry and Configuration Governance | Complete and merged |", roadmap)
         self.assertIn("| 11 | Optional Search Reintroduction | Approved final stage |", roadmap)
+        self.assertIn("Implemented; validation and owner merge pending", roadmap)
 
     def test_limitations_have_unique_identifiers(self):
         register = self.read("docs/LIMITATIONS_REGISTER.md")
         identifiers = re.findall(r"LIM-\d{3}", register)
-        self.assertGreaterEqual(len(set(identifiers)), 20)
+        self.assertGreaterEqual(len(set(identifiers)), 30)
         table_identifiers = re.findall(r"\| (LIM-\d{3}) \|", register)
         self.assertEqual(len(table_identifiers), len(set(table_identifiers)))
+        self.assertIn("LIM-030", register)
 
     def test_legacy_merger_is_marked_and_not_automated(self):
         merger = self.read("merge.py")
@@ -78,7 +89,19 @@ class DocumentationContractTests(unittest.TestCase):
         self.assertIn("active interim operating guidance", guidance)
         self.assertIn("docs/REPOSITORY_BASELINE.md", guidance)
         self.assertIn("docs/LIMITATIONS_REGISTER.md", guidance)
+        self.assertIn("AUDIT_03_CANONICAL_EVIDENCE.md", guidance)
         self.assertIn("What Phase 1 does not prove", guidance)
+        self.assertIn("accepted_latest.jsonl", guidance)
+
+    def test_audit03_contract_preserves_boundary_and_stop_conditions(self):
+        contract = self.read("AUDIT_03_CANONICAL_EVIDENCE.md")
+        self.assertIn("legacy_collector_emitted_csv_rows", contract)
+        self.assertIn(
+            "fetched_records = accepted_records + rejected_records + parse_failures",
+            contract,
+        )
+        self.assertIn("Stop and revise before merge", contract)
+        self.assertIn("no F-150 or Tundra path changes", contract)
 
 
 if __name__ == "__main__":
