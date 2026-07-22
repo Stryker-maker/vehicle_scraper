@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "profile": "audit_active",
   "vehicles": [
     {
@@ -7,35 +7,65 @@
       "config_path": "config_f350.json",
       "enabled": true,
       "purpose": "primary_purchase",
-      "priority": 1
+      "priority": 1,
+      "cadence": "weekly",
+      "enabled_sources": [
+        "autotrader",
+        "kijiji"
+      ],
+      "analysis_profile": "f350_purchase"
     },
     {
       "vehicle_key": "ram_3500",
       "config_path": "config_ram3500.json",
       "enabled": true,
       "purpose": "owned_vehicle_value_monitoring",
-      "priority": 2
+      "priority": 2,
+      "cadence": "weekly",
+      "enabled_sources": [
+        "autotrader",
+        "kijiji"
+      ],
+      "analysis_profile": "owned_vehicle_value"
     },
     {
       "vehicle_key": "subaru_forester",
       "config_path": "config_forester.json",
       "enabled": true,
       "purpose": "owned_vehicle_value_monitoring",
-      "priority": 2
+      "priority": 2,
+      "cadence": "weekly",
+      "enabled_sources": [
+        "autotrader",
+        "kijiji"
+      ],
+      "analysis_profile": "owned_vehicle_value"
     },
     {
       "vehicle_key": "honda_odyssey",
       "config_path": "config_odyssey.json",
       "enabled": true,
       "purpose": "family_friend_purchase_search",
-      "priority": 3
+      "priority": 3,
+      "cadence": "weekly",
+      "enabled_sources": [
+        "autotrader",
+        "kijiji"
+      ],
+      "analysis_profile": "family_friend_purchase"
     },
     {
       "vehicle_key": "kia_carnival",
       "config_path": "config_carnival.json",
       "enabled": true,
       "purpose": "family_friend_purchase_search",
-      "priority": 3
+      "priority": 3,
+      "cadence": "weekly",
+      "enabled_sources": [
+        "autotrader",
+        "kijiji"
+      ],
+      "analysis_profile": "family_friend_purchase"
     },
     {
       "vehicle_key": "ford_f150",
@@ -43,6 +73,12 @@
       "enabled": false,
       "purpose": "optional_curiosity",
       "priority": 4,
+      "cadence": "weekly",
+      "enabled_sources": [
+        "autotrader",
+        "kijiji"
+      ],
+      "analysis_profile": "optional_curiosity",
       "pause_reason": "Paused during the repository audit to reduce runtime and generated-data volume."
     },
     {
@@ -51,6 +87,12 @@
       "enabled": false,
       "purpose": "optional_curiosity",
       "priority": 4,
+      "cadence": "weekly",
+      "enabled_sources": [
+        "autotrader",
+        "kijiji"
+      ],
+      "analysis_profile": "optional_curiosity",
       "pause_reason": "Paused during the repository audit to reduce runtime and generated-data volume."
     }
   ]
