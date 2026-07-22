@@ -8,14 +8,15 @@ Its primary purpose is an informed early-2020s diesel Ford F-350 purchase. It al
 
 **Functional collection prototype under structured audit.**
 
-The repository validates governed scope, runs enabled sources independently, preserves failures and stale-output evidence, reconciles records through canonical stages, and creates accepted-record review datasets. It is not a finished appraisal, recommendation, or automatic vehicle-selection system.
+The repository validates governed scope, runs enabled sources independently, preserves failures and stale-output evidence, reconciles records through source-adapter and canonical stages, and creates accepted-record review datasets. It is not a finished appraisal, recommendation, or automatic vehicle-selection system.
 
 Important boundaries:
 
 - Automated cross-source ranking is disabled.
 - Every listing requires manual verification.
-- AutoTrader now uses a direct schema-v2 source adapter with tested pagination, visible rejects/parse failures, and truthful route/geodesic distance labels.
-- Kijiji geography remains untrusted and quarantined until Audit 05.
+- AutoTrader uses a direct schema-v2 adapter with tested pagination and truthful route/geodesic distance labels.
+- Kijiji uses a direct schema-v2 JSON-LD adapter; query origin never becomes listing geography.
+- Kijiji location is listing-specific unverified source evidence when present, otherwise unknown; distance remains disabled.
 - Source listing IDs are not VINs or cross-source vehicle identity.
 - Historical merged/ranked CSV files are not current recommendations.
 
@@ -55,11 +56,13 @@ After a successful full run, use:
 - `data/run_status/latest.json`
 - `data/run_status/latest.md`
 
-AutoTrader additionally writes source-adapter evidence:
+Both sources additionally write adapter evidence:
 
-- `data/<vehicle>/adapter_evidence/autotrader/requests_latest.jsonl`
-- `data/<vehicle>/adapter_evidence/autotrader/records_latest.jsonl`
-- `data/<vehicle>/adapter_evidence/autotrader/reconciliation_latest.json`
+```text
+data/<vehicle>/adapter_evidence/<source>/requests_latest.jsonl
+data/<vehicle>/adapter_evidence/<source>/records_latest.jsonl
+data/<vehicle>/adapter_evidence/<source>/reconciliation_latest.json
+```
 
 The supported manual-review CSV is built only from accepted canonical records and contains no `rank` or `score`.
 
@@ -67,59 +70,63 @@ Do not use `data/<vehicle>/merged/*.csv` as current recommendations. Historical 
 
 ## Evidence boundaries
 
-The canonical equation is:
+The required equation is:
 
 ```text
 fetched_records = accepted_records + rejected_records + parse_failures
 ```
 
-For AutoTrader after Audit 04, `fetched_records` means:
+For AutoTrader:
 
 ```text
 autotrader_adapter_response_listing_objects
 ```
 
-Every returned listing object is therefore preserved as accepted, rejected, or parse failure, including duplicate source identities. This proves accounting for configured AutoTrader queries, not complete national marketplace coverage.
-
-For Kijiji until Audit 05, `fetched_records` still means:
+For Kijiji after Audit 05:
 
 ```text
-legacy_collector_emitted_csv_rows
+kijiji_adapter_json_ld_listing_objects
 ```
 
-Raw values remain distinct from normalized values. Unknowns normalize to JSON `null` while raw source text is retained.
+Every returned adapter listing object is preserved as accepted, rejected, or parse failure, including duplicate source identities. This proves accounting for configured queries, not complete marketplace coverage.
+
+Raw values remain distinct from normalized values. Unknowns normalize to JSON `null` while raw source payloads and query provenance are retained.
 
 ## Current execution flow
 
 1. Validate registry schema v2 and every referenced config schema v2.
-2. Build the governed full or single-pair source plan.
-3. Run structured tests before collection.
-4. AutoTrader reads the approved schema-v2 config directly through `autotrader_run.py` and `autotrader_adapter.py`.
-5. Kijiji still receives a disposable legacy projection through the interim safety runner.
-6. Record freshness, status, current/stale rows, config isolation, and reconciliation evidence.
-7. Preserve source-adapter and canonical raw/normalized/accepted/rejected/parse-failure stages.
-8. Build unranked manual review from current accepted evidence.
-9. For a full run, create registry-wide health reports and optionally commit generated data.
+2. Validate every Kijiji query label against the explicit hub registry.
+3. Build the governed full or single-pair source plan.
+4. Run structured tests before collection.
+5. AutoTrader runs through `autotrader_run.py` and `autotrader_adapter.py`.
+6. Kijiji runs through `kijiji_run.py` and `kijiji_adapter.py` with no runtime patching or `exec`.
+7. Record requests, pagination, failures, current/stale rows, config isolation, and reconciliation evidence.
+8. Preserve adapter and canonical raw/normalized/accepted/rejected/parse-failure stages.
+9. Build unranked manual review from current accepted evidence.
+10. For a full run, create registry-wide health reports and optionally commit generated data.
 
 ## AutoTrader guarantees and limits
 
-The direct adapter provides:
-
-- explicit page size and offset requests
-- retry/backoff evidence
-- per-page query provenance
-- reported-total or short-page pagination termination
-- repeated-page and maximum-page fail-visible protection
-- visible duplicate, parse-failure, and criteria-rejection reasons
-- explicit distance methods: route API, geodesic estimate, or unavailable
-- no internal ranking or score
-- no config mutation or self-managing search locations
+The direct adapter provides explicit page-size/offset requests, retry/backoff evidence, per-page provenance, bounded pagination protection, visible duplicate/parse/exclusion reasons, truthful route/geodesic/unavailable distance methods, no ranking, and no config mutation.
 
 AutoTrader source status uses schema version `6` and adapter schema version `1`.
 
-## Kijiji interim boundary
+## Kijiji guarantees and limits
 
-Kijiji still runs through `phase1_kijiji_runner.py`, which disables location-based filtering, distance processing, source ranking, and automatic search-location mutation. Canonical evidence preserves the raw search origin but normalizes Kijiji location/address/distance to null or disabled. Audit 05 replaces this path.
+The direct Kijiji adapter provides:
+
+- six validated Cars & Trucks query hubs with no `l0` fallback
+- explicit retry and page evidence
+- JSON-LD `ItemList`, `Vehicle`, `Car`, and `Product` extraction
+- visible duplicate, parse-failure, and criteria-rejection reasons
+- query hub, page, request URL, and response-item provenance
+- listing-specific geography only from structured source fields
+- explicit unknown geography when listing evidence is absent
+- URL region evidence kept separate from location
+- disabled distance processing/filtering
+- no rank/score, runtime patching, or config mutation
+
+Kijiji source status uses schema version `7`, adapter schema version `1`, and location-registry version `1`.
 
 ## Workflow modes
 
@@ -131,12 +138,12 @@ The workflow is `.github/workflows/scrape.yml`.
 - Pull requests: compilation, registry/config validation, and structured tests only.
 - Generated-data follow-up: acknowledgement only; collectors do not rerun.
 
-Audit 04 validation uses:
+Audit 05 validation uses:
 
 ```text
 validation_mode: single_pair
 vehicle_key: ford_f350
-source: autotrader
+source: kijiji
 commit_generated_data: false
 ```
 
@@ -161,20 +168,20 @@ python autotrader_run.py \
   --fail-on-unhealthy
 ```
 
-The legacy command remains a compatibility alias into the same governed runtime:
+Run governed Kijiji collection:
+
+```bash
+python kijiji_run.py \
+  --config config_f350.json \
+  --timeout-seconds 4500 \
+  --fail-on-unhealthy
+```
+
+Legacy command names remain compatibility aliases into the same governed runtimes:
 
 ```bash
 python scraper.py --config config_f350.json --fail-on-unhealthy
-```
-
-Kijiji remains:
-
-```bash
-python phase1_pipeline.py run-source \
-  --source kijiji \
-  --config config_f350.json \
-  --timeout-seconds 4500 \
-  -- python phase1_kijiji_runner.py --config config_f350.json
+python kijiji_scraper.py --config config_f350.json --fail-on-unhealthy
 ```
 
 Never run `merge.py` to create a recommendation set.
@@ -182,17 +189,17 @@ Never run `merge.py` to create a recommendation set.
 ## Repository map
 
 ```text
-.github/workflows/scrape.yml  tests, full collection, and narrow validation
-autotrader_adapter.py         direct request/pagination/parse/filter adapter
-autotrader_distance.py        truthful route/geodesic/unavailable evidence
-autotrader_history.py         unranked CSV and compatibility observations
-autotrader_canonical.py       adapter-to-canonical reconciliation
-autotrader_run.py             bounded runtime and source status schema v6
-scraper.py                    compatibility alias into autotrader_run.py
+.github/workflows/scrape.yml  tests, full collection, narrow validation
+autotrader_*.py              direct AutoTrader adapter/runtime/evidence
+kijiji_locations.py           validated Kijiji hub registry
+kijiji_adapter.py             direct JSON-LD request/parser adapter
+kijiji_history.py             unranked Kijiji CSV/observation output
+kijiji_canonical.py           adapter-to-canonical reconciliation
+kijiji_run.py                 bounded runtime and source status schema v7
+kijiji_scraper.py             compatibility alias into kijiji_run.py
 canonical_evidence.py         canonical IDs, normalization, stages, reconciliation
-phase1_runtime.py             Kijiji-era compatibility runtime and shared protections
+phase1_runtime.py             shared legacy protections and utilities
 phase1_reporting.py           accepted-evidence manual review and health
-phase1_kijiji_runner.py       interim Kijiji safety adapter
 vehicle_registry.json/.py     operational scope and source plan
 vehicle_config.py/config_*.json governed source criteria
 merge.py                      disabled legacy merger/ranker
@@ -213,6 +220,7 @@ docs/                         repository authorities
 - `PHASE1_MANUAL_REVIEW.md`
 - `AUDIT_03_CANONICAL_EVIDENCE.md`
 - `AUDIT_04_AUTOTRADER_ADAPTER.md`
+- `AUDIT_05_KIJIJI_ADAPTER.md`
 
 ## Change authority
 
