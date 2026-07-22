@@ -7,6 +7,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from canonical_evidence import read_jsonl
 from phase1_pipeline import (
     dedupe_history_observations_for_date, expected_output_path,
     remove_history_observations_for_date, row_quality_warnings, run_source, write_json,
@@ -65,7 +66,7 @@ with out.open('w',newline='',encoding='utf-8') as h:
 """, encoding="utf-8")
         return path
 
-    def test_uncapped_200_rows_and_config_isolation(self):
+    def test_uncapped_200_rows_config_isolation_and_reconciliation(self):
         original = self.config_path.read_bytes()
         script = self.collector()
         status = run_source(
@@ -82,6 +83,16 @@ with out.open('w',newline='',encoding='utf-8') as h:
         self.assertFalse(status["approved_config_contains_legacy_controls"])
         self.assertEqual(self.config_path.read_bytes(), original)
         self.assertTrue(status["config_isolated"])
+        self.assertEqual(status["canonical_evidence_schema_version"], 1)
+        self.assertEqual(status["fetched_record_count"], 200)
+        self.assertEqual(status["accepted_record_count"], 200)
+        self.assertEqual(status["rejected_record_count"], 0)
+        self.assertEqual(status["parse_failure_count"], 0)
+        self.assertEqual(status["evidence_reconciliation_status"], "reconciled")
+        accepted = read_jsonl(
+            self.root / status["canonical_evidence_artifacts"]["accepted"]
+        )
+        self.assertEqual(len(accepted), 200)
 
     def test_kijiji_runtime_records_distance_bypass_and_3000_rows(self):
         script = self.root / "kijiji_collector.py"
@@ -104,6 +115,8 @@ with out.open('w',newline='',encoding='utf-8') as h:
             run_id="run-1",
         )
         self.assertEqual(status["current_row_count"], 3000)
+        self.assertEqual(status["accepted_record_count"], 3000)
+        self.assertEqual(status["evidence_reconciliation_status"], "reconciled")
         self.assertTrue(status["distance_processing_disabled"])
         self.assertTrue(status["distance_filter_disabled"])
         self.assertTrue(status["legacy_source_ranking_disabled"])
@@ -121,6 +134,7 @@ with out.open('w',newline='',encoding='utf-8') as h:
         self.assertEqual(status["current_row_count"], 0)
         self.assertEqual(status["stale_row_count"], 1)
         self.assertEqual(status["data_quality_status"], "not_evaluated_stale_output")
+        self.assertEqual(status["evidence_reconciliation_status"], "not_reconciled")
 
     def test_failure_is_recorded(self):
         status = run_source(
