@@ -8,11 +8,9 @@ This document defines current repository fields and their evidence limits. Raw v
 
 `vehicle_registry.json` schema version `2` is the operational authority for `profile`, ordered `vehicles`, `vehicle_key`, `config_path`, `enabled`, `purpose`, `priority`, `cadence`, `enabled_sources`, `analysis_profile`, and conditional `pause_reason`.
 
-Every `config_*.json` uses schema version `2` and contains `vehicle_key`, human-facing `make` and `model`, shared `criteria`, `origin`, and separate `sources.autotrader` / `sources.kijiji` query settings. Approved configs prohibit legacy flat controls such as `max_results`, `ranking_weights`, one shared `search_locations`, and flat source aliases.
+Every `config_*.json` uses schema version `2` and contains `vehicle_key`, human-facing `make` and `model`, shared `criteria`, `origin`, and separate `sources.autotrader` / `sources.kijiji` settings. Approved configs prohibit legacy flat controls. Kijiji `search_locations` must resolve through `kijiji_locations.py` registry version `1`; unsupported labels and duplicate IDs fail validation.
 
 ## Source fetched boundaries
-
-The required equation is:
 
 ```text
 fetched_records = accepted_records + rejected_records + parse_failures
@@ -20,22 +18,36 @@ fetched_records = accepted_records + rejected_records + parse_failures
 
 | Source | `fetched_record_scope` | Meaning |
 |---|---|---|
-| AutoTrader | `autotrader_adapter_response_listing_objects` | Every listing object returned to the configured direct adapter queries |
-| Kijiji | `legacy_collector_emitted_csv_rows` | Rows emitted by the legacy collector after its internal fetch/parse/filter path |
+| AutoTrader | `autotrader_adapter_response_listing_objects` | Every listing object returned to configured direct adapter queries |
+| Kijiji | `kijiji_adapter_json_ld_listing_objects` | Every JSON-LD listing object returned to configured validated hub queries |
 
-AutoTrader pagination completeness describes configured queries and locations, not complete national marketplace coverage. Kijiji source fetch completeness remains `not_proven_by_legacy_collector` until Audit 05.
+Neither boundary proves complete marketplace coverage.
 
-## AutoTrader adapter evidence schema version 1
+## Adapter evidence schema version 1
 
-AutoTrader writes under `data/<vehicle>/adapter_evidence/autotrader/`:
+Each direct source writes under `data/<vehicle>/adapter_evidence/<source>/`:
 
 | Artifact | Meaning |
 |---|---|
-| `requests_latest.jsonl` | One record per requested page, including `query_location`, `query_page`, `query_offset`, `request_url`, `attempts`, HTTP/error outcome, listing count, and `pagination_stop_reason` |
-| `records_latest.jsonl` | One record per response listing object with `raw_payload`, `provenance`, `record_stage`, `parsed_row`, `rejection_reasons`, and `parse_failure_reasons` |
-| `reconciliation_latest.json` | Page/request counts, pagination completeness, fetched/accepted/rejected/failure counts, and adapter equality result |
+| `requests_latest.jsonl` | One record per requested page with query/page/URL, attempts, HTTP/error outcome, returned-object count, and stop reason |
+| `records_latest.jsonl` | One record per returned listing object with `raw_payload`, `provenance`, `record_stage`, `parsed_row`, `rejection_reasons`, and `parse_failure_reasons` |
+| `reconciliation_latest.json` | Request/page counts, pagination completeness, fetched/accepted/rejected/failure counts, and equality result |
 
-Adapter record stages are `accepted`, `rejected`, and `parse_failure`. Rejection examples include `duplicate_source_listing_identity`, `missing_source_listing_id`, `missing_listing_url`, `year_out_of_range`, `price_out_of_range`, `fuel_unknown`, `fuel_mismatch`, `engine_unknown`, `engine_mismatch`, `distance_unavailable`, and `distance_out_of_range`. Parse failures include `listing_payload_not_object`, `missing_vehicle_object`, `invalid_price`, and `invalid_year`.
+Adapter stages are `accepted`, `rejected`, and `parse_failure`. Reasons include `duplicate_source_listing_identity`, `missing_source_listing_id`, `missing_listing_url`, `year_out_of_range`, `price_out_of_range`, `fuel_unknown`, `fuel_mismatch`, `engine_unknown`, `engine_mismatch`, `distance_unavailable`, `distance_out_of_range`, `listing_payload_not_object`, `invalid_price`, and `invalid_year`.
+
+### Kijiji request provenance
+
+Kijiji records preserve:
+
+- `query_location`
+- `query_display_name`
+- `query_location_id`
+- `query_slug`
+- `query_page`
+- `request_url`
+- `response_item_index`
+
+These fields describe the query that returned a record. They are not listing geography.
 
 ## Canonical evidence schema version 1
 
@@ -43,7 +55,7 @@ Each source writes under `data/<vehicle>/evidence/<source>/`:
 
 | Artifact | Meaning |
 |---|---|
-| `raw_latest.jsonl` | Exact source-boundary evidence and provenance |
+| `raw_latest.jsonl` | Exact source-boundary payload and provenance |
 | `normalized_latest.jsonl` | Successfully normalized records |
 | `accepted_latest.jsonl` | Records eligible for supported manual review |
 | `rejected_latest.jsonl` | Excluded records with `rejection_reasons` |
@@ -59,7 +71,7 @@ Each source writes under `data/<vehicle>/evidence/<source>/`:
 | `vehicle_key` | Governed vehicle key |
 | `source` | `autotrader` or `kijiji` |
 | `run_id` | Workflow or explicit local run ID |
-| `source_record_index` | Zero-based position at the source boundary |
+| `source_record_index` | Zero-based position at the adapter boundary |
 | `canonical_listing_id` | Stable source-scoped listing hash; not VIN or cross-source identity |
 | `observation_id` | Run-specific observation hash |
 | `source_listing_id` | Source-provided listing identifier claim |
@@ -67,43 +79,30 @@ Each source writes under `data/<vehicle>/evidence/<source>/`:
 | `source_claim_status` | `unverified_source_claims` |
 | `raw_record_ref` | Raw artifact selector |
 | `normalized_record_ref` | Normalized artifact selector |
-| `source_adapter_record_ref` | AutoTrader adapter record selector when available |
-| `query_provenance` | AutoTrader location/page/offset/request URL evidence when available |
+| `source_adapter_record_ref` | Adapter record selector |
+| `query_provenance` | Source query/page/request evidence |
 | `normalized` | Typed/null-safe values |
 | `field_evidence` | Raw value, normalized value, source field, and evidence status |
 | `quality_warnings` | Non-destructive warning codes |
 | `rejection_reasons` | Machine-readable exclusion reasons |
 | `parse_failure_reasons` | Machine-readable failure reasons |
 
-### Null and unknown policy
+## Null, geography, and distance policy
 
-Empty strings and common sentinels such as `Unknown`, `N/A`, `None`, `null`, and `unavailable` normalize to JSON `null`. Legacy mileage `999999` also normalizes to null. Raw evidence remains preserved.
+Empty strings and common unknown sentinels normalize to JSON `null`. Legacy mileage `999999` also normalizes to null. Raw evidence remains preserved.
 
-### Evidence status vocabulary
+Kijiji query origin never becomes listing geography. Kijiji `location` and `dealer_address` are populated only from listing-specific structured source fields and carry `source_reported_listing_specific_unverified`; otherwise they are null with `unknown` evidence status. `url_region_hint` remains separate `unverified_url_evidence`.
 
-Statuses include:
+Kijiji distance is always null in Audit 05:
 
-- `source_reported_unverified`
-- `source_reported_or_configured_unverified`
-- `source_reported_or_inferred_unverified`
-- `source_text_claim_unverified`
-- `source_identifier_claim_not_vin`
-- `source_reported_not_independently_verified`
-- `route_distance_from_source_reported_location`
-- `straight_line_estimate_from_source_reported_location`
-- `location_or_geocode_unavailable`
-- `legacy_method_not_yet_disambiguated` for pre-Audit-04 AutoTrader evidence only
-- `quarantined_unverified_search_origin`
-- `disabled_due_to_unverified_location`
-- `unverified_url_evidence`
-- `unavailable`
-- `unknown`
+- `distance_method` = `disabled_listing_location_not_routed`
+- `distance_evidence_status` = `disabled_no_verified_route`
 
-These labels describe evidence handling, not independent verification.
+AutoTrader distance statuses include `route_distance_from_source_reported_location`, `straight_line_estimate_from_source_reported_location`, and `location_or_geocode_unavailable`.
+
+Additional evidence statuses include `source_reported_unverified`, `source_reported_or_configured_unverified`, `source_reported_or_inferred_unverified`, `source_text_claim_unverified`, `source_identifier_claim_not_vin`, `source_reported_not_independently_verified`, `source_reported_listing_specific_unverified`, `quarantined_unverified_search_origin` for historical Kijiji evidence, `disabled_due_to_unverified_location`, `unverified_url_evidence`, `unavailable`, and `unknown`.
 
 ## Canonical normalized values
-
-Normalized records may contain:
 
 | Field | Meaning |
 |---|---|
@@ -111,7 +110,7 @@ Normalized records may contain:
 | `make` | Source/configured make or null |
 | `model` | Source/configured model or null |
 | `trim` | Source trim/title text or null |
-| `trim_tier` | Legacy keyword tier or null; not ranking authority |
+| `trim_tier` | Legacy descriptive keyword tier or null; not ranking authority |
 | `price_cad` | Asking price integer or null |
 | `mileage_km` | Odometer integer or null |
 | `engine` | Source-derived engine text or null |
@@ -119,11 +118,10 @@ Normalized records may contain:
 | `accident_claim` | Source-text claim or null |
 | `dealer` | Source seller/dealer name or null |
 | `seller_type_claim` | Source-derived seller category or null |
-| `dealer_address` | AutoTrader source evidence or null; Kijiji quarantined |
-| `location` | AutoTrader source location or null; Kijiji null |
-| `distance_km` | Explicit AutoTrader distance value or null; Kijiji null |
-| `distance_method` | Explicit route/geodesic/unavailable method or Kijiji disabled marker |
-| `distance_evidence_status` | AutoTrader routed/geodesic/unavailable evidence status |
+| `dealer_address` | Source-reported address or null with explicit evidence status |
+| `location` | Source-reported location or null with explicit evidence status |
+| `distance_km` | Explicit AutoTrader value or null; Kijiji null |
+| `distance_method` | Explicit AutoTrader method or Kijiji disabled marker |
 | `source_listing_id` | Source ID claim; not VIN |
 | `url_region_hint` | Kijiji URL segment evidence or null |
 | `url_region_status` | URL evidence label or null |
@@ -140,7 +138,7 @@ Normalized records may contain:
 
 ## Decision-safe manual-review CSV
 
-The supported CSV is generated only from `accepted_latest.jsonl`. It excludes source `rank`, `score`, `weeks_tracked`, and `price_last_week`. Kijiji search origin appears only in `unverified_location_value`.
+The supported CSV is generated only from `accepted_latest.jsonl`. It excludes source `rank`, `score`, `weeks_tracked`, and `price_last_week`. `unverified_location_value` preserves unverified raw location evidence when applicable; query origin remains available through adapter/canonical provenance, not as a decision field.
 
 The complete field order is:
 
@@ -150,43 +148,34 @@ Control fields include `ranking_status`, `review_status`, `collection_status`, `
 
 ## Source status
 
-Each enabled pair writes `data/<vehicle>/run_status/<source>_latest.json`.
-
-### Shared canonical fields
-
-- `canonical_evidence_schema_version`
-- `fetched_record_scope`
-- `source_fetch_completeness`
-- `fetched_record_count`
-- `normalized_record_count`
-- `accepted_record_count`
-- `rejected_record_count`
-- `parse_failure_count`
-- `evidence_reconciliation_status`
-- `evidence_reconciliation_equation`
-- `canonical_evidence_artifacts`
-- `canonical_evidence_error`
+Shared fields include `canonical_evidence_schema_version`, `fetched_record_scope`, `source_fetch_completeness`, `fetched_record_count`, `normalized_record_count`, `accepted_record_count`, `rejected_record_count`, `parse_failure_count`, `evidence_reconciliation_status`, `evidence_reconciliation_equation`, `canonical_evidence_artifacts`, and `canonical_evidence_error`.
 
 ### AutoTrader source status schema version 6
 
-AutoTrader additionally records:
+AutoTrader records adapter schema `1`, `runtime_config_projection: direct_schema_v2`, pagination/request counts, adapter artifacts, disabled ranking, and its explicit distance contract.
+
+### Kijiji source status schema version 7
+
+Kijiji records:
 
 - `source_adapter_schema_version` = `1`
+- `location_registry_version` = `1`
 - `runtime_config_projection` = `direct_schema_v2`
 - `pagination_complete`
+- `query_location_count`
 - `page_request_count`
 - `request_attempt_count`
 - `successful_page_count`
 - `failed_page_count`
-- `source_adapter_artifacts`
+- `listing_specific_location_record_count`
+- `unknown_location_record_count`
+- `distance_processing_disabled` = `true`
+- `distance_filter_disabled` = `true`
 - `legacy_source_ranking_disabled` = `true`
-- `distance_evidence_contract` = `explicit_route_api_or_geodesic_or_unavailable`
+- `location_evidence_contract` = `listing_specific_source_geography_or_unknown_query_origin_never_location`
+- adapter and canonical artifact paths
 
-### Kijiji source status schema version 5
-
-Kijiji retains `runtime_config_projection: legacy_collector_v1`, config-isolation evidence, and disabled geography/ranking markers until Audit 05.
-
-A source is healthy only when current, successful, fresh, minimally schema-valid, uncapped, config-isolated, reconciled, and non-empty. AutoTrader can report success only when pagination is complete and accepted/output counts match.
+A source is healthy only when current, successful, fresh, minimally schema-valid, uncapped, config-isolated, reconciled, non-empty, and complete for its configured pagination contract.
 
 ## Consolidated health schema version 5
 
