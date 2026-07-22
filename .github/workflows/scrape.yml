@@ -6,6 +6,33 @@ on:
     # Every Monday at 8:00 AM UTC (2:00 AM MDT)
     - cron: '0 8 * * 1'
   workflow_dispatch:
+    inputs:
+      validation_mode:
+        description: Collection scope for this manual run
+        type: choice
+        options:
+          - full
+          - single_pair
+        default: full
+        required: true
+      vehicle_key:
+        description: Governed vehicle key for single-pair validation
+        type: string
+        default: ford_f350
+        required: true
+      source:
+        description: Source for single-pair validation
+        type: choice
+        options:
+          - autotrader
+          - kijiji
+        default: autotrader
+        required: true
+      commit_generated_data:
+        description: Commit generated data from a manual full run
+        type: boolean
+        default: false
+        required: true
 
 concurrency:
   group: vehicle-scrape-${{ github.ref }}
@@ -45,6 +72,11 @@ jobs:
           vehicle_registry.py
           phase1_common.py
           canonical_evidence.py
+          autotrader_distance.py
+          autotrader_history.py
+          autotrader_adapter.py
+          autotrader_canonical.py
+          autotrader_run.py
           phase1_kijiji_runner.py
           phase1_runtime.py
           phase1_reporting.py
@@ -64,6 +96,7 @@ jobs:
     if: github.event_name != 'pull_request'
     needs: test
     runs-on: ubuntu-latest
+    timeout-minutes: 90
     permissions:
       contents: write
 
@@ -86,19 +119,66 @@ jobs:
           python vehicle_registry.py validate --registry vehicle_registry.json
           python vehicle_registry.py summary --registry vehicle_registry.json
 
-      - name: Collect uncapped source data with canonical status evidence
+      - name: Build governed collection plan
+        id: collection-plan
+        env:
+          VALIDATION_MODE: ${{ inputs.validation_mode || 'full' }}
+          VEHICLE_KEY: ${{ inputs.vehicle_key || 'ford_f350' }}
+          SELECTED_SOURCE: ${{ inputs.source || 'autotrader' }}
+        run: |
+          set -euo pipefail
+          plan="$RUNNER_TEMP/source-plan.tsv"
+          if [[ "$GITHUB_EVENT_NAME" == "schedule" || "$VALIDATION_MODE" == "full" ]]; then
+            python vehicle_registry.py active-runs --registry vehicle_registry.json > "$plan"
+          else
+            python - <<'PY' > "$plan"
+          import os
+          from pathlib import Path
+          from vehicle_registry import registry_entries
+
+          root = Path.cwd()
+          vehicle_key = os.environ["VEHICLE_KEY"]
+          source = os.environ["SELECTED_SOURCE"]
+          matches = [
+              entry for entry in registry_entries(root=root)
+              if entry["vehicle_key"] == vehicle_key
+          ]
+          if len(matches) != 1:
+              raise SystemExit(f"Unknown governed vehicle_key: {vehicle_key}")
+          entry = matches[0]
+          if not entry["enabled"]:
+              raise SystemExit(f"Vehicle is paused and cannot be smoke-tested: {vehicle_key}")
+          if source not in entry["enabled_sources"]:
+              raise SystemExit(
+                  f"Source {source} is not enabled for governed vehicle {vehicle_key}"
+              )
+          print(f"{entry['config_path']}\t{source}")
+          PY
+          fi
+          if [[ ! -s "$plan" ]]; then
+            echo "Collection plan is empty" >&2
+            exit 1
+          fi
+          echo "path=$plan" >> "$GITHUB_OUTPUT"
+          cat "$plan"
+
+      - name: Collect source data with canonical status evidence
         env:
           ORS_API_KEY: ${{ secrets.ORS_API_KEY }}
+          VALIDATION_MODE: ${{ inputs.validation_mode || 'full' }}
         run: |
           set -euo pipefail
           while IFS=$'\t' read -r config source; do
             case "$source" in
               autotrader)
-                python phase1_pipeline.py run-source \
-                  --source autotrader \
+                extra=()
+                if [[ "$VALIDATION_MODE" == "single_pair" ]]; then
+                  extra+=(--fail-on-unhealthy)
+                fi
+                python autotrader_run.py \
                   --config "$config" \
                   --timeout-seconds 4500 \
-                  -- python scraper.py --config "$config"
+                  "${extra[@]}"
                 ;;
               kijiji)
                 python phase1_pipeline.py run-source \
@@ -108,31 +188,111 @@ jobs:
                   -- python phase1_kijiji_runner.py --config "$config"
                 ;;
               *)
-                echo "Unsupported source in active run plan: $source" >&2
+                echo "Unsupported source in collection plan: $source" >&2
                 exit 1
                 ;;
             esac
-          done < <(python vehicle_registry.py active-runs --registry vehicle_registry.json)
+          done < "${{ steps.collection-plan.outputs.path }}"
+
+      - name: Validate single-pair source evidence
+        if: github.event_name == 'workflow_dispatch' && inputs.validation_mode == 'single_pair'
+        env:
+          PLAN_PATH: ${{ steps.collection-plan.outputs.path }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          from phase1_common import source_status_path, status_is_current_success
+          from vehicle_config import load_vehicle_config
+
+          plan_line = Path(os.environ["PLAN_PATH"]).read_text(encoding="utf-8").strip()
+          config_value, source = plan_line.split("\t")
+          root = Path.cwd()
+          config = load_vehicle_config(root / config_value)
+          status_path = source_status_path(root, config, source)
+          status = json.loads(status_path.read_text(encoding="utf-8"))
+          run_id = os.environ["GITHUB_RUN_ID"]
+          if not status_is_current_success(status, run_id):
+              raise SystemExit(f"Single-pair source status is unhealthy: {status_path}")
+          if source == "autotrader":
+              requirements = {
+                  "schema_version": 6,
+                  "source_adapter_schema_version": 1,
+                  "runtime_config_projection": "direct_schema_v2",
+                  "pagination_complete": True,
+                  "legacy_source_ranking_disabled": True,
+              }
+              mismatches = {
+                  key: {"expected": expected, "actual": status.get(key)}
+                  for key, expected in requirements.items()
+                  if status.get(key) != expected
+              }
+              if mismatches:
+                  raise SystemExit(
+                      "AutoTrader smoke contract failed: "
+                      + json.dumps(mismatches, sort_keys=True)
+                  )
+          print(
+              f"Single-pair validation passed: {config['vehicle_key']}:{source} | "
+              f"fetched={status.get('fetched_record_count')} | "
+              f"accepted={status.get('accepted_record_count')} | "
+              f"rejected={status.get('rejected_record_count')} | "
+              f"parse_failures={status.get('parse_failure_count')}"
+          )
+          PY
+
+      - name: Prepare single-pair validation artifact
+        if: github.event_name == 'workflow_dispatch' && inputs.validation_mode == 'single_pair'
+        env:
+          VEHICLE_KEY: ${{ inputs.vehicle_key }}
+          SELECTED_SOURCE: ${{ inputs.source }}
+        run: |
+          set -euo pipefail
+          artifact="$RUNNER_TEMP/smoke-artifact"
+          mkdir -p "$artifact/run_status" "$artifact/latest" "$artifact/evidence"
+          cp "data/$VEHICLE_KEY/run_status/${SELECTED_SOURCE}_latest.json" "$artifact/run_status/"
+          cp "data/$VEHICLE_KEY/latest/${VEHICLE_KEY}_${SELECTED_SOURCE}_latest.csv" "$artifact/latest/"
+          cp -R "data/$VEHICLE_KEY/evidence/$SELECTED_SOURCE/." "$artifact/evidence/"
+          if [[ -d "data/$VEHICLE_KEY/adapter_evidence/$SELECTED_SOURCE" ]]; then
+            mkdir -p "$artifact/adapter_evidence"
+            cp -R "data/$VEHICLE_KEY/adapter_evidence/$SELECTED_SOURCE/." "$artifact/adapter_evidence/"
+          fi
+          cp "${{ steps.collection-plan.outputs.path }}" "$artifact/source-plan.tsv"
+
+      - name: Upload single-pair validation artifact
+        if: github.event_name == 'workflow_dispatch' && inputs.validation_mode == 'single_pair'
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-smoke-${{ inputs.vehicle_key }}-${{ inputs.source }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/smoke-artifact
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Build evidence-backed manual-review files
+        if: github.event_name == 'schedule' || inputs.validation_mode == 'full'
         run: >-
           python phase1_pipeline.py build-manual-review
           --registry vehicle_registry.json
 
       - name: Write consolidated reconciliation and run-health report
+        if: github.event_name == 'schedule' || inputs.validation_mode == 'full'
         run: |
           python phase1_pipeline.py report-health --registry vehicle_registry.json
           cat data/run_status/latest.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Commit and push collected data and evidence
+        if: github.event_name == 'schedule' || (inputs.validation_mode == 'full' && inputs.commit_generated_data)
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          # Collectors receive temporary compatibility projections. Approved registry and
-          # configuration files remain unchanged; only active-scope data/evidence is committed.
+          # Single-pair smoke runs never reach this step. Scheduled and explicitly approved
+          # full runs may commit active-scope generated data and evidence.
           git add data/
           git diff --staged --quiet || git commit -m "Weekly scrape $(date +'%Y-%m-%d')"
           git push
 
       - name: Fail visibly when any expected source run is unhealthy
+        if: github.event_name == 'schedule' || inputs.validation_mode == 'full'
         run: python phase1_pipeline.py check-health

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This register preserves known repository weaknesses so they remain visible, prioritized, and assigned to approved packages. A successful workflow does not close a limitation unless its acceptance criteria are explicitly met.
+This register preserves known weaknesses so they remain visible, prioritized, and assigned to approved packages. A successful workflow does not close a limitation unless its acceptance criteria are met.
 
 Severity:
 
@@ -14,7 +14,8 @@ Severity:
 Status:
 
 - **Open** — not fixed
-- **Controlled, not fixed** — safeguards reduce harm but underlying defect remains
+- **Controlled, not fixed** — safeguards or one source reduce harm but the full defect remains
+- **Implemented, validation pending** — code/tests exist but required live/owner evidence is incomplete
 - **Resolved** — acceptance evidence exists for the stated boundary
 - **Deferred by owner** — intentionally postponed
 
@@ -22,62 +23,68 @@ Status:
 
 | ID | Severity | Status | Limitation | Current control | Planned package |
 |---|---|---|---|---|---|
-| LIM-001 | Critical | Controlled, not fixed | Kijiji parser stores search origin as location/address rather than verified listing geography | Canonical evidence preserves the raw value but normalizes location/distance to null and labels it quarantined | Audit 05 |
+| LIM-001 | Critical | Controlled, not fixed | Kijiji parser stores search origin as location/address rather than verified listing geography | Canonical evidence preserves raw value but normalizes location/distance to null and labels it quarantined | Audit 05 |
 | LIM-002 | Critical | Controlled, not fixed | Kijiji safety depends on exact runtime text replacement and `exec` | Patch-anchor tests and runtime safety adapter | Audit 05 |
-| LIM-003 | Critical | Resolved | Collector-emitted rows were not traceable through raw, normalized, accepted, rejected, and parse-failure stages | Canonical schema v1 artifacts and enforced reconciliation equation | Audit 03 |
-| LIM-004 | High | Open | AutoTrader has no verified pagination contract | Post-parse result cap is disabled | Audit 04 |
-| LIM-005 | High | Open | Broad collector exceptions can silently skip individual source parse failures before CSV output | Canonical layer begins at emitted CSV and explicitly labels source completeness unproven | Audits 04–05 |
-| LIM-006 | High | Controlled, not fixed | AutoTrader distance evidence does not distinguish routed from straight-line fallback reliably | Canonical field status remains `legacy_method_not_yet_disambiguated` | Audit 04 |
-| LIM-007 | High | Controlled, not fixed | `clean` means only that a small warning set did not fire | Manual review includes source-claim and field-evidence statuses; documentation limits interpretation | Audits 04–05 |
+| LIM-003 | Critical | Resolved | Source-boundary records were not traceable through raw, normalized, accepted, rejected, and parse-failure stages | Canonical schema v1 and enforced reconciliation | Audit 03 |
+| LIM-004 | High | Implemented, validation pending | AutoTrader had no verified pagination contract | Direct page-size/offset adapter, total/short-page termination, repeated-page/max-page failure evidence, fixtures | Audit 04 |
+| LIM-005 | High | Controlled, not fixed | Broad collector exceptions could silently skip per-record parse failures | AutoTrader response objects now preserve failures; Kijiji remains legacy | Audit 05 |
+| LIM-006 | High | Implemented, validation pending | AutoTrader distance evidence did not distinguish routed from straight-line fallback | Explicit route/geodesic/unavailable methods and evidence statuses | Audit 04 |
+| LIM-007 | High | Controlled, not fixed | `clean` means only that limited warning rules did not fire | Field/source evidence statuses and explicit documentation | Audits 04–05 |
 | LIM-008 | High | Open | F-350 data lacks engine/idle hours, cab, box, SRW/DRW, and verified history enrichment | No values are invented | Audit 09 |
-| LIM-009 | High | Controlled, not fixed | Source `listing_id` is not VIN or cross-source identity | Canonical ID is source-scoped and status explicitly says `source_identifier_claim_not_vin`; merger remains disabled | Audit 06 |
-| LIM-010 | High | Open | Price history mislabels observations as weeks and lacks lifecycle states | Supported review renames values to observation-based terms; underlying history model remains legacy | Audit 06 |
-| LIM-011 | High | Open | Timestamped CSV/history/evidence growth lacks retention boundaries | Optional high-volume vehicles paused; evidence writes latest artifacts only | Audit 07 |
+| LIM-009 | High | Controlled, not fixed | Source `listing_id` is not VIN or cross-source identity | Canonical ID is source-scoped and labelled `source_identifier_claim_not_vin`; merger disabled | Audit 06 |
+| LIM-010 | High | Open | Price history lacks lifecycle states and older artifacts use week terminology | Supported review uses observation terms; underlying model remains compatibility history | Audit 06 |
+| LIM-011 | High | Open | Timestamped CSV/history/evidence growth lacks retention boundaries | Optional high-volume vehicles paused; smoke artifacts expire after seven days | Audit 07 |
 | LIM-012 | Medium | Open | Workflow installs unpinned dependencies | Tests run first | Audit 08 |
-| LIM-013 | High | Resolved | Workflow scope was hard-coded and included unnecessary optional vehicles | Registry controls active vehicles; Audit 00 proved 10 runs and no paused changes | Audit 00 |
-| LIM-014 | High | Resolved | README contradicted actual operation | Current authority documents and documentation-contract tests | Audit 01 |
-| LIM-015 | Medium | Resolved | Approved configs contained legacy `max_results` and `ranking_weights` | Schema v2 prohibits them; compatibility values exist only in temporary runtime projection | Audit 02 |
-| LIM-016 | High | Resolved | Legacy collectors could receive/mutate approved config paths | Disposable projection plus byte-for-byte config isolation evidence | Audit 02 |
-| LIM-017 | Medium | Controlled, not fixed | Source CSVs and collector console output may contain rank/score fields | Supported manual review is built from canonical accepted records and contains neither field | Audits 04–05 |
-| LIM-018 | Medium | Open | Legacy source filters can reject unknown engine/fuel before canonical evidence exists | Canonical post-CSV exclusions are visible, but pre-CSV filtering remains unproven | Audits 04–05 |
+| LIM-013 | High | Resolved | Workflow scope was hard-coded and included unnecessary optional vehicles | Registry controls active vehicles; Audit 00 validation | Audit 00 |
+| LIM-014 | High | Resolved | README contradicted actual operation | Current authorities and documentation tests | Audit 01 |
+| LIM-015 | Medium | Resolved | Approved configs contained legacy `max_results` and `ranking_weights` | Schema v2 prohibits them | Audit 02 |
+| LIM-016 | High | Resolved | Legacy collectors could receive/mutate approved config paths | Audit 02 isolated configs; AutoTrader now reads schema v2 directly and remains byte-identical | Audits 02, 04 |
+| LIM-017 | Medium | Controlled, not fixed | Source output could contain rank/score fields | AutoTrader no longer emits either; supported review excludes them; Kijiji remains legacy | Audit 05 |
+| LIM-018 | Medium | Controlled, not fixed | Source filters could reject unknown engine/fuel without evidence | AutoTrader adapter records explicit reasons; Kijiji remains legacy | Audit 05 |
 | LIM-019 | Medium | Open | Kijiji location-ID mappings/fallbacks are not formally validated | Geography disabled for decisions | Audit 05 |
-| LIM-020 | Medium | Resolved | Source criteria and search locations were ambiguous shared flat configuration | Schema v2 separates and validates source settings | Audit 02 |
-| LIM-021 | High | Open | Tests focus more on wrappers than real source fixtures | Canonical hostile tests cover boundary semantics | Audits 04–05 |
+| LIM-020 | Medium | Resolved | Source criteria and locations were ambiguous shared flat configuration | Schema v2 separates and validates source settings | Audit 02 |
+| LIM-021 | High | Controlled, not fixed | Source parsing lacked representative fixtures | AutoTrader has two-page and hostile fixtures; Kijiji fixtures remain pending | Audit 05 |
 | LIM-022 | High | Open | Historical merger treats listing IDs like VINs and applies scoring | Workflow never calls it; explicitly disabled | Audit 06 |
-| LIM-023 | Medium | Open | Generated data and implementation share branch/PR diffs | Data follow-up inspected separately | Audits 07–08 |
-| LIM-024 | Medium | Open | Collection/tests share one workflow and generated-data approval adds friction | Acknowledgement path prevents duplicate collection | Audit 08 |
-| LIM-025 | High | Open | No transparent F-350 candidate/enrichment/override model | All accepted rows remain manual-review candidates | Audit 09 |
+| LIM-023 | Medium | Open | Generated data and implementation can share full-run branch/PR diffs | Audit 04 single-pair smoke uploads an artifact without committing | Audits 07–08 |
+| LIM-024 | Medium | Controlled, not fixed | Collection/tests share one workflow and generated-data approval adds friction | Single-pair smoke makes no commit; acknowledgement prevents duplicate full collection | Audit 08 |
+| LIM-025 | High | Open | No transparent F-350 candidate/enrichment/override model | Accepted rows remain manual-review candidates | Audit 09 |
 | LIM-026 | Medium | Open | Purpose-specific RAM/Forester and Odyssey/Carnival outputs do not exist | Collection continues | Audit 10 |
 | LIM-027 | Medium | Deferred by owner | F-150 and Tundra are not polished during core audit | Both remain paused with history retained | Audit 11 |
-| LIM-028 | Medium | Controlled, not fixed | Legacy collectors still contain flat-config mutation and ranking code internally | They receive only disposable projected configs | Audits 04–05 |
-| LIM-029 | Low | Open | Cadence and analysis profile are validated metadata but not yet used for separate scheduling/output execution | Current profile is uniformly weekly | Audits 08–10 |
-| LIM-030 | Critical | Open | End-to-end marketplace fetch counts, response payloads, and pre-CSV parse failures are not preserved | Reconciliation scope is explicitly `legacy_collector_emitted_csv_rows` and never represented as marketplace completeness | Audits 04–05 |
-| LIM-031 | Medium | Open | Evidence retention, archival policy, and repository-growth bounds are not defined | Current canonical artifacts use `latest` paths; timestamped source/review artifacts remain | Audit 07 |
-| LIM-032 | High | Open | Canonical listing IDs identify a source-scoped listing claim, not a physical vehicle or cross-source duplicate | ID derivation and status are explicit; no destructive merge occurs | Audit 06 |
+| LIM-028 | Medium | Controlled, not fixed | Legacy collectors contained flat-config mutation and ranking internally | AutoTrader behavior removed; Kijiji retains disposable projection and patched legacy code | Audit 05 |
+| LIM-029 | Low | Open | Cadence and analysis profile are validated metadata but not fully executed | Current scheduled profile remains weekly | Audits 08–10 |
+| LIM-030 | Critical | Controlled, not fixed | End-to-end request/response and pre-output record counts were not preserved | AutoTrader begins at response listing objects; Kijiji remains emitted-CSV scope | Audit 05 |
+| LIM-031 | Medium | Open | Evidence retention, archival policy, and repository-growth bounds are undefined | Canonical and adapter evidence use latest paths; timestamped source/review artifacts remain | Audit 07 |
+| LIM-032 | High | Open | Canonical listing IDs identify source-scoped claims, not physical vehicles or cross-source duplicates | ID status explicit; no destructive merge | Audit 06 |
+| LIM-033 | Medium | Open | AutoTrader pagination completeness covers only configured queries/locations, not the entire national marketplace | Fetched scope and source completeness labels are explicit | Audits 08–10 |
+| LIM-034 | Medium | Controlled, not fixed | AutoTrader distance depends on external geocoding and optional route service availability | Unavailable geography is rejected visibly; geodesic fallback is labelled as straight-line | Audit 08 |
 
 ## Interpretation notes
 
-### Canonical reconciliation boundary
+### Reconciliation boundaries
 
-Audit 03 guarantees that no row emitted by a legacy collector disappears after the canonical boundary:
+AutoTrader:
 
 ```text
-fetched_records = accepted_records + rejected_records + parse_failures
+autotrader_adapter_response_listing_objects
+  = accepted_records + rejected_records + parse_failures
 ```
 
-It does not guarantee that the collector fetched or emitted every marketplace record. That separate critical limitation remains open as LIM-030.
+Kijiji until Audit 05:
+
+```text
+legacy_collector_emitted_csv_rows
+  = accepted_records + rejected_records + parse_failures
+```
+
+Neither equation by itself proves full marketplace coverage.
 
 ### Controlled does not mean corrected
 
-Kijiji geography, runtime source rewriting, AutoTrader distance ambiguity, and internal legacy ranking remain controlled, not repaired.
-
-### Successful run does not close source limitations
-
-`SUCCESS` or `SUCCESS_WITH_WARNINGS` proves that enabled registry source pairs met the current runtime, config-isolation, freshness, and canonical-reconciliation health contract. It does not prove marketplace completeness, semantic accuracy, verified geography, vehicle identity, or purchase suitability.
+Kijiji geography/runtime patching, mixed-source completeness, identity, retention, and purpose-specific analysis remain incomplete even when an AutoTrader smoke run succeeds.
 
 ### Closure requirements
 
-A limitation becomes `Resolved` only when the relevant package implements or removes the affected capability, structured tests cover it, live validation is performed where external behaviour is involved, authorities are updated, and the owner approves/merges.
+A limitation becomes `Resolved` only when the relevant package implements/removes the defect, structured tests cover it, required live validation is complete, authorities are updated, and the owner approves/merges.
 
 ## Newly discovered limitations
 
