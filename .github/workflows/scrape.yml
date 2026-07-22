@@ -93,7 +93,22 @@ jobs:
         run: python vehicle_registry.py validate --registry vehicle_registry.json
 
       - name: Run structured tests
-        run: python -m unittest discover -s tests -v
+        id: structured-tests
+        run: |
+          set +e
+          python -m unittest discover -s tests -v > "$RUNNER_TEMP/structured-tests.txt" 2>&1
+          status=$?
+          cat "$RUNNER_TEMP/structured-tests.txt"
+          exit "$status"
+
+      - name: Upload failed structured-test log
+        if: failure() && steps.structured-tests.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: structured-test-failure-${{ github.run_id }}
+          path: ${{ runner.temp }}/structured-tests.txt
+          if-no-files-found: error
+          retention-days: 2
 
   scrape:
     name: Collect vehicle data
