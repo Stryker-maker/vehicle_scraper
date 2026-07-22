@@ -23,7 +23,7 @@ jobs:
         run: echo "Generated data commit acknowledged; code tests already passed before collection."
 
   test:
-    name: Phase 1 tests
+    name: Repository tests
     if: "!(github.event_name == 'pull_request' && github.actor == 'github-actions[bot]')"
     runs-on: ubuntu-latest
     permissions:
@@ -41,6 +41,7 @@ jobs:
       - name: Compile Python sources
         run: >-
           python -m py_compile
+          vehicle_registry.py
           phase1_common.py
           phase1_kijiji_runner.py
           phase1_runtime.py
@@ -49,6 +50,9 @@ jobs:
           scraper.py
           kijiji_scraper.py
           merge.py
+
+      - name: Validate active vehicle registry
+        run: python vehicle_registry.py validate --registry vehicle_registry.json
 
       - name: Run structured tests
         run: python -m unittest discover -s tests -v
@@ -75,19 +79,18 @@ jobs:
           python -m pip install --upgrade pip
           pip install requests beautifulsoup4 geopy
 
+      - name: Validate active vehicle registry
+        run: |
+          python vehicle_registry.py validate --registry vehicle_registry.json
+          python vehicle_registry.py summary --registry vehicle_registry.json
+
       - name: Collect uncapped AutoTrader and Kijiji data with status evidence
         env:
           ORS_API_KEY: ${{ secrets.ORS_API_KEY }}
         run: |
-          configs=(
-            config_f350.json
-            config_f150.json
-            config_ram3500.json
-            config_tundra.json
-            config_forester.json
-            config_odyssey.json
-            config_carnival.json
-          )
+          set -euo pipefail
+          active_configs="$(python vehicle_registry.py active-configs --registry vehicle_registry.json)"
+          mapfile -t configs <<< "$active_configs"
 
           for config in "${configs[@]}"; do
             python phase1_pipeline.py run-source \
@@ -107,25 +110,17 @@ jobs:
 
       - name: Build unranked manual-review files
         run: |
-          python phase1_pipeline.py build-manual-review --configs \
-            config_f350.json \
-            config_f150.json \
-            config_ram3500.json \
-            config_tundra.json \
-            config_forester.json \
-            config_odyssey.json \
-            config_carnival.json
+          set -euo pipefail
+          active_configs="$(python vehicle_registry.py active-configs --registry vehicle_registry.json)"
+          mapfile -t configs <<< "$active_configs"
+          python phase1_pipeline.py build-manual-review --configs "${configs[@]}"
 
       - name: Write consolidated run-health report
         run: |
-          python phase1_pipeline.py report-health --configs \
-            config_f350.json \
-            config_f150.json \
-            config_ram3500.json \
-            config_tundra.json \
-            config_forester.json \
-            config_odyssey.json \
-            config_carnival.json
+          set -euo pipefail
+          active_configs="$(python vehicle_registry.py active-configs --registry vehicle_registry.json)"
+          mapfile -t configs <<< "$active_configs"
+          python phase1_pipeline.py report-health --configs "${configs[@]}"
           cat data/run_status/latest.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Commit and push collected data and evidence
@@ -133,7 +128,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           # Collectors run against temporary uncapped configs. Approved repository
-          # configuration remains unchanged; only data and evidence are committed.
+          # configuration remains unchanged; only active-scope data and evidence are committed.
           git add data/
           git diff --staged --quiet || git commit -m "Weekly scrape $(date +'%Y-%m-%d')"
           git push
