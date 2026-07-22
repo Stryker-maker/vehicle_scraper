@@ -1,34 +1,45 @@
 {
+  "schema_version": 2,
   "vehicle_key": "ram_3500",
   "make": "RAM",
   "model": "3500",
-  "autotrader_make": "ram",
-  "autotrader_model": "3500",
-  "kijiji_make": "Ram",
-  "kijiji_model": "3500",
-  "min_year": 2012,
-  "max_year": 2014,
-  "max_price": 60000,
-  "fuel": "Diesel",
-  "engine": "",
-  "home_city": "Red Deer, AB",
-  "home_coords": [
-    52.2681,
-    -113.8112
-  ],
-  "max_distance_km": 800,
-  "max_results": 50,
-  "ranking_weights": {
-    "price": 0.5,
-    "mileage": 0.2,
-    "distance": 0.15,
-    "trim": 0.15
+  "criteria": {
+    "min_year": 2012,
+    "max_year": 2014,
+    "max_price_cad": 60000,
+    "fuel": "Diesel",
+    "engine": ""
   },
-  "search_locations": [
-    "Edmonton, AB",
-    "Calgary, AB",
-    "Regina, SK",
-    "Kelowna, BC",
-    "Moose Jaw, SK"
-  ]
+  "origin": {
+    "home_city": "Red Deer, AB",
+    "home_coords": [
+      52.2681,
+      -113.8112
+    ],
+    "max_distance_km": 800
+  },
+  "sources": {
+    "autotrader": {
+      "make": "ram",
+      "model": "3500",
+      "search_locations": [
+        "Edmonton, AB",
+        "Calgary, AB",
+        "Regina, SK",
+        "Kelowna, BC",
+        "Moose Jaw, SK"
+      ]
+    },
+    "kijiji": {
+      "make": "Ram",
+      "model": "3500",
+      "search_locations": [
+        "Edmonton, AB",
+        "Calgary, AB",
+        "Regina, SK",
+        "Kelowna, BC",
+        "Moose Jaw, SK"
+      ]
+    }
+  }
 }
