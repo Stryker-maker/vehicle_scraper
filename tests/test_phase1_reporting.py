@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from canonical_evidence import build_canonical_evidence
 from phase1_pipeline import (
     MANUAL_REVIEW_FIELDS, build_manual_review, collect_health,
     expected_output_path, source_status_path, write_json,
@@ -47,12 +48,23 @@ class ReportingTests(unittest.TestCase):
 
     def success(self, source, count=1):
         output = self.rows(source, count)
+        evidence = build_canonical_evidence(
+            root=self.root, config=self.config, source=source,
+            csv_path=output, run_id="run-1", completed_at_utc="now",
+        )
         status = {
+            "schema_version":5, "canonical_evidence_schema_version":1,
             "run_id":"run-1", "vehicle_key":"test_vehicle", "source":source,
             "execution_status":"success", "collection_status":"success",
             "completed_at_utc":"now", "output_updated_this_run":True,
             "schema_valid":True, "row_count":count, "current_row_count":count,
             "stale_row_count":0, "row_cap_disabled":True, "config_isolated":True,
+            "fetched_record_count":evidence["fetched_records"],
+            "accepted_record_count":evidence["accepted_records"],
+            "rejected_record_count":evidence["rejected_records"],
+            "parse_failure_count":evidence["parse_failures"],
+            "evidence_reconciliation_status":"reconciled",
+            "canonical_evidence_artifacts":evidence["artifacts"],
             "data_quality_status":"warnings_present" if source=="kijiji" else "clean",
             "quality_warning_rows":count if source=="kijiji" else 0,
             "quality_warning_count":count if source=="kijiji" else 0,
@@ -61,7 +73,7 @@ class ReportingTests(unittest.TestCase):
         }
         write_json(source_status_path(self.root, self.config, source), status)
 
-    def test_manual_review_keeps_200_and_removes_ranking(self):
+    def test_manual_review_keeps_200_and_uses_canonical_fields(self):
         self.success("autotrader", 120)
         self.success("kijiji", 80)
         summary = build_manual_review(
@@ -74,12 +86,20 @@ class ReportingTests(unittest.TestCase):
         self.assertEqual(reader.fieldnames, MANUAL_REVIEW_FIELDS)
         self.assertNotIn("rank", reader.fieldnames)
         self.assertNotIn("score", reader.fieldnames)
-        kijiji = next(row for row in rows if row["source"] == "Kijiji")
+        self.assertNotIn("weeks_tracked", reader.fieldnames)
+        self.assertIn("observation_count", reader.fieldnames)
+        self.assertTrue(all(row["canonical_listing_id"] for row in rows))
+        self.assertTrue(all(row["observation_id"] for row in rows))
+        kijiji = next(row for row in rows if row["source"] == "kijiji")
         self.assertEqual(kijiji["location"], "")
         self.assertEqual(kijiji["distance_km"], "")
         self.assertEqual(kijiji["distance_method"], "disabled_unverified_location")
         self.assertEqual(kijiji["unverified_location_value"], "Example, AB")
         self.assertEqual(kijiji["url_region_hint"], "calgary")
+        self.assertEqual(
+            kijiji["location_evidence_status"],
+            "quarantined_unverified_search_origin",
+        )
 
     def test_degraded_source_is_excluded_and_reports_stale_rows(self):
         self.success("autotrader")
@@ -89,6 +109,10 @@ class ReportingTests(unittest.TestCase):
             "output_updated_this_run":False, "schema_valid":True, "row_count":0,
             "current_row_count":0, "stale_row_count":1,
             "row_cap_disabled":True, "config_isolated":True,
+            "canonical_evidence_schema_version":1,
+            "accepted_record_count":0, "rejected_record_count":0,
+            "parse_failure_count":0, "fetched_record_count":0,
+            "evidence_reconciliation_status":"not_reconciled",
             "data_quality_status":"not_evaluated_stale_output",
             "quality_warning_rows":0, "quality_warning_count":0,
             "failure_reasons":["no_fresh_output"],
@@ -103,6 +127,7 @@ class ReportingTests(unittest.TestCase):
         self.assertEqual(stale["current_row_count"], 0)
         self.assertEqual(stale["stale_row_count"], 1)
         self.assertEqual(stale["data_quality_status"], "not_evaluated_stale_output")
+        self.assertEqual(stale["evidence_reconciliation_status"], "not_reconciled")
 
     def test_missing_source_degrades_health(self):
         self.success("autotrader")
@@ -120,6 +145,27 @@ class ReportingTests(unittest.TestCase):
         )
         self.assertEqual(report["overall_status"], "success_with_warnings")
         self.assertEqual(report["healthy_source_runs"], 2)
+        self.assertEqual(report["fetched_record_count"], 2)
+        self.assertEqual(report["accepted_record_count"], 2)
+        self.assertEqual(report["rejected_record_count"], 0)
+        self.assertEqual(report["parse_failure_count"], 0)
+
+    def test_evidence_run_mismatch_excludes_source(self):
+        self.success("autotrader")
+        status_path = source_status_path(self.root, self.config, "autotrader")
+        status = json.loads(status_path.read_text())
+        accepted_path = self.root / status["canonical_evidence_artifacts"]["accepted"]
+        line = json.loads(accepted_path.read_text().splitlines()[0])
+        line["run_id"] = "other-run"
+        accepted_path.write_text(json.dumps(line) + "\n")
+        result = build_manual_review(
+            root=self.root, config_paths=[self.config_path], run_id="run-1"
+        )["vehicles"][0]
+        self.assertEqual(result["included_sources"], [])
+        self.assertEqual(
+            result["excluded_sources"]["autotrader"],
+            "accepted_evidence_run_id_mismatch",
+        )
 
 
 if __name__ == "__main__":
