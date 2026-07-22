@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import csv
 import json
 import os
 import subprocess
@@ -201,7 +200,7 @@ def run_source(
                 root=root, config=config, source=source, csv_path=output_path,
                 run_id=active_run, completed_at_utc=completed_at,
             )
-        except (OSError, ValueError, csv.Error, json.JSONDecodeError) as exc:
+        except Exception as exc:
             evidence_error = f"{type(exc).__name__}: {exc}"
             failures.append("canonical_evidence_failed")
         else:
