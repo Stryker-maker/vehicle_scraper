@@ -11,8 +11,8 @@ This document preserves the owner-approved sequence for turning the repository i
 | 00 | Scope Freeze and Runtime Reduction | Complete and merged |
 | 01 | Repository Baseline and Project Truth | Complete and merged |
 | 02 | Vehicle Registry and Configuration Governance | Complete and merged |
-| 03 | Canonical Listing Schema and Evidence Model | Implemented; validation and owner merge pending |
-| 04 | AutoTrader Collector Audit and Refactor | Approved, not started |
+| 03 | Canonical Listing Schema and Evidence Model | Complete and merged |
+| 04 | AutoTrader Collector Audit and Refactor | Implemented; narrow validation and owner merge pending |
 | 05 | Kijiji Collector Replacement | Approved, not started |
 | 06 | Identity, Deduplication and Listing Lifecycle | Approved, not started |
 | 07 | Storage, Retention and Repository Hygiene | Approved, not started |
@@ -23,7 +23,7 @@ This document preserves the owner-approved sequence for turning the repository i
 
 ## Global completion criteria
 
-The audit is not complete until optional vehicles remain paused unless explicitly approved; one registry controls enabled vehicles and sources; approved configs are validated and source-specific; runtime source rewriting is removed; raw/accepted/rejected/parse-failure counts reconcile from the source adapters; parsing failures and exclusion reasons are visible; Kijiji location is verified or unknown; AutoTrader pagination is tested; distance methods are truthful; provenance is available; listing IDs are not confused with VINs; lifecycle/history semantics are correct; dependencies are locked; repository growth is bounded; documentation matches code; F-350 evidence supports real investigation; and three consecutive scheduled active-profile runs complete without manual repair.
+The audit is not complete until optional vehicles remain paused unless explicitly approved; one registry controls enabled vehicles and sources; approved configs are validated and source-specific; runtime source rewriting is removed; raw/accepted/rejected/parse-failure counts reconcile from both source adapters; parsing failures and exclusions are visible; Kijiji geography is verified or unknown; AutoTrader pagination is tested; distance methods are truthful; provenance is available; listing IDs are not confused with VINs; lifecycle/history semantics are correct; dependencies are locked; repository growth is bounded; documentation matches code; F-350 evidence supports real investigation; and three consecutive scheduled active-profile runs complete without manual repair.
 
 ---
 
@@ -49,36 +49,55 @@ Delivered the current README, repository baseline, architecture/data flow, vehic
 
 **Status:** complete and merged through PR #4.
 
-Delivered registry schema v2, config schema v2, validated purpose/priority/cadence/source/profile metadata, source-specific criteria, canonical location naming, disposable legacy projection, registry-driven source planning, config-isolation evidence, structured tests, and a successful ten-source live validation.
+Delivered registry schema v2, config schema v2, validated operational metadata, source-specific criteria, canonical location naming, disposable legacy projection, registry-driven source planning, config-isolation evidence, structured tests, and successful ten-source validation.
 
-Continuing boundary: source collectors remain legacy and retain their own parsing/ranking/geography defects for Audits 04 and 05.
+Continuing boundary: Kijiji retains its compatibility projection and interim source patching until Audit 05. AutoTrader no longer uses that path after Audit 04.
 
 ---
 
 ## Audit 03 — Canonical Listing Schema and Evidence Model
 
-**Status:** implemented on `ai/audit-03-canonical-evidence`; PR and live branch validation required before owner merge.
+**Status:** complete and merged through PR #5.
+
+Delivered canonical evidence schema v1, stable source-scoped listing IDs, observation IDs, exact raw-value preservation, typed/null-safe normalized values, per-field evidence status, accepted/rejected/parse-failure artifacts, reason codes, source/health schema v5, count reconciliation, decision-safe manual review, and Kijiji geography quarantine.
+
+The Audit 03 boundary was:
+
+```text
+legacy_collector_emitted_csv_rows
+  = accepted_records + rejected_records + parse_failures
+```
+
+Audits 04 and 05 move that boundary into their source adapters.
+
+---
+
+## Audit 04 — AutoTrader Collector Audit and Refactor
+
+**Status:** implemented on `ai/audit-04-autotrader-adapter`; pull-request checks and one narrow F-350 AutoTrader smoke run are required before owner merge.
 
 ### Purpose
 
-Make every record emitted by the current collectors traceable through raw, normalized, accepted, rejected, parse-failure, and manual-review stages without pretending the legacy collectors prove marketplace completeness.
+Replace the legacy AutoTrader script with a directly testable source adapter and preserve every response listing object through request, parse, rejection, acceptance, and canonical evidence stages.
 
 ### Scope
 
-- canonical evidence schema version 1
-- stable source-scoped canonical listing IDs
-- run-specific observation IDs
-- exact raw CSV value preservation
-- typed/null-safe normalized values
-- per-field provenance/evidence status
-- explicit unknown handling instead of misleading sentinels
-- accepted/rejected/parse-failure JSONL artifacts
-- machine-readable rejection/failure reasons
-- source-status and health schema version 5
-- enforced count reconciliation
-- decision-safe manual-review schema built only from accepted evidence
-- Kijiji raw geography preservation plus normalized quarantine
-- hostile tests for malformed rows, missing identifiers, unknowns, ID stability, and run mismatch
+- governed config schema v2 used directly
+- explicit AutoTrader request contract
+- pagination by page size and offset
+- retry/backoff with request-attempt evidence
+- per-page request provenance
+- response listing-object fetched boundary
+- duplicate records preserved as explicit rejections
+- parse failures preserved with machine-readable reasons
+- criteria exclusions preserved with reasons
+- truthful route/geodesic/unavailable distance evidence
+- unranked output with no score
+- AutoTrader adapter evidence schema v1
+- AutoTrader source status schema v6
+- adapter-to-canonical reconciliation
+- fixtures and hostile tests
+- narrow single-pair validation mode with artifact upload and no generated-data commit
 
 ### Required reconciliation
 
@@ -86,34 +105,23 @@ Make every record emitted by the current collectors traceable through raw, norma
 fetched_records = accepted_records + rejected_records + parse_failures
 ```
 
-For Audit 03, `fetched_records` is explicitly scoped to `legacy_collector_emitted_csv_rows`. Audits 04 and 05 must move this boundary into the source adapters.
+For AutoTrader, `fetched_records` means `autotrader_adapter_response_listing_objects`.
 
 ### Acceptance gate
 
-- no collector-emitted row disappears after the canonical boundary
-- raw and normalized values are distinguishable
-- unknowns normalize to JSON null while raw strings remain preserved
-- every rejection and parse failure has machine-readable reasons
-- source listing IDs are explicitly not VINs
-- supported manual review contains only accepted current-run evidence
-- source health requires reconciliation and at least one accepted record
-- structured tests pass
-- one live ten-source branch run proves all source pairs reconcile
-- F-150/Tundra remain untouched
+- request and two-page fixture tests pass
+- retries and pagination are visible and bounded
+- no response listing object disappears
+- every rejection and parse failure has reasons
+- distance method is explicit and truthful
+- no internal rank/score or config mutation remains
+- adapter and canonical counts reconcile
+- one narrow F-350 AutoTrader smoke run passes without a data commit
+- F-150/Tundra and Kijiji implementation remain untouched
 
 ### Non-scope
 
-No AutoTrader pagination/refactor, Kijiji source replacement, marketplace HTTP/raw-response capture, VIN/duplicate/lifecycle model, storage policy, purpose-specific analysis, ranking, F-350 enrichment, or optional-vehicle reintroduction.
-
----
-
-## Audit 04 — AutoTrader Collector Audit and Refactor
-
-**Status:** approved, not started.
-
-Replace the legacy AutoTrader script with a directly testable source adapter covering request contract, pagination, retry/backoff, request/fetch/parse/accept/reject counts, parse-failure preservation, fixtures, truthful distance evidence, no internal ranking, no config mutation, and reconciliation into Audit 03 stages.
-
-Acceptance: pagination and fixtures pass; no silent per-record loss; distance method is truthful; source-adapter counts reconcile.
+No Kijiji replacement, VIN/dedup/lifecycle model, retention policy, F-350 enrichment, purpose-specific analysis, ranking, criteria change, or optional-vehicle reintroduction.
 
 ---
 
@@ -151,7 +159,9 @@ Acceptance: `main` remains reviewable; retention is explicit; required evidence 
 
 **Status:** approved, not started.
 
-Lock dependencies; separate tests from collection; add profile/vehicle/source inputs; implement cadence; add anomaly detection and diagnostics; avoid multi-hour PR collection; and improve generated-data discipline.
+Lock dependencies; separate tests from collection; complete profile/vehicle/source inputs; implement cadence; add anomaly detection and diagnostics; avoid multi-hour PR collection; and improve generated-data discipline.
+
+Audit 04 introduces a limited single-pair validation input only to support time-sensitive source-adapter validation. Audit 08 owns the final workflow architecture.
 
 Acceptance: PR checks are fast/deterministic; scheduling is explicit; dependencies are reproducible; failures are actionable.
 
