@@ -48,6 +48,22 @@ def reporting_source_plan(args: argparse.Namespace, *, root: Path):
     return [(path, SOURCES) for path in config_paths(args.configs)]
 
 
+def _raise_for_canonical_review_exclusions(summary: dict) -> None:
+    failures: list[str] = []
+    for vehicle in summary.get("vehicles", []):
+        for source, reason in vehicle.get("excluded_sources", {}).items():
+            reason_text = str(reason)
+            if "evidence" in reason_text or "accepted_" in reason_text:
+                failures.append(
+                    f"{vehicle.get('vehicle_key', 'unknown')}:{source}:{reason_text}"
+                )
+    if failures:
+        raise RuntimeError(
+            "Canonical evidence integrity prevented manual-review generation: "
+            + ", ".join(failures)
+        )
+
+
 def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(description=__doc__)
     actions = root.add_subparsers(dest="action", required=True)
@@ -80,7 +96,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         return 0
     if args.action == "build-manual-review":
-        build_manual_review(root=root, source_plan=reporting_source_plan(args, root=root))
+        summary = build_manual_review(
+            root=root, source_plan=reporting_source_plan(args, root=root)
+        )
+        _raise_for_canonical_review_exclusions(summary)
         return 0
     if args.action == "report-health":
         report = collect_health(root=root, source_plan=reporting_source_plan(args, root=root))
