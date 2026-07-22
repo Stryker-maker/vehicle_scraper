@@ -143,6 +143,15 @@ def build_autotrader_canonical_evidence(
         )
         record["source_adapter_record_ref"] = adapter_ref
         record["query_provenance"] = adapter_record.get("provenance", {})
+        distance_status = str(
+            parsed_row.get("distance_evidence_status")
+            or "location_or_geocode_unavailable"
+        )
+        record["normalized"]["distance_evidence_status"] = distance_status
+        for field_name in ("distance_km", "distance_method"):
+            field_evidence = record.get("field_evidence", {}).get(field_name)
+            if isinstance(field_evidence, dict):
+                field_evidence["evidence_status"] = distance_status
         combined_rejections = sorted(set(record["rejection_reasons"] + adapter_rejections))
         record["rejection_reasons"] = combined_rejections
         normalized_records.append({**record, "record_stage": "normalized"})
@@ -195,6 +204,9 @@ def build_autotrader_canonical_evidence(
     write_jsonl(canonical_paths["parse_failures"], parse_failures)
     canonical_paths["reconciliation"].parent.mkdir(parents=True, exist_ok=True)
     temporary = canonical_paths["reconciliation"].with_suffix(".json.tmp")
-    temporary.write_text(json.dumps(reconciliation, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    temporary.write_text(
+        json.dumps(reconciliation, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     temporary.replace(canonical_paths["reconciliation"])
     return reconciliation
