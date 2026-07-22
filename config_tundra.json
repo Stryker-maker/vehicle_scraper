@@ -1,32 +1,41 @@
 {
+  "schema_version": 2,
   "vehicle_key": "toyota_tundra",
   "make": "Toyota",
   "model": "Tundra",
-  "autotrader_make": "toyota",
-  "autotrader_model": "tundra",
-  "kijiji_make": "Toyota",
-  "kijiji_model": "Tundra",
-  "min_year": 2022,
-  "max_year": 2025,
-  "max_price": 60000,
-  "fuel": "Hybrid",
-  "engine": "",
-  "home_city": "Red Deer, AB",
-  "home_coords": [
-    52.2681,
-    -113.8112
-  ],
-  "max_distance_km": 800,
-  "max_results": 50,
-  "ranking_weights": {
-    "price": 0.5,
-    "mileage": 0.2,
-    "distance": 0.15,
-    "trim": 0.15
+  "criteria": {
+    "min_year": 2022,
+    "max_year": 2025,
+    "max_price_cad": 60000,
+    "fuel": "Hybrid",
+    "engine": ""
   },
-  "search_locations": [
-    "Edmonton, AB",
-    "Calgary, AB",
-    "Camrose, AB"
-  ]
+  "origin": {
+    "home_city": "Red Deer, AB",
+    "home_coords": [
+      52.2681,
+      -113.8112
+    ],
+    "max_distance_km": 800
+  },
+  "sources": {
+    "autotrader": {
+      "make": "toyota",
+      "model": "tundra",
+      "search_locations": [
+        "Edmonton, AB",
+        "Calgary, AB",
+        "Camrose, AB"
+      ]
+    },
+    "kijiji": {
+      "make": "Toyota",
+      "model": "Tundra",
+      "search_locations": [
+        "Edmonton, AB",
+        "Calgary, AB",
+        "Camrose, AB"
+      ]
+    }
+  }
 }
