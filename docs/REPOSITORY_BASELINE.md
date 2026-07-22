@@ -3,54 +3,60 @@
 ## Status
 
 **Baseline date:** July 22, 2026  
-**Baseline source:** `main` after Audit 01, updated by Audit 02  
+**Baseline source:** `main` after Audit 02, updated by Audit 03 implementation  
 **Project state:** functional collection prototype under structured audit
 
-This document records what the repository currently is. Desired future behaviour is labelled separately.
+This document records current supported behaviour. Desired future behaviour is labelled separately.
 
 ## Higher purpose
 
-The repository is intended to become a continuously usable market-information tool that gathers listings, preserves trust evidence, supports repeatable comparisons, assists human purchase investigation and provides lightweight owned-vehicle value monitoring without opaque recommendation logic.
+The repository is intended to become a continuously usable market-information tool that gathers listings, preserves trust evidence, supports repeatable comparisons, assists human purchase investigation, and provides lightweight owned-vehicle value monitoring without opaque recommendation logic.
 
-The primary decision use case is an informed purchase of an early-2020s diesel Ford F-350, ideally a 2023 model at a reasonable price with acceptable kilometres and evidence about engine hours, idle hours, service history and prior use.
+The primary decision use case remains an informed purchase of an early-2020s diesel Ford F-350, ideally a 2023 model at a reasonable price with acceptable kilometres and evidence about engine hours, idle hours, service history, and prior use.
 
 ## Current supported capability
 
-The repository currently supports supervised collection and manual review. It can:
+The repository can:
 
-- validate registry schema v2 and every referenced config schema v2 before collection
-- derive an explicit enabled vehicle/source run plan from one registry
-- keep operational state separate from source search criteria
-- maintain separate AutoTrader and Kijiji make/model/location settings
-- project governed configs into temporary flat compatibility files for legacy collectors
-- prevent collectors from receiving or mutating approved config files
+- validate registry schema v2 and all referenced config schema-v2 files
+- derive one explicit enabled vehicle/source run plan
+- keep operational state separate from source criteria
+- project approved criteria into disposable legacy collector input
+- verify approved configs remain unchanged
 - attempt enabled sources independently with a 75-minute timeout
-- continue after individual source failures or timeouts
-- distinguish fresh output from preserved stale output
-- validate a minimum source CSV schema
-- disable the legacy row cap for runtime collection
-- record structured per-source run evidence
-- identify a limited set of row-quality warnings
+- continue after individual failures/timeouts
+- distinguish fresh from stale output
+- preserve every fresh collector-emitted row as canonical raw evidence
+- normalize typed values with explicit JSON nulls
+- generate stable source-scoped listing IDs and run-specific observation IDs
+- preserve per-field evidence status and source claims
+- classify rows as accepted, rejected, or parse failure with reasons
+- enforce collector-boundary count reconciliation
+- require reconciliation and accepted records for source health
+- build decision-safe manual-review CSVs only from accepted current-run evidence
+- quarantine Kijiji location/distance evidence
+- write per-source and consolidated health schema-v5 evidence
 - protect price history from failed runs and same-day duplication
-- build unranked manual-review files from current successful enabled sources
-- write health evidence for exactly the source pairs enabled in the registry
 
 ## Current unsupported capability
 
-The repository does not yet answer reliably:
+The repository still cannot reliably establish:
 
 - which listing is the best purchase
-- whether the market dataset is complete
+- marketplace-wide source completeness
+- HTTP/raw-response preservation inside current collectors
+- every pre-CSV parser failure or filter exclusion
+- verified AutoTrader pagination
 - actual Kijiji listing geography
-- whether every fetched record parsed correctly
-- why every omitted record was rejected
-- cross-source physical vehicle identity
+- routed versus straight-line AutoTrader distance on every row
+- VIN or cross-source physical-vehicle identity
+- duplicate confidence or destructive merge authority
 - sold/disappeared/relisted lifecycle state
-- route distance versus straight-line fallback on every AutoTrader row
 - independent verification of source claims
 - highway-use likelihood from engine and idle hours
+- bounded retention/repository growth
 
-Those require later approved packages.
+Those remain assigned to later approved packages.
 
 ## Governing vehicle scope
 
@@ -66,102 +72,102 @@ Those require later approved packages.
 | Ford F-150 | Paused | Optional curiosity | 4 | Weekly when enabled | AutoTrader, Kijiji |
 | Toyota Tundra | Paused | Optional curiosity | 4 | Weekly when enabled | AutoTrader, Kijiji |
 
-The detailed intent is governed by [Vehicle Purposes and Priorities](VEHICLE_PURPOSES.md).
-
 ## Component inventory
 
 ### Authoritative and active
 
-| Component | Status | Present responsibility |
-|---|---|---|
-| `vehicle_registry.json` | Authoritative | Operational state, purpose, priority, cadence, enabled sources and analysis profile |
-| `vehicle_registry.py` | Active governance | Validates registry/config consistency and emits active configs/source runs |
-| `vehicle_config.py` | Active governance | Validates config schema v2 and creates temporary legacy projections |
-| `config_*.json` | Governed criteria | Shared criteria, origin and separate source query settings |
-| `.github/workflows/scrape.yml` | Active | Tests, registry-driven collection, reporting and data commits |
-| `phase1_pipeline.py` | Active | Source execution, registry-aware review and health commands |
-| `phase1_runtime.py` | Active safety layer | Projection, timeout, isolation, history protection and status evidence |
-| `phase1_common.py` | Active | Shared paths, minimum schemas, fields and warning rules |
-| `phase1_reporting.py` | Active | Registry-source-aware review and health outputs |
-| `tests/` | Active | Governance, Phase 1 and documentation contracts |
-| `trim_tiers.json` | Active legacy configuration | Supplies trim keywords to collectors |
+| Component | Present responsibility |
+|---|---|
+| `vehicle_registry.json` | operational scope, purpose, cadence, source plan |
+| `vehicle_registry.py` | registry/config consistency and run-plan validation |
+| `vehicle_config.py` | config schema v2 and disposable legacy projection |
+| `config_*.json` | approved shared/source criteria |
+| `.github/workflows/scrape.yml` | tests, registry-driven collection, reporting, generated-data commits |
+| `phase1_pipeline.py` | CLI orchestration and final health gate |
+| `phase1_runtime.py` | execution, timeout, freshness, isolation, canonical integration, status |
+| `canonical_evidence.py` | raw/normalized/accepted/rejected/parse evidence and reconciliation |
+| `phase1_reporting.py` | accepted-evidence manual review and consolidated health |
+| `phase1_common.py` | shared schemas, paths, warnings, health contract |
+| `tests/` | governance, hostile evidence, runtime, reporting, workflow, and documentation contracts |
 
 ### Active legacy or interim
 
-| Component | Status | Present concern |
-|---|---|---|
-| `scraper.py` | Active legacy collector | Legacy ranking, pagination and distance behaviour remain |
-| `kijiji_scraper.py` | Legacy collector still executed | Geography and ranking cannot be trusted directly |
-| `phase1_kijiji_runner.py` | Active interim workaround | Runtime text replacement and `exec` remain temporary |
-| Temporary flat runtime config | Compatibility only | Contains injected `max_results`, ranking weights and selected source locations; never approved authority |
-| Source CSV `rank` and `score` | Legacy source output | Excluded from supported manual review |
+| Component | Present concern |
+|---|---|
+| `scraper.py` | pagination, internal ranking, distance, and pre-CSV parse visibility remain legacy |
+| `kijiji_scraper.py` | geography/ranking cannot be trusted directly |
+| `phase1_kijiji_runner.py` | runtime text replacement and `exec` remain temporary |
+| temporary flat config | compatibility only; never approved authority |
+| source CSV rank/score | retained only in implementation artifacts, not supported review |
+| source price-history JSON | observation history, not lifecycle authority |
 
 ### Disabled or historical
 
-| Component | Status | Rule |
-|---|---|---|
-| `merge.py` | Disabled legacy | Must not create recommendations |
-| `data/<vehicle>/merged/*.csv` | Historical | Not current recommendations |
-| `data/<vehicle>/merged/RANKING_DISABLED.md` | Active warning | Directs users to manual review |
-| Paused F-150 and Tundra data | Historical while paused | Retained but not refreshed |
-
-See [Legacy Components](LEGACY_COMPONENTS.md).
+| Component | Rule |
+|---|---|
+| `merge.py` | disabled; must not create current recommendations |
+| `data/<vehicle>/merged/*.csv` | historical only |
+| paused F-150/Tundra data | retained but not refreshed |
 
 ## Supported data products
 
-### Human-facing listing set
+### Decision-safe manual review
 
 `data/<vehicle>/manual_review/<vehicle>_manual_review_latest.csv`
 
-It includes current successful enabled sources, removes `rank` and `score`, exposes review status, quarantines Kijiji location/distance and retains warning-bearing records.
+This file contains only accepted current-run canonical records. It includes canonical IDs, raw/normalized references, evidence statuses, warning/review fields, safer observation names, and no rank/score.
+
+### Canonical source evidence
+
+For each source:
+
+- `raw_latest.jsonl`
+- `normalized_latest.jsonl`
+- `accepted_latest.jsonl`
+- `rejected_latest.jsonl`
+- `parse_failures_latest.jsonl`
+- `reconciliation_latest.json`
+
+These live under `data/<vehicle>/evidence/<source>/`.
 
 ### Run health
 
-- `data/run_status/latest.md`
-- `data/run_status/latest.json`
-
-These reflect the registry's enabled source pairs rather than assuming every vehicle always has two sources.
-
-### Source evidence
-
 - `data/<vehicle>/run_status/<source>_latest.json`
-- `data/<vehicle>/latest/<vehicle>_<source>_latest.csv`
-- timestamped source archives
-- source-specific price-history JSON
+- `data/run_status/latest.json`
+- `data/run_status/latest.md`
 
-Source CSVs are implementation artifacts, not purchase recommendations.
+Health now requires current/fresh/minimum-schema-valid output, uncapped execution, config isolation, recognized canonical evidence, successful reconciliation, and at least one accepted record.
 
 ## Present operational guarantees
 
-Current code and tests are intended to guarantee:
+Current code/tests are intended to guarantee:
 
 1. one registry controls enabled vehicles and sources
-2. invalid or conflicting registry/config state fails before collection
-3. approved configs contain no legacy `max_results`, ranking weights or shared source-location authority
+2. invalid/conflicting registry/config state fails before collection
+3. approved configs contain no legacy controls
 4. collectors receive only temporary compatibility projections
 5. approved configuration remains byte-for-byte unchanged
-6. paused vehicles and disabled sources are omitted from collection, review and health expectations
+6. paused vehicles/disabled sources are omitted from collection, evidence, review, and health expectations
 7. runtime is bounded and remaining attempts continue after failure
-8. stale files are not counted as fresh output
-9. expected enabled sources need fresh, non-empty, minimum-schema-valid output to be healthy
-10. same-day price-history duplication is controlled
-11. supported manual review contains no automated rank or score
-12. known Kijiji location uncertainty remains visible
+8. stale files are not counted as current
+9. every collector-emitted row is represented as accepted, rejected, or parse failure
+10. raw source strings remain preserved after canonicalization
+11. normalized unknowns use null rather than invented values
+12. every canonical rejection/failure has machine-readable reasons
+13. source listing IDs are explicitly not VINs
+14. supported manual review consumes accepted evidence only
+15. Kijiji location uncertainty remains visible and quarantined
 
 ## Explicit non-guarantees
 
-`SUCCESS` or `SUCCESS_WITH_WARNINGS` does not guarantee marketplace completeness, correct parsing, actual Kijiji location, routed distance, verified source claims, duplicate identity, elapsed lifecycle, current availability, mechanical condition, fair value or purchase suitability.
+`SUCCESS` or `SUCCESS_WITH_WARNINGS` does not guarantee marketplace completeness, correct legacy collector parsing before CSV output, actual Kijiji location, routed distance, verified source claims, physical vehicle identity, lifecycle, current availability, mechanical condition, fair value, or purchase suitability.
 
 ## Last live operating result
 
-Audit 00 live validation on July 22, 2026 produced 10/10 healthy enabled source runs, 362 current records, no stale rows, `SUCCESS_WITH_WARNINGS`, approximately 31 minutes of collection and no F-150/Tundra changes.
+Audit 02 live validation on July 22, 2026 produced 10/10 healthy enabled source runs, 374 current collector rows, no stale rows, `SUCCESS_WITH_WARNINGS`, and no F-150/Tundra changes.
 
-Audit 02 requires a new live validation because the collector input is now generated from governed schema-v2 configs. That validation must prove ten source runs, unchanged active criteria, no paused-vehicle changes and successful config-isolation evidence.
+Audit 03 requires a new live branch validation because canonical artifacts, manual-review schema, source health, and consolidated reconciliation totals change.
 
 ## Repository change authority
 
-Implementation work uses an approved `ai/*` branch and pull request. The owner reviews, merges and deletes the branch. The [Approved Audit Roadmap](AUDIT_ROADMAP.md) governs sequence unless the owner approves revision.
-
-## Baseline interpretation rule
-
-Where code, generated data or older documentation conflicts with this baseline, record the conflict and resolve it through the appropriate approved package rather than guessing.
+Implementation work uses an approved `ai/*` branch and pull request. The owner reviews, merges, and deletes the branch. The [Approved Audit Roadmap](AUDIT_ROADMAP.md) governs sequence unless the owner approves revision.
