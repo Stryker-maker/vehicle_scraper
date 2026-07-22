@@ -9,8 +9,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from canonical_evidence import read_jsonl
 from phase1_pipeline import (
-    dedupe_history_observations_for_date, expected_output_path,
-    remove_history_observations_for_date, row_quality_warnings, run_source, write_json,
+    dedupe_history_observations_for_date,
+    expected_output_path,
+    remove_history_observations_for_date,
+    row_quality_warnings,
+    run_source,
+    write_json,
 )
 
 
@@ -25,32 +29,41 @@ class RuntimeTests(unittest.TestCase):
             "make": "Test",
             "model": "Vehicle",
             "criteria": {
-                "min_year": 2000, "max_year": 2030, "max_price_cad": 100000,
-                "fuel": "Gas", "engine": "",
+                "min_year": 2000,
+                "max_year": 2030,
+                "max_price_cad": 100000,
+                "fuel": "Gas",
+                "engine": "",
             },
             "origin": {
-                "home_city": "Red Deer, AB", "home_coords": [52.2681, -113.8112],
+                "home_city": "Red Deer, AB",
+                "home_coords": [52.2681, -113.8112],
                 "max_distance_km": 800,
             },
             "sources": {
                 "autotrader": {
-                    "make": "test", "model": "vehicle",
+                    "make": "test",
+                    "model": "vehicle",
                     "search_locations": ["Original, AB"],
                 },
                 "kijiji": {
-                    "make": "Test", "model": "Vehicle",
-                    "search_locations": ["Original, AB"],
+                    "make": "Test",
+                    "model": "Vehicle",
+                    "search_locations": ["Edmonton, AB"],
                 },
             },
         }
-        self.config_path.write_text(json.dumps(self.config, indent=2), encoding="utf-8")
+        self.config_path.write_text(
+            json.dumps(self.config, indent=2), encoding="utf-8"
+        )
 
     def tearDown(self):
         self.temp.cleanup()
 
     def collector(self):
         path = self.root / "collector.py"
-        path.write_text("""
+        path.write_text(
+            """
 import argparse,csv,json
 from pathlib import Path
 p=argparse.ArgumentParser();p.add_argument('--config',required=True);p.add_argument('--source',required=True);a=p.parse_args()
@@ -63,15 +76,26 @@ f=['listing_id','url','source','price','mileage','location','distance_km']
 with out.open('w',newline='',encoding='utf-8') as h:
  w=csv.DictWriter(h,fieldnames=f);w.writeheader()
  for i in range(200): w.writerow({'listing_id':str(i),'url':f'https://example.invalid/2020-{i}','source':'AutoTrader','price':'1','mileage':'1','location':'A','distance_km':'1'})
-""", encoding="utf-8")
+""",
+            encoding="utf-8",
+        )
         return path
 
     def test_uncapped_200_rows_config_isolation_and_reconciliation(self):
         original = self.config_path.read_bytes()
         script = self.collector()
         status = run_source(
-            root=self.root, source="autotrader", config_path=self.config_path,
-            command=[sys.executable, str(script), "--config", "config_test.json", "--source", "autotrader"],
+            root=self.root,
+            source="autotrader",
+            config_path=self.config_path,
+            command=[
+                sys.executable,
+                str(script),
+                "--config",
+                "config_test.json",
+                "--source",
+                "autotrader",
+            ],
             run_id="run-1",
         )
         self.assertEqual(status["row_count"], 200)
@@ -96,22 +120,32 @@ with out.open('w',newline='',encoding='utf-8') as h:
 
     def test_kijiji_runtime_records_distance_bypass_and_3000_rows(self):
         script = self.root / "kijiji_collector.py"
-        script.write_text("""
+        script.write_text(
+            """
 import argparse,csv,json,os
 from pathlib import Path
 p=argparse.ArgumentParser();p.add_argument('--config',required=True);a=p.parse_args()
 assert os.environ['PHASE1_KIJIJI_DISTANCE_DISABLED']=='1'
 cfg=json.loads(Path(a.config).read_text())
-assert cfg['search_locations']==['Original, AB']
+assert cfg['search_locations']==['Edmonton, AB']
 out=Path('data')/cfg['vehicle_key']/'latest'/f"{cfg['vehicle_key']}_kijiji_latest.csv";out.parent.mkdir(parents=True,exist_ok=True)
 f=['listing_id','url','source','price','mileage','location','distance_km']
 with out.open('w',newline='',encoding='utf-8') as h:
  w=csv.DictWriter(h,fieldnames=f);w.writeheader()
  for i in range(3000): w.writerow({'listing_id':str(i),'url':f'https://www.kijiji.ca/v-cars-trucks/calgary/x/{i}','source':'Kijiji','price':'1','mileage':'1','location':'Search Origin','distance_km':''})
-""", encoding="utf-8")
+""",
+            encoding="utf-8",
+        )
         status = run_source(
-            root=self.root, source="kijiji", config_path=self.config_path,
-            command=[sys.executable, str(script), "--config", "config_test.json"],
+            root=self.root,
+            source="kijiji",
+            config_path=self.config_path,
+            command=[
+                sys.executable,
+                str(script),
+                "--config",
+                "config_test.json",
+            ],
             run_id="run-1",
         )
         self.assertEqual(status["current_row_count"], 3000)
@@ -124,22 +158,33 @@ with out.open('w',newline='',encoding='utf-8') as h:
     def test_stale_output_is_degraded_and_not_current(self):
         out = expected_output_path(self.root, self.config, "autotrader")
         out.parent.mkdir(parents=True)
-        out.write_text("listing_id,url,source,price,mileage,location,distance_km\n1,u,s,1,1,a,1\n")
+        out.write_text(
+            "listing_id,url,source,price,mileage,location,distance_km\n"
+            "1,u,s,1,1,a,1\n"
+        )
         status = run_source(
-            root=self.root, source="autotrader", config_path=self.config_path,
-            command=[sys.executable, "-c", "pass"], run_id="run-1",
+            root=self.root,
+            source="autotrader",
+            config_path=self.config_path,
+            command=[sys.executable, "-c", "pass"],
+            run_id="run-1",
         )
         self.assertEqual(status["execution_status"], "degraded")
         self.assertIn("no_fresh_output", status["failure_reasons"])
         self.assertEqual(status["current_row_count"], 0)
         self.assertEqual(status["stale_row_count"], 1)
-        self.assertEqual(status["data_quality_status"], "not_evaluated_stale_output")
+        self.assertEqual(
+            status["data_quality_status"], "not_evaluated_stale_output"
+        )
         self.assertEqual(status["evidence_reconciliation_status"], "not_reconciled")
 
     def test_failure_is_recorded(self):
         status = run_source(
-            root=self.root, source="kijiji", config_path=self.config_path,
-            command=[sys.executable, "-c", "raise SystemExit(7)"], run_id="run-1",
+            root=self.root,
+            source="kijiji",
+            config_path=self.config_path,
+            command=[sys.executable, "-c", "raise SystemExit(7)"],
+            run_id="run-1",
         )
         self.assertEqual(status["execution_status"], "failed")
         self.assertEqual(status["exit_code"], 7)
@@ -147,39 +192,63 @@ with out.open('w',newline='',encoding='utf-8') as h:
     def test_timeout_is_bounded(self):
         started = time.monotonic()
         status = run_source(
-            root=self.root, source="autotrader", config_path=self.config_path,
+            root=self.root,
+            source="autotrader",
+            config_path=self.config_path,
             command=[sys.executable, "-c", "import time;time.sleep(2)"],
-            run_id="run-1", timeout_seconds=.05,
+            run_id="run-1",
+            timeout_seconds=0.05,
         )
         self.assertLess(time.monotonic() - started, 1)
         self.assertEqual(status["execution_status"], "timed_out")
 
     def test_history_helpers_are_idempotent(self):
         path = self.root / "history.json"
-        write_json(path, {"x": [{"date":"old","price":3},{"date":"today","price":2},{"date":"today","price":1}]})
+        write_json(
+            path,
+            {
+                "x": [
+                    {"date": "old", "price": 3},
+                    {"date": "today", "price": 2},
+                    {"date": "today", "price": 1},
+                ]
+            },
+        )
         self.assertEqual(remove_history_observations_for_date(path, "today"), 2)
         data = json.loads(path.read_text())
-        data["x"] += [{"date":"today","price":2},{"date":"today","price":1}]
+        data["x"] += [
+            {"date": "today", "price": 2},
+            {"date": "today", "price": 1},
+        ]
         write_json(path, data)
         self.assertEqual(dedupe_history_observations_for_date(path, "today"), 1)
         self.assertEqual(json.loads(path.read_text())["x"][-1]["price"], 1)
 
     def test_failed_run_restores_history(self):
         path = self.root / "data/test_vehicle/price_history_autotrader.json"
-        write_json(path, {"x": [{"date":"2026-07-21","price":1}]})
+        write_json(path, {"x": [{"date": "2026-07-21", "price": 1}]})
         original = path.read_bytes()
         run_source(
-            root=self.root, source="autotrader", config_path=self.config_path,
-            command=[sys.executable, "-c", "raise SystemExit(2)"], run_id="run-1",
+            root=self.root,
+            source="autotrader",
+            config_path=self.config_path,
+            command=[sys.executable, "-c", "raise SystemExit(2)"],
+            run_id="run-1",
         )
         self.assertEqual(path.read_bytes(), original)
 
     def test_quality_warning_rules(self):
         warnings = row_quality_warnings(
-            {"year":"2014","mileage":"1","url":"https://x/2011-dodge"},
-            "Kijiji", current_year=2026,
+            {
+                "year": "2014",
+                "mileage": "1",
+                "url": "https://x/2011-dodge",
+                "location_evidence_status": "unknown",
+            },
+            "Kijiji",
+            current_year=2026,
         )
-        self.assertIn("unverified_kijiji_location", warnings)
+        self.assertIn("kijiji_location_unknown", warnings)
         self.assertIn("url_year_conflicts_with_parsed_year", warnings)
         self.assertIn("suspiciously_low_mileage", warnings)
 
