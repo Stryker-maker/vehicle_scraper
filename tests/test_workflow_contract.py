@@ -18,7 +18,7 @@ class WorkflowContractTests(unittest.TestCase):
     def test_all_workflow_stages_use_authoritative_registry_source_plan(self):
         self.assertIn("vehicle_registry.py validate", self.workflow)
         self.assertIn("vehicle_registry.py active-runs", self.workflow)
-        self.assertEqual(self.workflow.count("--registry vehicle_registry.json"), 5)
+        self.assertGreaterEqual(self.workflow.count("--registry vehicle_registry.json"), 6)
         self.assertIn("build-manual-review", self.workflow)
         self.assertIn("report-health", self.workflow)
         self.assertNotIn("vehicle_registry.py active-configs", self.workflow)
