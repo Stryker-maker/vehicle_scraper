@@ -1,8 +1,15 @@
 """
-Cross-source merger script.
-Runs after both AutoTrader and Kijiji scrapers complete.
-Merges latest files per vehicle, flags duplicates, outputs merged CSV.
-Usage: python merge.py --config config_f350.json
+LEGACY / DISABLED: historical cross-source merger and ranker.
+
+This script is not called by the supported GitHub Actions workflow and must not
+be used to create current recommendations. Its duplicate logic treats
+source-specific listing IDs as though they could be VINs, applies broad
+price/mileage tolerances, fills fields across sources without an approved
+evidence model, and re-sorts by the disabled legacy score.
+
+It is retained only for audit history until Audit 06 replaces identity,
+deduplication, and listing-lifecycle behaviour. See
+`docs/LEGACY_COMPONENTS.md` and use the current manual-review CSV instead.
 """
 import argparse
 import csv
