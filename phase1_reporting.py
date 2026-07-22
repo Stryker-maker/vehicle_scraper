@@ -4,13 +4,39 @@ import csv
 import os
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Iterable, Sequence
 
 from phase1_common import (
     MANUAL_REVIEW_FIELDS, SOURCE_FIELDS, SOURCES, expected_output_path, load_json,
     read_csv_rows, row_quality_warnings, source_status_path,
     status_is_current_success, utc_now, write_json,
 )
+
+SourcePlan = Iterable[tuple[Path, Sequence[str]]]
+
+
+def _resolved_plan(
+    *, config_paths: Iterable[Path] | None, source_plan: SourcePlan | None,
+) -> list[tuple[Path, tuple[str, ...]]]:
+    if source_plan is not None:
+        if config_paths is not None:
+            raise ValueError("Provide config_paths or source_plan, not both")
+        plan = [(Path(path), tuple(sources)) for path, sources in source_plan]
+    elif config_paths is not None:
+        plan = [(Path(path), SOURCES) for path in config_paths]
+    else:
+        raise ValueError("A config_paths or source_plan value is required")
+    if not plan:
+        raise ValueError("Reporting source plan must not be empty")
+    for path, sources in plan:
+        if not sources:
+            raise ValueError(f"Reporting source plan has no sources for {path}")
+        unsupported = sorted(set(sources) - set(SOURCES))
+        if unsupported:
+            raise ValueError(f"Unsupported reporting source(s): {', '.join(unsupported)}")
+        if len(sources) != len(set(sources)):
+            raise ValueError(f"Reporting source plan has duplicate sources for {path}")
+    return plan
 
 
 def transform_manual_review_row(row: dict[str, str], status: dict[str, Any]) -> dict[str, str]:
@@ -46,19 +72,22 @@ def transform_manual_review_row(row: dict[str, str], status: dict[str, Any]) -> 
 
 
 def build_manual_review(
-    *, root: Path, config_paths: Iterable[Path], run_id: str | None = None
+    *, root: Path, config_paths: Iterable[Path] | None = None,
+    source_plan: SourcePlan | None = None, run_id: str | None = None,
 ) -> dict[str, Any]:
     root = root.resolve()
     active_run = run_id or os.environ.get("GITHUB_RUN_ID", "local")
     summaries: list[dict[str, Any]] = []
-    for raw_path in config_paths:
+    for raw_path, enabled_sources in _resolved_plan(
+        config_paths=config_paths, source_plan=source_plan
+    ):
         config_path = raw_path if raw_path.is_absolute() else root / raw_path
         config = load_json(config_path)
         key = str(config["vehicle_key"])
         rows: list[dict[str, str]] = []
         included: list[str] = []
         excluded: dict[str, str] = {}
-        for source in SOURCES:
+        for source in enabled_sources:
             status_path = source_status_path(root, config, source)
             if not status_path.exists():
                 excluded[source] = "missing_status"
@@ -97,6 +126,7 @@ def build_manual_review(
         warning_rows = sum(1 for row in rows if row["quality_warnings"])
         summaries.append({
             "vehicle_key": key, "row_count": len(rows),
+            "expected_sources": list(enabled_sources),
             "quality_warning_rows": warning_rows, "included_sources": included,
             "excluded_sources": excluded, "latest_output": str(latest.relative_to(root)),
             "archive_output": str(archive.relative_to(root)),
@@ -107,15 +137,18 @@ def build_manual_review(
 
 
 def collect_health(
-    *, root: Path, config_paths: Iterable[Path], run_id: str | None = None
+    *, root: Path, config_paths: Iterable[Path] | None = None,
+    source_plan: SourcePlan | None = None, run_id: str | None = None,
 ) -> dict[str, Any]:
     root = root.resolve()
     active_run = run_id or os.environ.get("GITHUB_RUN_ID", "local")
     entries: list[dict[str, Any]] = []
-    for raw_path in config_paths:
+    for raw_path, enabled_sources in _resolved_plan(
+        config_paths=config_paths, source_plan=source_plan
+    ):
         config_path = raw_path if raw_path.is_absolute() else root / raw_path
         config = load_json(config_path)
-        for source in SOURCES:
+        for source in enabled_sources:
             status_path = source_status_path(root, config, source)
             if status_path.exists():
                 status = load_json(status_path)
@@ -152,7 +185,7 @@ def collect_health(
     warnings = [entry for entry in entries if entry["data_quality_status"] == "warnings_present"]
     overall = "degraded" if unhealthy else "success_with_warnings" if warnings else "success"
     return {
-        "schema_version": 3, "run_id": active_run, "generated_at_utc": utc_now(),
+        "schema_version": 4, "run_id": active_run, "generated_at_utc": utc_now(),
         "overall_status": overall, "expected_source_runs": len(entries),
         "healthy_source_runs": len(entries) - len(unhealthy),
         "unhealthy_source_runs": len(unhealthy),
