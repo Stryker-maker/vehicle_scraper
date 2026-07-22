@@ -23,10 +23,25 @@ SOURCE_FIELDS = [
     "listing_id", "url_region_hint", "url_region_status", "url", "source",
 ]
 MANUAL_REVIEW_FIELDS = [
+    "evidence_schema_version", "vehicle_key", "source", "canonical_listing_id", "observation_id",
+    "source_listing_id", "source_listing_id_status", "source_claim_status",
+    "raw_record_ref", "normalized_record_ref",
     "ranking_status", "review_status", "collection_status", "data_quality_status",
     "quality_warnings", "source_run_status", "source_completed_at_utc",
-    "location_status", "distance_status", "unverified_location_value",
-    "unverified_distance_value", *SOURCE_FIELDS,
+    "year", "year_evidence_status", "make", "make_evidence_status",
+    "model", "model_evidence_status", "trim", "trim_evidence_status",
+    "price_cad", "price_evidence_status", "mileage_km",
+    "mileage_evidence_status", "engine", "engine_evidence_status",
+    "fuel", "fuel_evidence_status", "accident_claim",
+    "accident_evidence_status", "dealer", "dealer_evidence_status",
+    "seller_type_claim", "seller_type_evidence_status", "dealer_address",
+    "dealer_address_evidence_status", "location", "location_evidence_status",
+    "unverified_location_value", "distance_km", "distance_evidence_status",
+    "distance_method", "url_region_hint", "url_region_evidence_status",
+    "listing_url", "listing_url_evidence_status", "observation_count",
+    "first_observed_price_cad", "previous_observation_price_cad",
+    "change_from_previous_observation_cad", "change_from_first_observation_cad",
+    "source_price_history_text", "legacy_trend_text", "days_on_market_claim",
 ]
 
 
@@ -163,6 +178,9 @@ def status_is_current_success(status: dict[str, Any], run_id: str) -> bool:
         and status.get("output_updated_this_run") is True
         and status.get("schema_valid") is True
         and int(status.get("current_row_count", status.get("row_count", 0))) > 0
+        and int(status.get("accepted_record_count", 0)) > 0
+        and status.get("evidence_reconciliation_status") == "reconciled"
+        and status.get("canonical_evidence_schema_version") == 1
         and status.get("row_cap_disabled") is True
         and status.get("config_isolated") is True
     )
