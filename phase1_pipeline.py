@@ -15,6 +15,7 @@ from phase1_runtime import (
     dedupe_history_observations_for_date, remove_history_observations_for_date,
     run_source,
 )
+from vehicle_registry import DEFAULT_REGISTRY_PATH, active_source_plan
 
 __all__ = [
     "MANUAL_REVIEW_FIELDS", "build_manual_review", "collect_health",
@@ -30,6 +31,18 @@ def config_paths(values: Sequence[str]) -> list[Path]:
     return [Path(value) for value in values]
 
 
+def add_reporting_scope_arguments(action: argparse.ArgumentParser) -> None:
+    scope = action.add_mutually_exclusive_group(required=True)
+    scope.add_argument("--registry")
+    scope.add_argument("--configs", nargs="+")
+
+
+def reporting_source_plan(args: argparse.Namespace, *, root: Path):
+    if args.registry:
+        return active_source_plan(root=root, registry_path=Path(args.registry))
+    return [(path, SOURCES) for path in config_paths(args.configs)]
+
+
 def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(description=__doc__)
     actions = root.add_subparsers(dest="action", required=True)
@@ -39,9 +52,9 @@ def parser() -> argparse.ArgumentParser:
     run.add_argument("--timeout-seconds", type=float, default=DEFAULT_TIMEOUT_SECONDS)
     run.add_argument("command", nargs=argparse.REMAINDER)
     manual = actions.add_parser("build-manual-review")
-    manual.add_argument("--configs", nargs="+", required=True)
+    add_reporting_scope_arguments(manual)
     report = actions.add_parser("report-health")
-    report.add_argument("--configs", nargs="+", required=True)
+    add_reporting_scope_arguments(report)
     check = actions.add_parser("check-health")
     check.add_argument("--report", default="data/run_status/latest.json")
     return root
@@ -62,10 +75,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         return 0
     if args.action == "build-manual-review":
-        build_manual_review(root=root, config_paths=config_paths(args.configs))
+        build_manual_review(root=root, source_plan=reporting_source_plan(args, root=root))
         return 0
     if args.action == "report-health":
-        report = collect_health(root=root, config_paths=config_paths(args.configs))
+        report = collect_health(root=root, source_plan=reporting_source_plan(args, root=root))
         json_path, md_path = write_health_report(root=root, report=report)
         print(f"Health JSON: {json_path.relative_to(root)}")
         print(f"Health summary: {md_path.relative_to(root)}")
