@@ -1,3 +1,3 @@
 # Merged ranking disabled
 
-The automated cross-source merged ranking is disabled during Phase 1. Existing merged CSV files are historical and are no longer refreshed. Use `../manual_review/subaru_forester_manual_review_latest.csv` for current unranked, uncapped data. Kijiji distance filtering and location-based ranking are disabled because its listing locations are unverified.
+The automated cross-source merged ranking is disabled. Existing merged CSV files are historical and are no longer refreshed. Use `../manual_review/subaru_forester_manual_review_latest.csv` for current decision-safe accepted records. Raw, normalized, rejected and parse-failure evidence is stored under `../evidence/`. Kijiji location remains quarantined because it is unverified.

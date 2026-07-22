@@ -9,6 +9,7 @@ import time
 from pathlib import Path
 from typing import Any, Sequence
 
+from canonical_evidence import EVIDENCE_SCHEMA_VERSION, build_canonical_evidence
 from phase1_common import (
     DEFAULT_TIMEOUT_SECONDS, UNBOUNDED_MAX_RESULTS, analyze_csv_quality,
     expected_output_path, file_signature, price_history_path, source_status_path,
@@ -103,6 +104,21 @@ def replace_config_argument(
     return [runtime_arg if arg in candidates else arg for arg in command]
 
 
+def _empty_evidence() -> dict[str, Any]:
+    return {
+        "evidence_schema_version": EVIDENCE_SCHEMA_VERSION,
+        "fetched_records": 0,
+        "normalized_records": 0,
+        "accepted_records": 0,
+        "rejected_records": 0,
+        "parse_failures": 0,
+        "reconciled": False,
+        "fetched_record_scope": "not_evaluated",
+        "source_fetch_completeness": "not_evaluated",
+        "artifacts": {},
+    }
+
+
 def run_source(
     *, root: Path, source: str, config_path: Path, command: Sequence[str],
     run_id: str | None = None, timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
@@ -111,6 +127,7 @@ def run_source(
     config_path = config_path if config_path.is_absolute() else root / config_path
     original_config = config_path.read_bytes()
     config = load_vehicle_config(config_path)
+    active_run = run_id or os.environ.get("GITHUB_RUN_ID", "local")
     output_path = expected_output_path(root, config, source)
     status_path = source_status_path(root, config, source)
     history_path = price_history_path(root, config, source)
@@ -173,11 +190,34 @@ def run_source(
         failures.append("invalid_output_schema")
     if fresh and current_rows < 1:
         failures.append("empty_output")
+
+    evidence = _empty_evidence()
+    evidence_error: str | None = None
+    completed_at = utc_now()
+    if fresh and validation["schema_valid"]:
+        try:
+            evidence = build_canonical_evidence(
+                root=root, config=config, source=source, csv_path=output_path,
+                run_id=active_run, completed_at_utc=completed_at,
+            )
+        except Exception as exc:
+            evidence_error = f"{type(exc).__name__}: {exc}"
+            failures.append("canonical_evidence_failed")
+        else:
+            if evidence.get("reconciled") is not True:
+                failures.append("evidence_reconciliation_failed")
+            if int(evidence.get("accepted_records", 0)) < 1:
+                failures.append("no_accepted_records")
+
+    config_isolated = config_path.read_bytes() == original_config
+    if not config_isolated:
+        config_path.write_bytes(original_config)
+        failures.append("approved_config_mutated")
+
     status_name = (
         "timed_out" if timed_out else "failed" if returncode != 0
         else "degraded" if failures else "success"
     )
-
     if status_name == "success":
         deduped_after = dedupe_history_observations_for_date(history_path, today)
     else:
@@ -198,22 +238,16 @@ def run_source(
             "quality_warning_count": 0, "quality_warning_summary": {},
         }
 
-    config_isolated = config_path.read_bytes() == original_config
-    if not config_isolated:
-        config_path.write_bytes(original_config)
-        failures.append("approved_config_mutated")
-        if status_name == "success":
-            status_name = "degraded"
-
     status = {
-        "schema_version": 4,
+        "schema_version": 5,
         "configuration_schema_version": CONFIG_SCHEMA_VERSION,
+        "canonical_evidence_schema_version": EVIDENCE_SCHEMA_VERSION,
         "runtime_config_projection": "legacy_collector_v1",
         "approved_config_contains_legacy_controls": False,
-        "run_id": run_id or os.environ.get("GITHUB_RUN_ID", "local"),
+        "run_id": active_run,
         "vehicle_key": config["vehicle_key"], "source": source,
         "config_path": str(config_path.relative_to(root)), "command": list(command),
-        "started_at_utc": started_at, "completed_at_utc": utc_now(),
+        "started_at_utc": started_at, "completed_at_utc": completed_at,
         "execution_status": status_name, "collection_status": status_name,
         "exit_code": returncode, "timed_out": timed_out,
         "timeout_seconds": timeout_seconds, "failure_reasons": failures,
@@ -230,12 +264,30 @@ def run_source(
         "observed_file_row_count": observed_rows,
         "same_day_history_removed_before_run": removed_before,
         "same_day_history_duplicates_removed_after_run": deduped_after,
+        "fetched_record_scope": evidence.get("fetched_record_scope"),
+        "source_fetch_completeness": evidence.get("source_fetch_completeness"),
+        "fetched_record_count": int(evidence.get("fetched_records", 0)),
+        "normalized_record_count": int(evidence.get("normalized_records", 0)),
+        "accepted_record_count": int(evidence.get("accepted_records", 0)),
+        "rejected_record_count": int(evidence.get("rejected_records", 0)),
+        "parse_failure_count": int(evidence.get("parse_failures", 0)),
+        "evidence_reconciliation_status": (
+            "reconciled" if evidence.get("reconciled") is True else "not_reconciled"
+        ),
+        "evidence_reconciliation_equation": evidence.get(
+            "reconciliation_equation",
+            "fetched_records = accepted_records + rejected_records + parse_failures",
+        ),
+        "canonical_evidence_artifacts": evidence.get("artifacts", {}),
+        "canonical_evidence_error": evidence_error,
         **{**validation, "row_count": current_rows}, **quality,
         "stdout_tail": stdout[-4000:], "stderr_tail": stderr[-4000:],
     }
     write_json(status_path, status)
     print(
-        f"[{config['vehicle_key']}:{source}] {status_name} | current_rows={current_rows} "
-        f"| stale_rows={stale_rows} | fresh={fresh} | quality={quality['data_quality_status']}"
+        f"[{config['vehicle_key']}:{source}] {status_name} | emitted={current_rows} "
+        f"| accepted={status['accepted_record_count']} | rejected={status['rejected_record_count']} "
+        f"| parse_failures={status['parse_failure_count']} | "
+        f"reconciliation={status['evidence_reconciliation_status']}"
     )
     return status

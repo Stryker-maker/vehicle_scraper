@@ -44,6 +44,7 @@ jobs:
           vehicle_config.py
           vehicle_registry.py
           phase1_common.py
+          canonical_evidence.py
           phase1_kijiji_runner.py
           phase1_runtime.py
           phase1_reporting.py
@@ -85,7 +86,7 @@ jobs:
           python vehicle_registry.py validate --registry vehicle_registry.json
           python vehicle_registry.py summary --registry vehicle_registry.json
 
-      - name: Collect uncapped source data with status evidence
+      - name: Collect uncapped source data with canonical status evidence
         env:
           ORS_API_KEY: ${{ secrets.ORS_API_KEY }}
         run: |
@@ -113,12 +114,12 @@ jobs:
             esac
           done < <(python vehicle_registry.py active-runs --registry vehicle_registry.json)
 
-      - name: Build unranked manual-review files
+      - name: Build evidence-backed manual-review files
         run: >-
           python phase1_pipeline.py build-manual-review
           --registry vehicle_registry.json
 
-      - name: Write consolidated run-health report
+      - name: Write consolidated reconciliation and run-health report
         run: |
           python phase1_pipeline.py report-health --registry vehicle_registry.json
           cat data/run_status/latest.md >> "$GITHUB_STEP_SUMMARY"
@@ -128,7 +129,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           # Collectors receive temporary compatibility projections. Approved registry and
-          # configuration files remain unchanged; only active-scope data is committed.
+          # configuration files remain unchanged; only active-scope data/evidence is committed.
           git add data/
           git diff --staged --quiet || git commit -m "Weekly scrape $(date +'%Y-%m-%d')"
           git push

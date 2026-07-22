@@ -2,103 +2,87 @@
 
 ## Purpose
 
-This document describes current execution architecture and generated artifacts. It distinguishes governed, supported flow from legacy and interim behaviour.
+This document describes the current execution architecture and generated artifacts. It distinguishes governed, supported flow from legacy source behaviour and explicitly defines the Audit 03 canonical boundary.
 
 ## Current execution layers
 
 ### 1. Operational registry
 
-`vehicle_registry.json` schema v2 is the sole authority for:
-
-- enabled/paused state
-- purpose and priority
-- cadence metadata
-- enabled sources
-- purpose-linked analysis profile
-- pause reason
-
-`vehicle_registry.py` validates the registry and every referenced config before emitting either unique active config paths or the ordered active vehicle/source run plan.
+`vehicle_registry.json` schema v2 is the sole authority for enabled/paused state, purpose, priority, cadence metadata, enabled sources, analysis profile, and pause reason. `vehicle_registry.py` validates the registry and every referenced config before emitting the ordered active vehicle/source run plan.
 
 ### 2. Governed source criteria
 
-Each `config_*.json` schema-v2 file contains:
-
-- human-facing vehicle identity
-- shared year, price, fuel and engine criteria
-- origin and intended distance boundary
-- separate AutoTrader make/model/location settings
-- separate Kijiji make/model/location settings
-
-`vehicle_config.py` rejects unknown/obsolete fields, invalid ranges, invalid coordinates, unsupported location formatting and duplicate locations.
-
-Approved configs never contain legacy `max_results`, `ranking_weights` or one shared `search_locations` authority.
+Each `config_*.json` schema-v2 file contains shared year/price/fuel/engine criteria, origin settings, and separate AutoTrader/Kijiji query settings. `vehicle_config.py` rejects obsolete or invalid approved fields. Legacy flat controls exist only in a disposable runtime projection.
 
 ### 3. Workflow orchestration
 
 `.github/workflows/scrape.yml` provides:
 
-- normal pull request: compile, validate governed registry/configs and run tests
-- scheduled/manual workflow: test first, then execute the registry's active source plan
-- generated-data PR event: acknowledgement only
+- pull request: compilation, registry/config validation, and tests
+- scheduled/manual run: tests first, then registry-driven collection
+- generated-data commit: acknowledgement only
 
-Collection, manual-review generation and health reporting all consume the same registry source plan. A source removed from `enabled_sources` is omitted from all three stages.
+Collection, evidence generation, manual review, and health reporting all use the same registry source plan.
 
-### 4. Phase 1 runtime compatibility and safety
-
-`phase1_pipeline.py` exposes commands for source execution, manual-review generation, health reporting and final health enforcement.
+### 4. Runtime compatibility and source execution
 
 `phase1_runtime.py`:
 
-1. loads and validates the approved schema-v2 config
-2. derives the selected source's settings
-3. creates a temporary flat legacy config via `vehicle_config.py`
-4. injects effectively unbounded `max_results` and compatibility-only ranking weights
-5. substitutes the temporary path into the collector command
-6. runs the collector with a 75-minute timeout
-7. verifies the approved config remained byte-for-byte unchanged
-8. records freshness, schema, current/stale rows, warnings, failures and projection evidence
-9. protects price history from failed runs and same-day duplication
+1. validates the approved schema-v2 config
+2. creates a source-specific temporary legacy projection
+3. injects an effectively unbounded result cap
+4. runs the collector with a 75-minute timeout
+5. verifies the approved config remained byte-for-byte unchanged
+6. checks output freshness and minimum source schema
+7. invokes the canonical evidence layer for every fresh valid source CSV
+8. requires reconciliation and at least one accepted record
+9. records source, evidence, warning, history, and failure status
 
-The compatibility file is disposable collector input, not approved authority.
+The compatibility projection is collector input only. It is not approved configuration authority.
 
-### 5. Source collectors
+### 5. Legacy source collectors
 
-#### AutoTrader
+AutoTrader currently runs through `scraper.py`. Kijiji runs through `phase1_kijiji_runner.py`, which runtime-patches `kijiji_scraper.py` and disables unsafe geography, distance, ranking, and location mutation behaviour.
+
+Audit 03 does not refactor either collector. Therefore, source-level request counts, HTTP payloads, skipped parser records, and true marketplace fetch completeness remain unavailable until Audits 04 and 05.
+
+### 6. Canonical evidence layer
+
+`canonical_evidence.py` begins at the fresh collector CSV boundary.
+
+For every collector-emitted row it:
+
+- preserves exact raw CSV strings
+- generates a stable source-scoped `canonical_listing_id`
+- generates a run-specific `observation_id`
+- normalizes typed values with real JSON nulls
+- records per-field provenance/evidence status
+- keeps source listing IDs distinct from VIN
+- quarantines Kijiji location/distance values
+- classifies the row as accepted, rejected, or parse failure
+- writes machine-readable reasons
+- enforces count reconciliation
+
+Current reconciliation scope is explicitly `legacy_collector_emitted_csv_rows`:
 
 ```text
-registry/config validation
-  → phase1_pipeline
-  → phase1_runtime
-  → temporary AutoTrader legacy projection
-  → scraper.py
+fetched_records = accepted_records + rejected_records + parse_failures
 ```
 
-`scraper.py` remains legacy. Audit 02 governs its input but does not repair pagination, parse-failure visibility, distance evidence or internal source ranking.
+This proves no row disappears after the canonical boundary. It does not prove no record disappeared inside a legacy collector before CSV output.
 
-#### Kijiji
+### 7. Evidence-backed reporting
 
-```text
-registry/config validation
-  → phase1_pipeline
-  → phase1_runtime
-  → temporary Kijiji legacy projection
-  → phase1_kijiji_runner.py
-  → runtime-patched kijiji_scraper.py
-```
+`phase1_reporting.py`:
 
-The Kijiji adapter still disables geocoding, distance processing, location filtering, source ranking and automatic location-list mutation, while adding URL-region hints. Runtime source rewriting remains temporary until Audit 05.
-
-### 6. Reporting
-
-`phase1_reporting.py` consumes the registry source plan. It:
-
-- expects only enabled source pairs
-- includes only current successful rows for the active run
-- removes rank and score from manual review
-- quarantines Kijiji search-origin values
-- writes timestamped/latest review CSVs
-- writes consolidated Markdown/JSON health reports
-- creates `RANKING_DISABLED.md` in merged directories
+- consumes only enabled source pairs
+- includes only current successful sources with reconciled evidence
+- loads `accepted_latest.jsonl`, not the raw collector CSV
+- writes a decision-safe manual-review CSV with canonical IDs and evidence statuses
+- removes source ranking and misleading legacy field names from supported output
+- writes consolidated JSON/Markdown health with reconciliation totals
+- keeps Kijiji location evidence quarantined
+- maintains the historical-ranking disabled marker
 
 ## Current data flow
 
@@ -106,98 +90,109 @@ The Kijiji adapter still disables geocoding, distance processing, location filte
 flowchart TD
     A[vehicle_registry.json schema v2] --> B[vehicle_registry.py]
     C[config_*.json schema v2] --> B
-    C --> D[vehicle_config.py validation]
-    B --> D
-    D --> E[GitHub Actions tests]
-    E --> F[Active vehicle/source plan]
-
-    F --> G[phase1_pipeline run-source]
-    G --> H[phase1_runtime]
-    H --> I[Temporary source-specific legacy projection]
-
-    I --> J[scraper.py AutoTrader]
-    I --> K[phase1_kijiji_runner.py]
-    K --> L[kijiji_scraper.py runtime-patched]
-
-    J --> M[AutoTrader latest CSV]
-    L --> N[Kijiji latest CSV]
-    J --> O[AutoTrader price history]
-    L --> P[Kijiji price history]
-    H --> Q[Per-source run status JSON]
-
-    F --> R[phase1_reporting]
-    M --> R
-    N --> R
-    Q --> R
-    R --> S[Manual-review latest CSV]
-    R --> T[Manual-review archive]
-    R --> U[Consolidated health JSON]
-    R --> V[Consolidated health Markdown]
-    R --> W[RANKING_DISABLED marker]
-
-    S --> X[Human verification]
-    U --> Y[Final health gate]
-    V --> Y
-    Y --> Z[Generated-data commit]
+    C --> D[vehicle_config.py]
+    B --> E[Registry source plan]
+    D --> E
+    E --> F[phase1_pipeline run-source]
+    F --> G[phase1_runtime]
+    G --> H[Temporary legacy projection]
+    H --> I[scraper.py AutoTrader]
+    H --> J[phase1_kijiji_runner.py]
+    J --> K[kijiji_scraper.py runtime-patched]
+    I --> L[AutoTrader source CSV]
+    K --> M[Kijiji source CSV]
+    L --> N[canonical_evidence.py]
+    M --> N
+    N --> O[raw JSONL]
+    N --> P[normalized JSONL]
+    N --> Q[accepted JSONL]
+    N --> R[rejected JSONL]
+    N --> S[parse failures JSONL]
+    N --> T[reconciliation JSON]
+    G --> U[per-source status schema v5]
+    Q --> V[phase1_reporting.py]
+    U --> V
+    E --> V
+    V --> W[decision-safe manual-review CSV]
+    V --> X[consolidated health JSON/Markdown schema v5]
+    X --> Y[final health gate]
+    Y --> Z[generated-data commit]
 ```
 
 ## Artifact map
 
-### Registry and configuration
+### Authority and runtime input
 
-| Artifact | Producer | Consumer | Authority |
-|---|---|---|---|
-| `vehicle_registry.json` | owner-approved change | workflow, registry utility, reporting plan | operational scope/source authority |
-| `config_*.json` | owner-approved change | config validator/runtime projector | approved source criteria |
-| temporary runtime config | `vehicle_config.py` through `phase1_runtime.py` | one legacy collector process | compatibility only; deleted after run |
-| `trim_tiers.json` | owner-approved change | collectors | legacy trim keywords |
+| Artifact | Authority/role |
+|---|---|
+| `vehicle_registry.json` | operational scope and enabled-source authority |
+| `config_*.json` | approved source criteria |
+| temporary runtime config | disposable legacy compatibility only |
+| `trim_tiers.json` | active legacy keyword configuration |
 
-### Source output
+### Collector artifacts
 
-| Artifact | Producer | Consumer | Notes |
-|---|---|---|---|
-| `data/<vehicle>/latest/<vehicle>_autotrader_latest.csv` | `scraper.py` | reporting/diagnostics | may contain legacy rank/score |
-| `data/<vehicle>/latest/<vehicle>_kijiji_latest.csv` | patched Kijiji execution | reporting/diagnostics | geography not trustworthy |
-| timestamped source CSV | collector | diagnostics/history | retention not bounded |
-| source price-history JSON | collector | legacy trend fields | not a lifecycle model |
+| Artifact | Role and limit |
+|---|---|
+| `data/<vehicle>/latest/<vehicle>_<source>_latest.csv` | fresh collector-emitted rows; may contain legacy fields |
+| timestamped source CSV | diagnostic history with unbounded retention pending Audit 07 |
+| source price-history JSON | legacy observation history, not lifecycle authority |
+
+### Canonical evidence artifacts
+
+| Artifact | Role |
+|---|---|
+| `raw_latest.jsonl` | exact collector CSV strings |
+| `normalized_latest.jsonl` | typed/null-safe normalized rows |
+| `accepted_latest.jsonl` | current supported review inputs |
+| `rejected_latest.jsonl` | exclusions with reasons |
+| `parse_failures_latest.jsonl` | malformed/failed rows with reasons |
+| `reconciliation_latest.json` | counts, scope caveat, paths, and equality result |
+
+All canonical artifacts live under `data/<vehicle>/evidence/<source>/`.
 
 ### Run evidence and supported review
 
-| Artifact | Producer | Consumer | Notes |
-|---|---|---|---|
-| `data/<vehicle>/run_status/<source>_latest.json` | runtime | reporting/humans | includes schema-v2/projection/isolation evidence |
-| `data/run_status/latest.json` | reporting | health gate/humans | registry-source-aware expected runs |
-| `data/run_status/latest.md` | reporting | GitHub summary/humans | readable health evidence |
-| `data/<vehicle>/manual_review/<vehicle>_manual_review_latest.csv` | reporting | human review | supported listing set |
-| timestamped manual-review CSV | reporting | history | retention not bounded |
-| `data/<vehicle>/merged/*.csv` | disabled merger | none | historical only |
+| Artifact | Role |
+|---|---|
+| `data/<vehicle>/run_status/<source>_latest.json` | source execution plus canonical evidence status |
+| `data/run_status/latest.json` | registry-wide health and reconciliation totals |
+| `data/run_status/latest.md` | readable health summary |
+| `data/<vehicle>/manual_review/<vehicle>_manual_review_latest.csv` | supported decision-safe accepted records |
+| timestamped manual-review CSV | review history pending retention policy |
+| `data/<vehicle>/merged/*.csv` | disabled historical output only |
 
-## Freshness and health logic
+## Health contract
 
-A source is healthy only when its run ID matches, execution succeeded, output is fresh, minimum schema is valid, current rows are non-zero, row cap is disabled and approved config isolation is true. Preserved older files are stale, never current.
+A source is healthy only when:
 
-Overall status is `degraded` when any enabled pair is unhealthy, `success_with_warnings` when all are healthy but row warnings exist, and `success` when all are healthy without current warning rows.
+- the run ID is current
+- execution succeeded
+- output is fresh
+- minimum source schema is valid
+- current collector-emitted rows are non-zero
+- canonical evidence schema version is recognized
+- accepted record count is non-zero
+- evidence reconciliation status is `reconciled`
+- result cap is disabled
+- approved config isolation is true
 
-## Data loss visibility boundary
-
-The current architecture still does not reconcile:
-
-```text
-fetched records = accepted records + rejected records + parse failures
-```
-
-Raw, rejected and parse-failure artifacts belong to Audit 03 and source audits. Successful execution does not prove completeness.
+Overall status is `degraded` when any enabled source pair is unhealthy, `success_with_warnings` when all pairs are healthy but warnings exist, and `success` when all pairs are healthy without warning rows.
 
 ## Authority boundaries
 
-- registry determines operational vehicle/source scope
-- governed configs determine source-specific criteria
-- temporary legacy projection is compatibility, not authority
-- source CSV values are parsed evidence, not verified truth
-- manual-review transformation governs human-facing presentation
-- health describes collection execution and limited warning rules, not vehicle quality
-- the owner retains purchase, sale, merge and roadmap authority
+- registry controls operational vehicle/source scope
+- governed configs control source criteria
+- temporary projection is compatibility, not authority
+- collector CSV values are unverified evidence
+- raw canonical values preserve what the collector emitted
+- normalized values are transformations, not verification
+- accepted means structurally eligible for manual review, not purchase-approved
+- rejected/parse-failure records remain evidence and are not silently discarded
+- source listing IDs are not VIN or cross-source identity
+- manual review governs human-facing presentation
+- owner retains purchase, sale, merge, and roadmap authority
 
-## Target direction
+## Remaining boundary
 
-Later packages add canonical evidence stages, direct source adapters, verified/unknown geography, lifecycle and identity evidence, bounded storage and purpose-specific decision support. Phase 1 remains controlled interim operation until those replacements are proven.
+Audits 04 and 05 must move the raw/fetched boundary into directly testable source adapters so request, response, parser, accepted, rejected, and parse-failure counts reconcile from the marketplace fetch itself. Audit 06 then adds identity/deduplication/lifecycle semantics. Audit 07 addresses evidence retention and repository growth.

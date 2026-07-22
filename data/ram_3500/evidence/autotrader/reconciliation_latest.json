@@ -1,0 +1,24 @@
+{
+  "accepted_records": 4,
+  "artifacts": {
+    "accepted": "data/ram_3500/evidence/autotrader/accepted_latest.jsonl",
+    "normalized": "data/ram_3500/evidence/autotrader/normalized_latest.jsonl",
+    "parse_failures": "data/ram_3500/evidence/autotrader/parse_failures_latest.jsonl",
+    "raw": "data/ram_3500/evidence/autotrader/raw_latest.jsonl",
+    "reconciliation": "data/ram_3500/evidence/autotrader/reconciliation_latest.json",
+    "rejected": "data/ram_3500/evidence/autotrader/rejected_latest.jsonl"
+  },
+  "evidence_schema_version": 1,
+  "fetched_record_scope": "legacy_collector_emitted_csv_rows",
+  "fetched_records": 4,
+  "generated_at_utc": "2026-07-22T18:42:12+00:00",
+  "normalized_records": 4,
+  "parse_failures": 0,
+  "reconciled": true,
+  "reconciliation_equation": "fetched_records = accepted_records + rejected_records + parse_failures",
+  "rejected_records": 0,
+  "run_id": "29946946382",
+  "source": "autotrader",
+  "source_fetch_completeness": "not_proven_by_legacy_collector",
+  "vehicle_key": "ram_3500"
+}

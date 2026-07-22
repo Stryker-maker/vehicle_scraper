@@ -29,7 +29,14 @@ class WorkflowContractTests(unittest.TestCase):
     def test_pull_requests_do_not_run_collectors(self):
         self.assertIn("if: github.event_name != 'pull_request'", self.workflow)
         self.assertIn("vehicle_config.py", self.workflow)
+        self.assertIn("canonical_evidence.py", self.workflow)
         self.assertIn("Validate governed vehicle registry and configurations", self.workflow)
+
+    def test_collection_commits_canonical_evidence(self):
+        self.assertIn("canonical status evidence", self.workflow)
+        self.assertIn("evidence-backed manual-review files", self.workflow)
+        self.assertIn("consolidated reconciliation", self.workflow)
+        self.assertIn("git add data/", self.workflow)
 
 
 if __name__ == "__main__":

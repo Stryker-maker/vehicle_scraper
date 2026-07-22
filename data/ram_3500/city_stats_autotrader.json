@@ -2,10 +2,11 @@
   "candidates": {
     "Fort Saskatchewan, AB": 1,
     "Vernon, BC": 1,
-    "Islay, AB": 2
+    "Islay, AB": 2,
+    "Sherwood Park, AB": 1
   },
   "zero_weeks": {
-    "Calgary, AB": 6,
-    "Regina, SK": 3
+    "Calgary, AB": 7,
+    "Regina, SK": 4
   }
 }

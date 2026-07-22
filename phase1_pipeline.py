@@ -6,6 +6,10 @@ import sys
 from pathlib import Path
 from typing import Sequence
 
+from canonical_evidence import (
+    EVIDENCE_SCHEMA_VERSION, build_canonical_evidence, canonical_artifact_paths,
+    read_jsonl,
+)
 from phase1_common import (
     DEFAULT_TIMEOUT_SECONDS, MANUAL_REVIEW_FIELDS, SOURCES, expected_output_path,
     load_json, row_quality_warnings, source_status_path, write_json,
@@ -18,10 +22,11 @@ from phase1_runtime import (
 from vehicle_registry import DEFAULT_REGISTRY_PATH, active_source_plan
 
 __all__ = [
-    "MANUAL_REVIEW_FIELDS", "build_manual_review", "collect_health",
-    "dedupe_history_observations_for_date", "expected_output_path",
-    "remove_history_observations_for_date", "row_quality_warnings", "run_source",
-    "source_status_path", "write_json",
+    "EVIDENCE_SCHEMA_VERSION", "MANUAL_REVIEW_FIELDS", "build_canonical_evidence",
+    "canonical_artifact_paths", "read_jsonl", "build_manual_review",
+    "collect_health", "dedupe_history_observations_for_date",
+    "expected_output_path", "remove_history_observations_for_date",
+    "row_quality_warnings", "run_source", "source_status_path", "write_json",
 ]
 
 
@@ -41,6 +46,22 @@ def reporting_source_plan(args: argparse.Namespace, *, root: Path):
     if args.registry:
         return active_source_plan(root=root, registry_path=Path(args.registry))
     return [(path, SOURCES) for path in config_paths(args.configs)]
+
+
+def _raise_for_canonical_review_exclusions(summary: dict) -> None:
+    failures: list[str] = []
+    for vehicle in summary.get("vehicles", []):
+        for source, reason in vehicle.get("excluded_sources", {}).items():
+            reason_text = str(reason)
+            if "evidence" in reason_text or "accepted_" in reason_text:
+                failures.append(
+                    f"{vehicle.get('vehicle_key', 'unknown')}:{source}:{reason_text}"
+                )
+    if failures:
+        raise RuntimeError(
+            "Canonical evidence integrity prevented manual-review generation: "
+            + ", ".join(failures)
+        )
 
 
 def parser() -> argparse.ArgumentParser:
@@ -75,7 +96,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         return 0
     if args.action == "build-manual-review":
-        build_manual_review(root=root, source_plan=reporting_source_plan(args, root=root))
+        summary = build_manual_review(
+            root=root, source_plan=reporting_source_plan(args, root=root)
+        )
+        _raise_for_canonical_review_exclusions(summary)
         return 0
     if args.action == "report-health":
         report = collect_health(root=root, source_plan=reporting_source_plan(args, root=root))
@@ -93,10 +117,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
             return 1
         message = (
-            "All expected source runs produced fresh, uncapped output; data-quality "
-            "warnings require manual review."
+            "All expected source runs produced fresh, uncapped output with reconciled "
+            "canonical evidence; data-quality warnings require manual review."
             if report.get("overall_status") == "success_with_warnings"
-            else "All expected source runs produced fresh, uncapped, valid output."
+            else "All expected source runs produced fresh, uncapped output with reconciled canonical evidence."
         )
         print(message)
         return 0

@@ -2,246 +2,184 @@
 
 ## Purpose
 
-This document defines current repository fields and the limits of the evidence they represent. Blank, `Unknown`, `N/A`, sentinel values and source claims must not be treated as equivalent.
+This document defines current repository fields and the evidence limits they represent. Raw strings, normalized values, source claims, inferred values, unknown values, and rejected records are distinct concepts.
 
-## Registry schema version 2
+## Registry and configuration
 
-`vehicle_registry.json` is the sole operational authority for vehicle and source execution.
+`vehicle_registry.json` uses schema version `2` and is the sole operational authority for `profile`, ordered `vehicles`, `vehicle_key`, `config_path`, `enabled`, `purpose`, `priority`, `cadence`, `enabled_sources`, `analysis_profile`, and conditional `pause_reason`.
 
-| Field | Type | Meaning |
-|---|---|---|
-| `schema_version` | integer | Must equal `2` |
-| `profile` | string | Operational profile name; currently `audit_active` |
-| `vehicles` | array | Ordered vehicle entries |
-| `vehicle_key` | string | Canonical repository key; must match the referenced config |
-| `config_path` | string | Repository-relative governed config path |
-| `enabled` | boolean | Includes or excludes the vehicle from collection, review generation and health reporting |
-| `purpose` | enum string | `primary_purchase`, `owned_vehicle_value_monitoring`, `family_friend_purchase_search`, or `optional_curiosity` |
-| `priority` | positive integer | Owner-approved relative priority; lower is higher |
-| `cadence` | enum string | Approved cadence metadata: `weekly` or `manual` |
-| `enabled_sources` | array | Ordered subset of `autotrader` and `kijiji`; drives collection and expected health entries |
-| `analysis_profile` | enum string | Purpose-linked future output profile; validated but not yet used for ranking |
-| `pause_reason` | string, conditional | Required when `enabled` is false; prohibited when enabled |
+Every `config_*.json` file uses schema version `2` and contains `vehicle_key`, human-facing `make` and `model`, shared `criteria`, `origin`, and separate `sources.autotrader` / `sources.kijiji` query settings. Approved configs prohibit legacy flat controls such as `max_results`, `ranking_weights`, one shared `search_locations`, and flat source aliases.
 
-Validation rejects missing or unknown fields, duplicate vehicle keys, duplicate config paths, unsupported purposes/cadences/sources, inconsistent purpose/profile pairs, unsafe paths, missing configs, config key mismatches, paused entries without reasons and registries with no enabled vehicle.
+## Canonical evidence schema version 1
 
-Changing only `enabled` remains sufficient to pause or re-enable a vehicle because cadence and source selections remain stored with the entry.
+`canonical_evidence.py` starts at the fresh legacy collector CSV boundary. It does not claim that the legacy collector fetched or parsed every marketplace record. Until Audits 04 and 05 replace the source adapters, `fetched_records` means rows emitted by the legacy collector into its latest CSV.
 
-## Vehicle configuration schema version 2
+Each source writes current evidence under:
 
-Every `config_*.json` file is an approved source-criteria document. Operational state does not belong here.
+```text
+data/<vehicle>/evidence/<source>/
+```
 
-### Top-level fields
+| Artifact | Meaning |
+|---|---|
+| `raw_latest.jsonl` | One envelope per collector-emitted row, preserving the exact CSV strings in `raw_values` |
+| `normalized_latest.jsonl` | Successfully normalized rows, including rows later accepted or rejected |
+| `accepted_latest.jsonl` | Normalized records eligible for supported manual review |
+| `rejected_latest.jsonl` | Structurally normalized records excluded with machine-readable `rejection_reasons` |
+| `parse_failures_latest.jsonl` | Malformed or unnormalizable rows with `parse_failure_reasons` and retained raw evidence where available |
+| `reconciliation_latest.json` | Counts, artifact paths, scope caveat, and reconciliation result |
+
+The enforced equation is:
+
+```text
+fetched_records = accepted_records + rejected_records + parse_failures
+```
+
+### Record envelope fields
 
 | Field | Meaning |
 |---|---|
-| `schema_version` | Must equal `2` |
-| `vehicle_key` | Canonical registry/data key in lowercase snake case |
-| `make` | Human-facing make |
-| `model` | Human-facing model |
-| `criteria` | Shared vehicle acceptance criteria |
-| `origin` | Search origin and intended distance boundary |
-| `sources` | Separate AutoTrader and Kijiji query settings |
+| `evidence_schema_version` | Canonical evidence schema version; currently `1` |
+| `record_stage` | `raw`, `normalized`, `accepted`, `rejected`, or `parse_failure` |
+| `vehicle_key` | Governed repository vehicle key |
+| `source` | Lowercase source key: `autotrader` or `kijiji` |
+| `run_id` | Workflow run ID or explicit local run ID |
+| `source_record_index` | Zero-based row position at the canonical boundary |
+| `canonical_listing_id` | Stable hash of vehicle, source, and source listing identity basis; not a VIN and not cross-source identity |
+| `observation_id` | Run-specific stable hash of canonical listing, run, and source row position |
+| `source_listing_id` | Source-provided listing identifier after explicit null handling |
+| `source_listing_id_status` | `source_identifier_claim_not_vin` or `unknown` |
+| `source_claim_status` | `unverified_source_claims` |
+| `raw_record_ref` | Artifact path plus raw record selector |
+| `normalized_record_ref` | Artifact path plus normalized source-record selector |
+| `normalized` | Typed/null-safe canonical values |
+| `field_evidence` | Per-field raw value, normalized value, source field, and evidence status |
+| `quality_warnings` | Non-destructive warning codes |
+| `rejection_reasons` | Machine-readable reasons; empty for accepted records |
+| `parse_failure_reasons` | Machine-readable parser/normalizer failure codes |
 
-### `criteria`
+### Null and unknown policy
 
-| Field | Meaning | Current caveat |
-|---|---|---|
-| `min_year` | Minimum accepted parsed model year | Unknown years may still be rejected by legacy collectors without rejection evidence |
-| `max_year` | Maximum accepted parsed model year | F-350 remains broad market context, not only the preferred target year |
-| `max_price_cad` | Maximum parsed asking price in CAD | Excludes taxes, fees and negotiation |
-| `fuel` | Required fuel substring/category | Depends on source parsing accuracy |
-| `engine` | Required engine substring; blank disables the engine criterion | Unknown parsing can still exclude otherwise relevant rows |
+Empty strings and common sentinels such as `Unknown`, `N/A`, `None`, `null`, and `unavailable` normalize to JSON `null`. Legacy mileage sentinel `999999` also normalizes to `null`. The exact original string remains in `raw_values` and in the relevant `field_evidence.raw_value`.
 
-### `origin`
+Unknown values do not automatically reject a record. Current structural rejection reasons are `missing_source_listing_id` and `missing_listing_url`. Malformed column counts become `malformed_column_count` parse failures. Reader-level CSV failures use `csv_reader_error`; normalization exceptions use a `normalization_error:<type>` code.
 
-| Field | Meaning | Current caveat |
-|---|---|---|
-| `home_city` | Origin in `City, PROVINCE` form | Used by legacy distance logic |
-| `home_coords` | `[latitude, longitude]` | Validated for numeric bounds |
-| `max_distance_km` | Intended travel-distance boundary | Kijiji distance filtering remains disabled; AutoTrader method remains ambiguous |
+### Evidence status vocabulary
 
-### `sources.autotrader` and `sources.kijiji`
+Current evidence statuses include:
+
+- `source_reported_unverified`
+- `source_reported_or_configured_unverified`
+- `source_reported_or_inferred_unverified`
+- `source_text_claim_unverified`
+- `source_identifier_claim_not_vin`
+- `source_reported_not_independently_verified`
+- `legacy_method_not_yet_disambiguated`
+- `quarantined_unverified_search_origin`
+- `disabled_due_to_unverified_location`
+- `unverified_url_evidence`
+- `unavailable`
+- `unknown`
+
+These labels describe evidence strength or handling. They do not verify a vehicle, seller, price, history, location, or availability.
+
+## Canonical normalized values
+
+Normalized records may contain:
 
 | Field | Meaning |
 |---|---|
-| `make` | Source-specific query make/slug |
-| `model` | Source-specific query model/slug |
-| `search_locations` | Ordered, non-empty, duplicate-free locations in `City, PROVINCE` form |
+| `year` | Parsed integer model year or null |
+| `make` | Source-reported or configured make text or null |
+| `model` | Source-reported or configured model text or null |
+| `trim` | Source/title-derived trim text or null |
+| `trim_tier` | Legacy numeric tier or null; not recommendation authority |
+| `price_cad` | Parsed asking price integer in CAD or null |
+| `mileage_km` | Parsed odometer integer in kilometres or null |
+| `engine` | Source-derived engine text or null |
+| `fuel` | Source-derived/inferred fuel text or null |
+| `accident_claim` | Source-text claim or null; not a vehicle-history report |
+| `dealer` | Source-reported seller/dealer name or null |
+| `seller_type_claim` | Source-derived seller category claim or null |
+| `dealer_address` | AutoTrader source evidence or null; Kijiji value is quarantined |
+| `location` | AutoTrader reported location or null; Kijiji normalized location is null |
+| `distance_km` | Legacy AutoTrader numeric distance or null; Kijiji is null |
+| `distance_method` | Legacy method label or `disabled_unverified_location` |
+| `source_listing_id` | Source-specific ID claim; not VIN |
+| `url_region_hint` | Kijiji URL segment evidence or null |
+| `url_region_status` | Source-provided URL evidence label or null |
+| `listing_url` | Source listing URL or null |
+| `source_name` | Source display text or lowercase fallback |
+| `observation_count` | Legacy stored-observation count; not elapsed weeks |
+| `first_observed_price_cad` | First stored price for current source listing ID |
+| `previous_observation_price_cad` | Previous stored observation price; not necessarily one week earlier |
+| `change_from_previous_observation_cad` | Current minus previous stored observation |
+| `change_from_first_observation_cad` | Current minus first stored observation |
+| `source_price_history_text` | Source or legacy price-history text |
+| `legacy_trend_text` | Legacy trend wording; not authoritative elapsed-time evidence |
+| `days_on_market_claim` | Source/legacy duration text claim or null |
 
-The two source location lists are independently governed even when currently identical. Changing one source no longer implicitly changes the other.
+## Decision-safe manual-review CSV
 
-### Prohibited approved-config fields
+The supported manual-review CSV is generated only from `accepted_latest.jsonl`. It excludes source `rank`, source `score`, misleading `weeks_tracked`, and misleading `price_last_week` names. It preserves source claims with explicit status columns and retains Kijiji search-origin evidence only in `unverified_location_value`.
 
-Approved schema-v2 configs reject legacy flat fields including:
+The complete field order is:
 
-- `autotrader_make`
-- `autotrader_model`
-- `kijiji_make`
-- `kijiji_model`
-- shared `search_locations`
-- `min_year`, `max_year`, `max_price`, `fuel`, `engine` at top level
-- `home_city`, `home_coords`, `max_distance_km` at top level
-- `max_results`
-- `ranking_weights`
+`evidence_schema_version`, `vehicle_key`, `source`, `canonical_listing_id`, `observation_id`, `source_listing_id`, `source_listing_id_status`, `source_claim_status`, `raw_record_ref`, `normalized_record_ref`, `ranking_status`, `review_status`, `collection_status`, `data_quality_status`, `quality_warnings`, `source_run_status`, `source_completed_at_utc`, `year`, `year_evidence_status`, `make`, `make_evidence_status`, `model`, `model_evidence_status`, `trim`, `trim_evidence_status`, `price_cad`, `price_evidence_status`, `mileage_km`, `mileage_evidence_status`, `engine`, `engine_evidence_status`, `fuel`, `fuel_evidence_status`, `accident_claim`, `accident_evidence_status`, `dealer`, `dealer_evidence_status`, `seller_type_claim`, `seller_type_evidence_status`, `dealer_address`, `dealer_address_evidence_status`, `location`, `location_evidence_status`, `unverified_location_value`, `distance_km`, `distance_evidence_status`, `distance_method`, `url_region_hint`, `url_region_evidence_status`, `listing_url`, `listing_url_evidence_status`, `observation_count`, `first_observed_price_cad`, `previous_observation_price_cad`, `change_from_previous_observation_cad`, `change_from_first_observation_cad`, `source_price_history_text`, `legacy_trend_text`, `days_on_market_claim`.
 
-`vehicle_config.py` creates those values only in a temporary compatibility projection for the active legacy collector. The projection uses the selected source's location list, injects an effectively unbounded `max_results`, and supplies fixed compatibility ranking weights. Those weights do not govern supported manual-review output.
+### Manual-review control fields
 
-## Source CSV fields
-
-Source CSVs are internal collection artifacts and may include legacy fields absent from supported manual review.
-
-| Field | Current meaning | Evidence and limitation |
-|---|---|---|
-| `rank` | Legacy source-order position | Not a supported recommendation; removed from manual review |
-| `year` | Parsed model year | Source-derived; warning rules detect only some conflicts |
-| `make` | Parsed or configured make | Not independently verified |
-| `model` | Parsed or configured model | Formatting varies by source |
-| `trim` | Parsed trim keyword or title-derived text | Can be incomplete or misleading |
-| `trim_tier` | Legacy numeric trim tier | Not approved purchase ranking |
-| `price` | Parsed asking price in CAD | Excludes taxes, fees, financing and negotiation |
-| `price_history` | Source wording or legacy price label | Not a complete listing lifecycle |
-| `trend` | Legacy observation summary | Observation count is not reliable elapsed time |
-| `weeks_tracked` | Stored observation count | Misnamed; not guaranteed calendar weeks |
-| `price_first_seen` | First stored price for current source listing ID | Can reset when source ID changes |
-| `price_last_week` | Previous stored observation price | Previous observation may not be one week earlier |
-| `price_change_week` | Current minus previous stored price | Timing is not guaranteed weekly |
-| `price_change_total` | Current minus first stored price | Applies only to current source ID history |
-| `mileage` | Parsed odometer in kilometres | `999999` may be a legacy unknown sentinel |
-| `engine` | Parsed engine text | Can be `Unknown` |
-| `fuel` | Parsed/inferred fuel category | Not independently verified |
-| `accident_flag` | Keyword classification | Not a vehicle-history report |
-| `days_on_market` | Source date/time text or `N/A` | Not a normalized lifecycle duration |
-| `dealer` | Parsed seller/dealer name | May be `Unknown` |
-| `seller_type` | Parsed/inferred seller category | Not independently verified |
-| `dealer_address` | Parsed dealer address or legacy Kijiji search origin | Kijiji value is quarantined |
-| `location` | Parsed AutoTrader location or legacy Kijiji search origin | Kijiji value is not verified listing location |
-| `distance_km` | Legacy computed distance | Kijiji blank/disabled; AutoTrader fallback not fully exposed |
-| `distance_method` | Legacy location source or disabled marker | Does not always distinguish route from straight line |
-| `listing_id` | Source-specific listing identifier | Not a VIN and not cross-source identity |
-| `url_region_hint` | Kijiji URL region segment | Unverified navigation evidence only |
-| `url_region_status` | Hint status | `unverified_url_evidence` or `unavailable` |
-| `url` | Direct listing URL | May later change or disappear |
-| `score` | Legacy numeric score or blank | Not supported guidance; removed from manual review |
-| `source` | Source display name | Normally `AutoTrader` or `Kijiji` |
-
-## Supported manual-review fields
-
-The supported CSV contains Phase 1 evidence fields followed by non-rank source fields.
-
-| Field | Current value or meaning |
+| Field | Meaning |
 |---|---|
-| `ranking_status` | `DISABLED_MANUAL_REVIEW_REQUIRED` |
-| `review_status` | `manual_review_required`, `location_verification_required`, or `data_quality_review_required` |
-| `collection_status` | Current source collection status |
-| `data_quality_status` | `clean` or `warnings_present` under limited current rules |
+| `ranking_status` | Always `DISABLED_MANUAL_REVIEW_REQUIRED` |
+| `review_status` | `manual_review_required`, `data_quality_review_required`, or `location_verification_required` |
+| `collection_status` | Current source collection result |
+| `data_quality_status` | `clean` or `warnings_present` under current limited rules |
 | `quality_warnings` | Semicolon-separated warning codes |
 | `source_run_status` | Current source execution status |
-| `source_completed_at_utc` | Source completion time |
-| `location_status` | Location evidence label |
-| `distance_status` | Distance evidence label |
-| `unverified_location_value` | Quarantined Kijiji search origin |
-| `unverified_distance_value` | Quarantined legacy distance value |
-| `year` | Source year |
-| `make` | Source/configured make |
-| `model` | Source/configured model |
-| `trim` | Source trim/title text |
-| `trim_tier` | Legacy trim tier, not recommendation |
-| `price` | Asking price |
-| `price_history` | Legacy/source history wording |
-| `trend` | Legacy observation summary |
-| `weeks_tracked` | Observation count, not elapsed weeks |
-| `price_first_seen` | First stored price |
-| `price_last_week` | Previous stored price |
-| `price_change_week` | Change from previous observation |
-| `price_change_total` | Change from first observation |
-| `mileage` | Parsed kilometres |
-| `engine` | Parsed engine text |
-| `fuel` | Parsed/inferred fuel |
-| `accident_flag` | Source-text keyword claim |
-| `days_on_market` | Source/legacy duration text |
-| `dealer` | Seller/dealer name |
-| `seller_type` | Seller category |
-| `dealer_address` | AutoTrader address; blanked for Kijiji review rows |
-| `location` | AutoTrader reported location; blanked for Kijiji review rows |
-| `distance_km` | Legacy AutoTrader distance; blanked for Kijiji |
-| `distance_method` | Legacy method label or Kijiji disabled marker |
-| `listing_id` | Source listing ID |
-| `url_region_hint` | Kijiji URL region hint |
-| `url_region_status` | Hint evidence status |
-| `url` | Direct listing URL |
-| `source` | Source display name |
+| `source_completed_at_utc` | Source completion timestamp |
 
-Current warning codes are `unverified_kijiji_location`, `url_year_conflicts_with_parsed_year`, `suspiciously_low_mileage`, `year_unknown`, and `mileage_unknown`. A row marked `clean` is not verified or purchase-safe.
+A row labelled `clean` is not verified or purchase-safe. It only means the current warning rules did not fire.
 
-For Kijiji rows, manual-review generation preserves the search origin only in `unverified_location_value`, clears location/address/distance fields and uses `disabled_unverified_location`.
+## Per-source run-status JSON schema version 5
 
-## Per-source run-status JSON
+Each enabled pair writes `data/<vehicle>/run_status/<source>_latest.json`.
 
-Each enabled vehicle/source pair writes `data/<vehicle>/run_status/<source>_latest.json`.
+Audit 02 fields remain, including governed config/projection/isolation evidence, freshness, timeout, history protection, warnings, and stale rows. Audit 03 adds:
 
 | Field | Meaning |
 |---|---|
-| `schema_version` | Source-status schema version, presently `4` |
-| `configuration_schema_version` | Approved config schema used, presently `2` |
-| `runtime_config_projection` | `legacy_collector_v1` |
-| `approved_config_contains_legacy_controls` | False for governed configs |
-| `run_id` | GitHub run ID or `local` |
-| `vehicle_key` | Governed vehicle key |
-| `source` | Lowercase source key |
-| `config_path` | Approved config path |
-| `command` | Original collector command before substitution |
-| `started_at_utc` | Wrapper start time |
-| `completed_at_utc` | Wrapper completion time |
-| `timeout_seconds` | Applied timeout |
-| `execution_status` | `success`, `degraded`, `failed`, or `timed_out` |
-| `collection_status` | Currently mirrors execution status |
-| `exit_code` | Collector exit code or null after timeout |
-| `timed_out` | Whether timeout occurred |
-| `failure_reasons` | Machine-readable failure reasons |
-| `stdout_tail` | Captured standard-output tail |
-| `stderr_tail` | Captured standard-error tail |
-| `expected_output` | Expected latest CSV path |
-| `output_exists` | Whether output exists |
-| `output_updated_this_run` | Freshness result |
-| `schema_valid` | Minimum columns present |
-| `missing_columns` | Missing minimum columns |
-| `validation_error` | CSV read/schema error |
-| `observed_file_row_count` | Physical rows observed |
-| `current_row_count` | Fresh current rows |
-| `stale_row_count` | Preserved stale rows |
-| `stale_output_available` | Whether stale output exists |
-| `configured_max_results` | Null; approved configs no longer contain this field |
-| `effective_max_results` | `unbounded` |
-| `row_cap_disabled` | Confirms runtime compatibility projection is uncapped |
-| `config_isolated` | Approved config remained byte-for-byte unchanged |
-| `distance_processing_disabled` | True for current Kijiji path |
-| `distance_filter_disabled` | True for current Kijiji path |
-| `legacy_source_ranking_disabled` | True for current Kijiji path |
-| `same_day_history_removed_before_run` | Same-date observations removed before execution |
-| `same_day_history_duplicates_removed_after_run` | Same-date duplicates removed after success |
-| `data_quality_status` | `clean`, `warnings_present`, `not_evaluated`, or stale equivalent |
-| `quality_warning_rows` | Rows with warnings |
-| `quality_warning_count` | Warning occurrences |
-| `quality_warning_summary` | Warning-code counts |
+| `canonical_evidence_schema_version` | Currently `1` |
+| `fetched_record_scope` | `legacy_collector_emitted_csv_rows` when evaluated |
+| `source_fetch_completeness` | `not_proven_by_legacy_collector` until source adapters are replaced |
+| `fetched_record_count` | Rows entering the canonical boundary |
+| `normalized_record_count` | Rows successfully normalized |
+| `accepted_record_count` | Records eligible for supported review |
+| `rejected_record_count` | Normalized records with explicit rejection reasons |
+| `parse_failure_count` | Rows preserved as parse failures |
+| `evidence_reconciliation_status` | `reconciled` or `not_reconciled` |
+| `evidence_reconciliation_equation` | Human-readable required equation |
+| `canonical_evidence_artifacts` | Repository-relative artifact paths |
+| `canonical_evidence_error` | Error text when evidence generation fails, otherwise null |
 
-Minimum schema validity still does not establish completeness or semantic correctness.
+A source is healthy only if it is current, successful, fresh, minimally schema-valid, uncapped, config-isolated, reconciled, and has at least one accepted record.
 
-## Consolidated run-health JSON
+## Consolidated health JSON schema version 5
 
-`data/run_status/latest.json` currently uses schema version `4`.
+`data/run_status/latest.json` contains the registry-derived expected source entries and totals:
 
-| Field | Meaning |
-|---|---|
-| `run_id` | Active run ID |
-| `generated_at_utc` | Report generation time |
-| `overall_status` | `success`, `success_with_warnings`, or `degraded` |
-| `expected_source_runs` | Count of enabled registry source pairs, not a fixed two-per-vehicle assumption |
-| `healthy_source_runs` | Expected pairs meeting current-success contract |
-| `unhealthy_source_runs` | Expected pairs failing that contract |
-| `source_runs_with_quality_warnings` | Source entries containing row warnings |
-| `sources` | Per-vehicle/source summaries |
+- `expected_source_runs`
+- `healthy_source_runs`
+- `unhealthy_source_runs`
+- `source_runs_with_quality_warnings`
+- `fetched_record_count`
+- `accepted_record_count`
+- `rejected_record_count`
+- `parse_failure_count`
+- `sources`
 
-## Not-yet-existent canonical fields
+The Markdown health report displays the same reconciliation counts for each enabled source pair.
 
-The repository still lacks canonical VIN/evidence, engine and idle hours, cab/box/SRW/DRW, four-wheel-drive evidence, fleet/service/history/warranty evidence, listing lifecycle, raw payloads, normalized IDs, rejection reasons, parse-failure evidence, owner notes and candidate classification. These belong to later approved packages and must not be simulated from unrelated fields.
+## Remaining non-canonical areas
+
+Audit 03 does not create marketplace HTTP/raw-response evidence inside the legacy collectors. It also does not create VIN identity, duplicate confidence, listing lifecycle, engine/idle-hour evidence, cab/box/drivetrain evidence, verified service/history/warranty evidence, owner notes, or candidate classifications. Those remain assigned to Audits 04–10 and must not be simulated from unrelated fields.
