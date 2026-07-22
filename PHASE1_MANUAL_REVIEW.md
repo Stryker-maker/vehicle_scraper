@@ -9,46 +9,41 @@ For current architecture, field semantics, limitations and future package owners
 - `docs/DATA_DICTIONARY.md`
 - `docs/LIMITATIONS_REGISTER.md`
 - `docs/AUDIT_ROADMAP.md`
+- `AUDIT_02_CONFIG_GOVERNANCE.md`
 
-Phase 1 keeps both AutoTrader and Kijiji collection enabled for every registry-enabled vehicle while preventing the current unsafe cross-source ranking from being presented as a recommendation.
+Phase 1 prevents unsafe cross-source ranking from being presented as a recommendation while preserving current collection and review evidence.
 
-## What Phase 1 controls
+## What Phase 1 and Audit 02 control
 
-- Both source scrapers run for every enabled vehicle.
-- The authoritative active and paused vehicle list is `vehicle_registry.json`.
-- The wrapper runs each collector against an isolated temporary configuration, so one source cannot change the approved search locations used by another source.
-- The wrapper overrides the legacy `max_results` value with an effectively unbounded runtime value. Every listing that passes the current source filters is retained, including result sets larger than 50 or 200 vehicles.
-- Each collector has a 75-minute timeout. A timeout is recorded and the remaining collectors continue.
-- Every source run writes structured collection and data-quality evidence under `data/<vehicle>/run_status/`.
-- Same-day reruns keep one price-history observation per listing and do not create an artificial extra observation for that date.
-- The old `merge.py` process is not called by the automated workflow.
-- Fresh source results are copied into `data/<vehicle>/manual_review/<vehicle>_manual_review_latest.csv`.
-- Manual-review files contain no `rank` or `score` column.
-- Phase 1 Kijiji collection bypasses geocoding, route calculation, geographic filtering, legacy source ranking and automatic location-list mutation because the current Kijiji location value is only the search origin.
-- Kijiji distance fields are blank and marked `disabled_unverified_location`. The search origin remains available only as unverified evidence.
-- Kijiji URL region segments are exposed as `url_region_hint` with status `unverified_url_evidence`; they are navigation hints, not verified listing locations.
-- Suspicious values, including URL/year conflicts and implausibly low mileage, are retained but marked in `quality_warnings`.
-- Existing files under `data/<vehicle>/merged/` remain historical records and are not refreshed. Each directory receives a `RANKING_DISABLED.md` warning.
+- `vehicle_registry.json` is the authority for enabled vehicles, enabled sources, purpose, priority, cadence and analysis profile.
+- Every referenced schema-v2 config is validated before collection.
+- AutoTrader and Kijiji criteria are separately governed in each config.
+- The workflow executes only the vehicle/source pairs emitted by `vehicle_registry.py active-runs`.
+- Manual-review generation and health reporting use the same source plan.
+- The runtime creates a temporary flat compatibility config for each legacy collector.
+- The approved config is never passed to a collector and must remain byte-for-byte unchanged.
+- The temporary projection injects an effectively unbounded result cap; approved configs contain no `max_results` or `ranking_weights`.
+- Each collector has a 75-minute timeout; remaining attempts continue after a failure.
+- Every source run writes structured collection and limited quality evidence under `data/<vehicle>/run_status/`.
+- Same-day reruns retain one price-history observation per listing/date.
+- `merge.py` is not called.
+- Current successful source rows feed `data/<vehicle>/manual_review/<vehicle>_manual_review_latest.csv`.
+- Manual-review files contain no `rank` or `score`.
+- Kijiji collection bypasses geocoding, route calculation, geographic filtering, legacy source ranking and location-list mutation.
+- Kijiji distance is blank/disabled; search origin remains only as unverified evidence.
+- URL-region hints are navigation evidence, not verified location.
+- Suspicious rows are retained with `quality_warnings`.
+- Historical merged files are not refreshed and contain warning markers.
 
 ## What Phase 1 does not prove
 
-Phase 1 does not prove:
-
-- that every marketplace record was fetched
-- that every fetched record parsed successfully
-- why every omitted record was rejected
-- that Kijiji geography is correct
-- that AutoTrader distance is always routed driving distance
-- that a source claim is verified
-- that source listing IDs identify the same physical vehicle across sources
-- that observation count equals elapsed weeks
-- that a listing is available, mechanically sound, fairly priced or suitable to purchase
+Phase 1 does not prove marketplace completeness, parse completeness, rejection reasons, Kijiji geography, routed AutoTrader distance, verified source claims, cross-source vehicle identity, elapsed lifecycle, availability, mechanical condition, fair value or purchase suitability.
 
 A source or row labelled `clean` has only passed the current limited warning rules.
 
-## Audit 00 active scope
+## Active audit scope
 
-During the repository audit, the scheduled and manual workflow collects only these enabled vehicles:
+Enabled vehicles:
 
 - Ford F-350 — primary purchase research
 - RAM 3500 — owned-vehicle value monitoring
@@ -56,25 +51,24 @@ During the repository audit, the scheduled and manual workflow collects only the
 - Honda Odyssey — family-friend purchase search
 - Kia Carnival — family-friend purchase search
 
-Ford F-150 and Toyota Tundra collection is paused. Their existing data is retained unchanged, but no collector, manual-review generation, health expectation or generated-data update should run for them while disabled in `vehicle_registry.json`.
+Ford F-150 and Toyota Tundra remain paused. Their history and governed criteria are retained, but no source run, current manual review, health expectation or generated-data update should occur while disabled.
 
-Use the registry commands to inspect or validate active scope:
+Inspect governance with:
 
 ```bash
 python vehicle_registry.py validate
 python vehicle_registry.py summary
 python vehicle_registry.py active-configs
+python vehicle_registry.py active-runs
 ```
 
 ## Workflow behaviour
 
-Collector failures and timeouts do not stop the remaining collector attempts. The workflow completes all attempts, builds manual-review files from current successful sources, writes a consolidated health report, commits collected evidence and then fails visibly when an expected enabled source is unhealthy.
+Collector failures and timeouts do not stop remaining attempts. The workflow completes the registry plan, builds review files from current successful enabled sources, writes health evidence, commits generated data and fails visibly when an expected source is unhealthy.
 
-Data-quality warnings do not discard records or fail collection. A fully collected run with warnings is reported as `SUCCESS_WITH_WARNINGS`, meaning the records are available but require manual verification.
+Data-quality warnings do not discard records or fail collection. `SUCCESS_WITH_WARNINGS` means all expected source runs were healthy under current execution rules but row evidence still requires manual review.
 
-Health reports distinguish `Current rows` from `Stale rows`. A stale file is preserved but never counted as current output and is labelled `not_evaluated_stale_output`.
-
-A generated-data commit receives a lightweight successful acknowledgement check instead of rerunning collectors. Normal code and workflow changes run the full structured test suite.
+Health distinguishes current from stale rows. Generated-data follow-up receives acknowledgement only rather than rerunning collectors.
 
 ## Files to use
 
@@ -83,26 +77,17 @@ Use:
 - `data/<vehicle>/manual_review/<vehicle>_manual_review_latest.csv`
 - `data/run_status/latest.md`
 - `data/run_status/latest.json`
-- `data/<vehicle>/run_status/<source>_latest.json` when source-level evidence is needed
+- `data/<vehicle>/run_status/<source>_latest.json`
 
 Do not use:
 
-- historical merged CSV files as current ranked recommendations
+- historical merged CSVs as recommendations
 - source `rank` or `score` as purchase guidance
 - Kijiji search-origin values as verified listing location
+- temporary runtime-config fields as approved project criteria
 
 ## Manual review guidance
 
-Treat every listing as a candidate requiring direct verification. Confirm the live listing page, actual location, current price, mileage, vehicle identity, vehicle history, seller identity and availability before relying on it.
+Confirm the live listing, actual location, current price, mileage, identity, history, seller and availability. Review `quality_warnings`, `review_status`, `location_status`, `distance_status`, `url_region_hint`, `url_region_status`, `source_completed_at_utc`, `configuration_schema_version`, `runtime_config_projection` and `config_isolated`.
 
-Review these evidence fields first:
-
-- `quality_warnings`
-- `review_status`
-- `location_status`
-- `distance_status`
-- `url_region_hint`
-- `url_region_status`
-- `source_completed_at_utc`
-
-Phase 1 remains in force until later audit packages replace its temporary safeguards with trustworthy source adapters and canonical evidence models.
+Phase 1 remains in force until source adapters and canonical evidence models replace these interim safeguards.
