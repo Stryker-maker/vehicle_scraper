@@ -7,10 +7,11 @@ This document prevents old files, fields, and behaviours from being mistaken for
 ## Status classes
 
 - **Disabled legacy** — retained for history; excluded from supported workflow
-- **Historical output** — preserved older evidence; not refreshed or authoritative
-- **Active legacy** — still executes but is scheduled for replacement
-- **Interim safety control** — actively reduces harm while a defect remains
-- **Runtime compatibility field** — generated temporarily for a legacy process; never approved authority
+- **Historical output** — preserved older evidence; not current authority
+- **Compatibility alias** — old entry point redirected into the supported path
+- **Active legacy** — still executes and awaits replacement
+- **Interim safety control** — reduces harm while an upstream defect remains
+- **Runtime compatibility field** — temporary input for a legacy process; never approved authority
 
 ## Disabled legacy
 
@@ -18,104 +19,99 @@ This document prevents old files, fields, and behaviours from being mistaken for
 
 Status: **disabled legacy**
 
-The workflow never calls it. It must not produce recommendations because it treats listing IDs like possible VINs, uses broad duplicate tolerances, fills fields without an approved identity/evidence model, sorts by disabled scores, and writes ranked merged CSVs. Audit 06 decides final removal/reuse.
+The workflow never calls it. It treats source listing IDs like possible VINs, uses broad duplicate tolerances, fills fields without an approved identity model, and ranks output. Audit 06 decides final removal or limited historical reuse.
 
 ### Historical merged CSVs
 
 Path: `data/<vehicle>/merged/*.csv`
 
-Do not refresh, recommend from, graph as current market, or infer availability from these files. Retain until storage policy is approved. `RANKING_DISABLED.md` redirects to current accepted-record manual review.
+Do not refresh, recommend from, graph as current market, or infer current availability from these files. `RANKING_DISABLED.md` redirects users to accepted-record manual review.
 
-## Active legacy
+## AutoTrader replacement state
 
 ### `scraper.py`
 
-Status: **active legacy AutoTrader collector**
+Status: **compatibility alias**
 
-It still contains internal ranking/display, distance ambiguity, location mutation attempts, broad exceptions, and fixed-page assumptions. Audit 02 governs its input. Audit 03 reconciles only rows it emits. Audit 04 replaces/refactors source behaviour and moves the raw/fetch boundary into the adapter.
+The legacy AutoTrader implementation has been removed from this file. Older commands are redirected into `autotrader_run.py`, preserving timeout, source status, canonical evidence, and config isolation.
+
+### `autotrader_adapter.py`
+
+Status: **active supported source adapter**
+
+It directly reads schema-v2 config, preserves request/page and response-object evidence, paginates, retries, records duplicates/rejections/parse failures, emits no rank or score, and does not mutate config or locations.
+
+### AutoTrader flat projection and ranking code
+
+Status: **retired for AutoTrader**
+
+AutoTrader no longer receives `max_results`, `ranking_weights`, flat source aliases, or a mutable shared location list. `runtime_config_projection` is `direct_schema_v2`.
+
+## Kijiji active legacy
 
 ### `kijiji_scraper.py`
 
 Status: **legacy Kijiji collector still executed**
 
-Do not run directly for supported collection. Direct execution would restore untrusted geography, filtering, ranking, and mutation. The workflow uses `phase1_kijiji_runner.py` until Audit 05. Audit 03 preserves emitted rows but does not validate source geography or pre-CSV completeness.
-
-### `trim_tiers.json`
-
-Status: **active legacy configuration**
-
-Substring tiers may support future descriptive normalization but are not recommendation weights and may misclassify packages. Final role belongs to source/F-350 work.
-
-## Interim safety and compatibility controls
+Do not run it directly for supported collection. Direct execution would restore untrusted geography, distance filtering, ranking, and mutation behaviour.
 
 ### `phase1_kijiji_runner.py`
 
 Status: **active interim safety control**
 
-It patches exact source anchors and executes modified Kijiji code. It prevents known unsafe geography/ranking from reaching supported output but remains fragile and difficult to analyze. Do not generalize this pattern.
+It patches exact source anchors and executes modified Kijiji code. It disables known unsafe geography, distance, ranking, and location mutation but remains fragile. Audit 05 replaces it.
 
-### Canonical evidence boundary
-
-Status: **active supported evidence control with a legacy upstream boundary**
-
-`canonical_evidence.py` preserves and reconciles every row emitted by current collectors into raw, normalized, accepted, rejected, and parse-failure artifacts. This is a genuine supported evidence layer, but its `fetched_records` count is scoped to `legacy_collector_emitted_csv_rows`.
-
-It does not prove what happened before CSV emission. Audits 04–05 must provide request/response/parser evidence inside the source adapters.
-
-### Evidence-backed manual-review transformation
-
-Status: **active supported presentation control**
-
-`phase1_reporting.py` now consumes accepted canonical evidence rather than raw collector CSVs. It excludes rank/score, replaces misleading legacy history names with observation-based names, exposes evidence statuses, and quarantines Kijiji geography.
-
-Accepted means structurally eligible for human review, not verified or recommended.
-
-### Governed config projection
+### Governed Kijiji config projection
 
 Status: **active compatibility boundary**
 
-Approved schema-v2 configs are validated and never passed to collectors. For each source run, `vehicle_config.py` creates a disposable flat compatibility config containing source-selected locations, legacy aliases, effectively unbounded `max_results`, and fixed compatibility ranking weights.
+`vehicle_config.py` creates a disposable flat Kijiji projection containing source-selected locations, legacy aliases, effectively unbounded `max_results`, and compatibility `ranking_weights`. It is never approved authority. AutoTrader no longer uses this projection.
 
-This resolves approved-config ambiguity/mutation authority. It does not remove flat-config assumptions or ranking code from collectors; Audits 04–05 own that removal.
+## Shared supported controls
 
-## Runtime compatibility and legacy fields
+### Canonical evidence
 
-### `max_results`
+Status: **active supported evidence control**
+
+`canonical_evidence.py` preserves raw, normalized, accepted, rejected, parse-failure, and reconciliation artifacts. AutoTrader now supplies response-object adapter evidence to this layer. Kijiji still supplies emitted CSV rows until Audit 05.
+
+### Evidence-backed manual review
+
+Status: **active supported presentation control**
+
+`phase1_reporting.py` consumes accepted canonical evidence, excludes rank/score, uses observation-based history names, exposes evidence statuses, and quarantines Kijiji geography. Accepted does not mean verified or recommended.
+
+## Remaining legacy fields
+
+### `max_results` and `ranking_weights`
 
 - prohibited in approved configs
-- generated only in temporary runtime projection
-- injected as effectively unbounded
-- never interpreted as owner-approved output scope
-
-### `ranking_weights`
-
-- prohibited in approved configs
-- generated only for legacy process compatibility
-- excluded from supported evidence/manual-review logic
-- never represents purchase priorities
-
-### Flat source aliases and `search_locations`
-
-- prohibited at approved config top level
-- generated from source-specific schema-v2 settings
-- temporary values are not repository authority
+- no longer used by AutoTrader
+- generated only for the Kijiji legacy compatibility path
+- never represent owner-approved ranking or result scope
 
 ### Source `rank` and `score`
 
-They may exist in source CSVs and collector console output. They are absent from canonical normalized decision fields and supported manual review. They must not guide recommendations, graphs, or shortlists.
+AutoTrader no longer emits these. Kijiji legacy source artifacts may still contain them. Canonical accepted evidence and supported manual review exclude both.
 
 ### `weeks_tracked`, `price_last_week`, `price_change_week`
 
-These remain legacy source/history names. Canonical normalized/manual-review output exposes `observation_count`, `previous_observation_price_cad`, and `change_from_previous_observation_cad` instead. Audit 06 replaces the underlying lifecycle/history semantics.
+These remain compatibility source/history names. Supported output exposes `observation_count`, `previous_observation_price_cad`, and `change_from_previous_observation_cad`. Audit 06 replaces underlying lifecycle semantics.
 
-### Legacy unknown sentinels
+### Unknown sentinels
 
-Strings such as `Unknown`/`N/A` and mileage sentinel `999999` may remain in raw source artifacts. Canonical normalization converts them to JSON null while preserving the exact raw value and evidence status.
+Raw artifacts may retain `Unknown`, `N/A`, or `999999`. Canonical normalization converts these to JSON null while preserving raw evidence.
+
+### `trim_tiers.json`
+
+Status: **active legacy descriptive configuration**
+
+Keyword tiers may support descriptive normalization but are not recommendation weights and can misclassify packages. Audit 09 decides their F-350 role.
 
 ## Paused vehicle data
 
-F-150 and Tundra are not legacy merely because they are paused. Their governed criteria and historical records remain for Audit 11; no current source, evidence, review, or status data should change while disabled.
+F-150 and Tundra are paused, not legacy. Their criteria and historical data remain for Audit 11; no current source, evidence, review, or status data should change while disabled.
 
 ## Removal rule
 
-A legacy component is removed only after replacement/abandonment is approved, historical evidence needs are assessed, tests/docs no longer depend on it, and the owner approves deletion.
+Remove a legacy component only after replacement/abandonment is approved, historical evidence needs are assessed, tests/docs no longer depend on it, and the owner approves deletion.
