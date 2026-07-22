@@ -66,10 +66,12 @@ class DocumentationContractTests(unittest.TestCase):
         merger = self.read("merge.py")
         workflow = self.read(".github/workflows/scrape.yml")
         legacy = self.read("docs/LEGACY_COMPONENTS.md")
+        readme = self.read("README.md")
         self.assertIn("LEGACY / DISABLED", merger)
         self.assertIn("merge.py", legacy)
         self.assertNotIn("python merge.py", workflow)
-        self.assertIn("historical merged CSV", self.read("README.md"))
+        self.assertIn("Historical merged", readme)
+        self.assertIn("not current recommendations", readme)
 
     def test_phase1_guidance_points_to_current_authorities(self):
         guidance = self.read("PHASE1_MANUAL_REVIEW.md")
