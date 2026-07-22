@@ -5,7 +5,9 @@
     "Islay, AB": 2
   },
   "zero_weeks": {
-    "Calgary, AB": 4,
-    "Regina, SK": 1
+    "Calgary, AB": 5,
+    "Regina, SK": 2,
+    "Kelowna, BC": 1,
+    "Moose Jaw, SK": 1
   }
 }
