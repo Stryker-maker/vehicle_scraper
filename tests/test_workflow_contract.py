@@ -15,15 +15,21 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("phase1_kijiji_runner.py --config", self.workflow)
         self.assertIn("--timeout-seconds 4500", self.workflow)
 
-    def test_all_workflow_stages_use_authoritative_registry(self):
+    def test_all_workflow_stages_use_authoritative_registry_source_plan(self):
         self.assertIn("vehicle_registry.py validate", self.workflow)
-        self.assertGreaterEqual(
-            self.workflow.count("vehicle_registry.py active-configs"), 3
-        )
+        self.assertIn("vehicle_registry.py active-runs", self.workflow)
+        self.assertEqual(self.workflow.count("--registry vehicle_registry.json"), 5)
+        self.assertIn("build-manual-review", self.workflow)
+        self.assertIn("report-health", self.workflow)
+        self.assertNotIn("vehicle_registry.py active-configs", self.workflow)
         self.assertNotIn("config_f150.json", self.workflow)
         self.assertNotIn("config_tundra.json", self.workflow)
         self.assertNotIn("config_f350.json", self.workflow)
-        self.assertIn("vehicle_registry.py", self.workflow)
+
+    def test_pull_requests_do_not_run_collectors(self):
+        self.assertIn("if: github.event_name != 'pull_request'", self.workflow)
+        self.assertIn("vehicle_config.py", self.workflow)
+        self.assertIn("Validate governed vehicle registry and configurations", self.workflow)
 
 
 if __name__ == "__main__":
