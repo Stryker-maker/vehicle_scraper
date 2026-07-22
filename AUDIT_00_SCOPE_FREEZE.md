@@ -1,12 +1,14 @@
 # Audit 00 — Scope Freeze and Runtime Reduction
 
+**Status:** complete and merged through PR #2 on July 22, 2026.
+
 ## Purpose
 
-Audit 00 reduces collection time and generated-data volume while the repository is being audited. It does not change source parsing, filtering, ranking safety, market analysis, or historical data.
+Audit 00 reduced collection time and generated-data volume while the repository is being audited. It did not change source parsing, filtering, ranking safety, market analysis or historical data.
 
 ## Authoritative scope
 
-`vehicle_registry.json` is the single authoritative list used by collection, manual-review generation, and health reporting.
+`vehicle_registry.json` is the single authoritative list used by collection, manual-review generation and health reporting.
 
 ### Active
 
@@ -25,22 +27,22 @@ Audit 00 reduces collection time and generated-data volume while the repository 
 | Ford F-150 | Optional curiosity search; high runtime and generated-data volume |
 | Toyota Tundra | Optional curiosity search; deferred until the final audit stage |
 
-Paused vehicles retain all existing repository data. They do not run collectors, generate new manual-review files, contribute expected health entries, or receive data updates.
+Paused vehicles retain all existing repository data. They do not run collectors, generate new manual-review files, contribute expected health entries or receive data updates.
 
 ## Workflow contract
 
 The workflow must:
 
-1. Validate `vehicle_registry.json` before collection.
-2. Derive its config paths from the registry for both source loops.
-3. Use the same registry-derived config paths for manual-review generation.
-4. Use the same registry-derived config paths for health reporting.
-5. Expect ten source runs: two sources for each of five active vehicles.
-6. Leave paused-vehicle data untouched.
+1. validate `vehicle_registry.json` before collection
+2. derive config paths from the registry for both source loops
+3. use the same registry-derived config paths for manual-review generation
+4. use the same registry-derived config paths for health reporting
+5. expect ten source runs: two sources for each of five active vehicles
+6. leave paused-vehicle data untouched
 
-## Non-scope
+## Intentional non-scope
 
-Audit 00 does not:
+Audit 00 did not:
 
 - refactor either collector
 - repair Kijiji location extraction
@@ -50,14 +52,26 @@ Audit 00 does not:
 - delete historical F-150 or Tundra data
 - re-enable automated ranking
 
-## Validation
+## Acceptance evidence
 
-Audit 00 is complete when:
+Manual workflow run `29926745165` on branch `ai/audit-00-scope-freeze` established:
 
-- registry validation passes
-- structured tests pass
-- the workflow contains no hard-coded vehicle config list
-- F-150 and Tundra are disabled only through the registry
-- a manual workflow run attempts ten source runs
-- no F-150 or Tundra data file changes during that run
-- the consolidated health report expects ten source runs
+- registry validation passed
+- structured tests passed
+- collection completed
+- 10/10 expected enabled source runs were healthy
+- overall health was `SUCCESS_WITH_WARNINGS`
+- no stale rows were reported
+- 362 current records were collected
+- only the five enabled vehicle data directories and consolidated health files changed
+- Ford F-150 data did not change
+- Toyota Tundra data did not change
+- the collection window was approximately 31 minutes
+
+The generated-data commit was `3023687062e304cf881ade89aa5df6184eeb5530`.
+
+PR #2 was merged to `main`, and branch `ai/audit-00-scope-freeze` was deleted.
+
+## Continuing rule
+
+F-150 and Tundra remain paused until Audit 11 unless the repository owner explicitly approves a roadmap revision. Audit 00 proves scope control and runtime reduction only; it does not resolve source-data limitations.
