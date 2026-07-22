@@ -52,6 +52,17 @@ def _require_positive_int(value: Any, label: str) -> int:
     return value
 
 
+def _validate_location(value: Any, label: str) -> str:
+    location = _require_text(value, label)
+    match = LOCATION_PATTERN.fullmatch(location)
+    if not match:
+        raise ValueError(f"{label} must use 'City, PROVINCE' format")
+    city, province = location.rsplit(", ", 1)
+    if re.search(rf"(?:^|\s){re.escape(province)}$", city, flags=re.IGNORECASE):
+        raise ValueError(f"{label} repeats the province abbreviation in the city name")
+    return location
+
+
 def validate_vehicle_config(config: dict[str, Any], *, label: str = "vehicle config") -> dict[str, Any]:
     config = _require_object(config, label)
     _validate_keys(
@@ -90,9 +101,7 @@ def validate_vehicle_config(config: dict[str, Any], *, label: str = "vehicle con
         required={"home_city", "home_coords", "max_distance_km"},
         label=f"{label}.origin",
     )
-    home_city = _require_text(origin["home_city"], f"{label}.origin.home_city")
-    if not LOCATION_PATTERN.fullmatch(home_city):
-        raise ValueError(f"{label}.origin.home_city must use 'City, PROVINCE' format")
+    _validate_location(origin["home_city"], f"{label}.origin.home_city")
     coords = origin["home_coords"]
     if not isinstance(coords, list) or len(coords) != 2:
         raise ValueError(f"{label}.origin.home_coords must contain [latitude, longitude]")
@@ -118,20 +127,15 @@ def validate_vehicle_config(config: dict[str, Any], *, label: str = "vehicle con
         if not isinstance(locations, list) or not locations:
             raise ValueError(f"{label}.sources.{source}.search_locations must be a non-empty list")
         seen: set[str] = set()
-        for index, location in enumerate(locations):
-            location = _require_text(
-                location, f"{label}.sources.{source}.search_locations[{index}]"
-            )
-            if not LOCATION_PATTERN.fullmatch(location):
-                raise ValueError(
-                    f"{label}.sources.{source}.search_locations[{index}] must use "
-                    "'City, PROVINCE' format"
-                )
-            if location in seen:
+        for index, raw_location in enumerate(locations):
+            location_label = f"{label}.sources.{source}.search_locations[{index}]"
+            location = _validate_location(raw_location, location_label)
+            canonical = location.casefold()
+            if canonical in seen:
                 raise ValueError(
                     f"{label}.sources.{source}.search_locations contains duplicate: {location}"
                 )
-            seen.add(location)
+            seen.add(canonical)
     return config
 
 
