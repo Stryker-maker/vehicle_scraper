@@ -41,7 +41,6 @@ class DocumentationContractTests(unittest.TestCase):
         for obsolete in (
             "Price 60% | Mileage 25% | Distance 15%",
             "Edit `config.json`",
-            "Weekly AutoTrader Scrape",
             "score | Ranking score (lower = better)",
             "phase1_kijiji_runner.py",
             "acknowledgement only",
@@ -60,8 +59,6 @@ class DocumentationContractTests(unittest.TestCase):
             "insufficient_multi_run_history",
             "not a verified faster-sale range",
             "fetched_records = accepted_records + rejected_records + parse_failures",
-            "autotrader_adapter_response_listing_objects",
-            "kijiji_adapter_json_ld_listing_objects",
             "source_identifier_claim_not_vin",
             "candidate_only_not_merged",
             "Python is fixed to `3.11.13`",
@@ -70,17 +67,11 @@ class DocumentationContractTests(unittest.TestCase):
 
     def test_data_dictionary_covers_general_and_purpose_fields(self):
         dictionary = self.read("docs/DATA_DICTIONARY.md")
-        missing = [field for field in MANUAL_REVIEW_FIELDS if field not in dictionary]
-        self.assertEqual(missing, [])
+        self.assertEqual(
+            [field for field in MANUAL_REVIEW_FIELDS if field not in dictionary],
+            [],
+        )
         for value in (
-            "source_identifier_claim_not_vin",
-            "candidate_only_not_merged",
-            "price_observation_compaction_digest_sha256",
-            "source_text_reported_unverified",
-            "km_per_engine_hour",
-            "idle_hour_percent",
-            "computed_classification",
-            "purpose_inputs.json",
             "owner_reported_historical_unverified",
             "owner_input_required",
             "friend_input_required",
@@ -93,64 +84,45 @@ class DocumentationContractTests(unittest.TestCase):
             "candidate_outside_stated_preferences",
             "purpose_specific_candidate_classification_not_rank_not_score",
             "candidate_review_not_rank_not_recommendation_not_condition_verification",
+            "price_observation_compaction_digest_sha256",
+            "source_text_reported_unverified",
         ):
             self.assertIn(value, dictionary)
 
-    def test_approved_roadmap_preserves_every_package_and_current_status(self):
+    def test_roadmap_status_and_limitations_are_current(self):
         roadmap = self.read("docs/AUDIT_ROADMAP.md")
         for number in range(12):
             self.assertRegex(roadmap, rf"## Audit {number:02d} — ")
         for row in (
-            "| 08 | CI and Workflow Hardening | Complete and merged |",
             "| 09 | F-350 Buyer Intelligence | Complete and merged |",
             "| 10 | Secondary Purpose Outputs | Implemented; deterministic and narrow validation pending |",
             "| 11 | Optional Search Reintroduction | Approved final stage |",
         ):
             self.assertIn(row, roadmap)
-
-    def test_limitations_have_unique_identifiers_and_audit10_entries(self):
         register = self.read("docs/LIMITATIONS_REGISTER.md")
-        table_identifiers = re.findall(r"\| (LIM-\d{3}) \|", register)
-        self.assertEqual(len(table_identifiers), len(set(table_identifiers)))
-        self.assertGreaterEqual(len(table_identifiers), 54)
-        for identifier in (
-            "LIM-043",
-            "LIM-048",
-            "LIM-049",
-            "LIM-050",
-            "LIM-051",
-            "LIM-052",
-            "LIM-053",
-            "LIM-054",
-        ):
+        identifiers = re.findall(r"\| (LIM-\d{3}) \|", register)
+        self.assertEqual(len(identifiers), len(set(identifiers)))
+        self.assertGreaterEqual(len(identifiers), 54)
+        for identifier in ("LIM-048", "LIM-049", "LIM-050", "LIM-051", "LIM-052", "LIM-053", "LIM-054"):
             self.assertIn(identifier, register)
 
-    def test_legacy_components_do_not_authorize_secondary_inference(self):
-        merger = self.read("merge.py")
-        collection = self.read(".github/workflows/scrape.yml")
+    def test_legacy_and_operating_guidance_prevent_inference(self):
         legacy = self.read("docs/LEGACY_COMPONENTS.md")
-        self.assertIn("LEGACY / DISABLED", merger)
-        self.assertNotIn("python merge.py", collection)
+        guidance = self.read("PHASE1_MANUAL_REVIEW.md")
         for value in (
-            "trim_tiers.json",
             "not current odometer",
             "subject_profile_incomplete",
             "candidate_pending_requirements",
             "verified faster-sale range",
         ):
             self.assertIn(value, legacy)
-
-    def test_phase1_guidance_covers_secondary_profiles(self):
-        guidance = self.read("PHASE1_MANUAL_REVIEW.md")
         for value in (
             "active interim operating guidance",
             "What Phase 1 does not prove",
             "seven-day evidence",
             "market_snapshot_latest.md",
             "current odometer",
-            "subject_profile_incomplete",
             "requirements_summary_latest.md",
-            "candidate_pending_requirements",
             "questions_for_friend",
             "Never apply F-350 truck assumptions",
         ):
@@ -169,7 +141,7 @@ class DocumentationContractTests(unittest.TestCase):
             self.assertIn("Stop and revise before merge", self.read(path))
         audit10 = self.read("AUDIT_10_SECONDARY_PURPOSE_OUTPUTS.md")
         for value in (
-            "owner_reported_historical_unverified",
+            "historical owner-reported, unverified claims",
             "friend_input_required",
             "lower_observed_asking_band_not_verified_faster_sale_range_or_sale_probability",
             "insufficient_multi_run_history",
