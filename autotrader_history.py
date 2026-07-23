@@ -5,12 +5,18 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from phase1_common import SOURCE_FIELDS, write_json
+from phase1_common import SOURCE_FIELDS
 
 EXTRA_FIELDS = [
     "distance_evidence_status", "query_location", "query_page",
     "query_offset", "request_url",
 ]
+
+
+LEGACY_HISTORY_NOTICE = (
+    "Legacy source history retired; use identity_lifecycle artifacts and supported "
+    "manual-review elapsed/price fields"
+)
 
 
 def load_trim_tiers(root: Path, vehicle_key: str) -> dict[str, list[str]]:
@@ -22,42 +28,30 @@ def load_trim_tiers(root: Path, vehicle_key: str) -> dict[str, list[str]]:
     return {name: list(tiers.get(name, [])) for name in ("tier3", "tier2", "tier1")}
 
 
-def apply_price_history(root: Path, config: dict[str, Any], rows: list[dict[str, Any]]) -> None:
-    path = root / "data" / str(config["vehicle_key"]) / "price_history_autotrader.json"
-    try:
-        history = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
-    except (OSError, ValueError, json.JSONDecodeError):
-        history = {}
-    if not isinstance(history, dict):
-        history = {}
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+def apply_price_history(
+    root: Path, config: dict[str, Any], rows: list[dict[str, Any]]
+) -> None:
+    """Retain source CSV compatibility fields without trusting legacy history files.
+
+    Audit 06 moves active observation, elapsed-time, lifecycle, and price-change
+    semantics into ``identity_lifecycle.py``. Historical ``price_history_*.json``
+    files are deliberately not read, migrated, or rewritten here.
+    """
+    del root, config
     for row in rows:
-        records = history.setdefault(str(row["listing_id"]), [])
-        if not isinstance(records, list):
-            records = []
-            history[str(row["listing_id"])] = records
-        first = records[0].get("price") if records else row["price"]
-        previous = records[-1].get("price") if records else row["price"]
-        count = len(records)
         row.update(
-            weeks_tracked=count,
-            price_first_seen=first,
-            price_last_week=previous,
-            price_change_week=row["price"] - previous,
-            price_change_total=row["price"] - first,
+            weeks_tracked="",
+            price_first_seen="",
+            price_last_week="",
+            price_change_week="",
+            price_change_total="",
+            trend=LEGACY_HISTORY_NOTICE,
         )
-        change = row["price_change_total"]
-        row["trend"] = (
-            "First observed this run" if not records
-            else f"Down ${abs(change):,} over {count} observations" if change < 0
-            else f"Up ${change:,} over {count} observations" if change > 0
-            else f"Unchanged for {count} observations"
-        )
-        records.append({"date": today, "price": row["price"]})
-    write_json(path, history)
 
 
-def write_csv_outputs(root: Path, config: dict[str, Any], rows: list[dict[str, Any]]) -> tuple[Path, Path]:
+def write_csv_outputs(
+    root: Path, config: dict[str, Any], rows: list[dict[str, Any]]
+) -> tuple[Path, Path]:
     import csv
 
     key = str(config["vehicle_key"])
@@ -70,7 +64,11 @@ def write_csv_outputs(root: Path, config: dict[str, Any], rows: list[dict[str, A
     latest = latest_dir / f"{key}_autotrader_latest.csv"
     for path in (archive, latest):
         with path.open("w", encoding="utf-8", newline="") as handle:
-            writer = csv.DictWriter(handle, fieldnames=[*SOURCE_FIELDS, *EXTRA_FIELDS], extrasaction="ignore")
+            writer = csv.DictWriter(
+                handle,
+                fieldnames=[*SOURCE_FIELDS, *EXTRA_FIELDS],
+                extrasaction="ignore",
+            )
             writer.writeheader()
             writer.writerows(rows)
     return archive, latest
