@@ -14,8 +14,8 @@ This document preserves the owner-approved sequence for turning the repository i
 | 03 | Canonical Listing Schema and Evidence Model | Complete and merged |
 | 04 | AutoTrader Collector Audit and Refactor | Complete and merged |
 | 05 | Kijiji Collector Replacement | Complete and merged |
-| 06 | Identity, Deduplication and Listing Lifecycle | Implemented; deterministic validation and owner merge pending |
-| 07 | Storage, Retention and Repository Hygiene | Approved, not started |
+| 06 | Identity, Deduplication and Listing Lifecycle | Complete and merged |
+| 07 | Storage, Retention and Repository Hygiene | Implemented; deterministic validation and owner merge pending |
 | 08 | CI and Workflow Hardening | Approved, not started |
 | 09 | F-350 Buyer Intelligence | Approved, not started |
 | 10 | Secondary Purpose Outputs | Approved, not started |
@@ -23,7 +23,7 @@ This document preserves the owner-approved sequence for turning the repository i
 
 ## Global completion criteria
 
-The audit is not complete until optional vehicles remain paused unless approved; registry/config authority is preserved; both adapters reconcile raw objects; parsing/exclusions are visible; Kijiji geography is listing-specific or unknown; source listing IDs are distinct from VIN; identity/lifecycle semantics are explainable; retention is bounded; workflows are reproducible; documentation matches code; F-350 evidence supports investigation; and three consecutive scheduled active-profile runs complete without manual repair.
+The audit is not complete until optional vehicles remain paused unless approved; registry/config authority is preserved; both adapters reconcile returned objects; parsing and exclusions are visible; Kijiji geography is listing-specific or unknown; source listing IDs remain distinct from VIN; identity/lifecycle semantics are explainable; generated-data and state growth are bounded; dependencies and workflows are reproducible; documentation matches code; F-350 evidence supports investigation; and three consecutive scheduled active-profile runs complete without manual repair.
 
 ---
 
@@ -85,39 +85,38 @@ Kijiji fetched scope is `kijiji_adapter_json_ld_listing_objects`.
 
 ## Audit 06 — Identity, Deduplication and Listing Lifecycle
 
-**Status:** implemented on `ai/audit-06-identity-lifecycle`; deterministic exact-head validation and owner merge remain pending.
+**Status:** complete and merged through PR #8.
 
-### Scope
+Delivered source-ID/VIN separation, explicit VIN evidence, deterministic fingerprints, non-destructive duplicate candidates, active/missing/reappeared/retired lifecycle states, successful-run-only advancement, actual elapsed time, corrected price observations, fail-closed reporting, source status schema v8, and consolidated health schema v6.
 
-- source listing IDs remain distinct from VIN
-- VIN is explicit source evidence with format/conflict/not-reported status
-- deterministic strict/loose fingerprints expose comparison components
-- cross-source duplicate candidates have high/medium/low confidence and visible reasons
-- duplicate candidates are non-destructive and never merge canonical records
-- first/last seen timestamps use successful source observations
-- lifecycle states are active/missing/reappeared/retired
-- failed or unhealthy source runs do not advance lifecycle
-- retirement requires three consecutive successful misses and fourteen elapsed days
-- same-run replay is idempotent
-- price observations use first/previous/current/change semantics
-- legacy week-named history and `price_history_*.json` do not influence supported output
-- source status becomes schema v8; consolidated health becomes schema v6
-
-### Acceptance
-
-Identity and lifecycle evidence must be explainable; VIN-like listing IDs must not become VIN; duplicate candidates must not merge data; actual elapsed time must replace artificial weeks; lifecycle rollback must preserve prior state on unhealthy runs; supported manual review must fail closed when identity evidence is missing or mismatched.
-
-### Non-scope
-
-No retention/deletion policy, repository-growth bounds, buyer ranking, F-350 enrichment, purpose-specific analytics, sold-state verification, or optional-vehicle reintroduction.
+Duplicate candidates remain `candidate_only_not_merged`. Retired state is an operational inference, not a sold claim.
 
 ---
 
 ## Audit 07 — Storage, Retention and Repository Hygiene
 
-**Status:** approved, not started.
+**Status:** implemented on `ai/audit-07-storage-retention`; deterministic exact-head validation and owner merge remain pending.
 
-Define archive/evidence retention, compact history, bounded repository growth, deletion evidence, and generated-data diff strategy.
+### Scope
+
+- retain eight timestamped source CSVs per active vehicle/source
+- retain four timestamped manual-review CSVs per active vehicle
+- preserve all current `*_latest` evidence in place
+- compact listing price history to the newest thirteen raw observations plus cumulative totals, extrema, first/current values, and a chained SHA-256 digest
+- retain at most 500 retired listings per source and no retired tombstone older than 365 days
+- preserve bounded, cumulative SHA-256 deletion ledgers
+- remove active-vehicle legacy `price_history_*.json` and historical merged CSVs through governed deletion evidence
+- cap individual managed files at 50 MiB and active managed data at 500 MiB
+- require source health, retention verification, and staged-path validation before generated-data commits
+- leave paused F-150/Tundra data untouched
+
+### Acceptance
+
+Repository growth must be measurable and bounded; current evidence and lifecycle continuity must survive; deletion evidence must identify path, reason, size, and SHA-256; compacted history must retain truthful aggregate semantics; and staged generated-data diffs must reject paused, ungoverned, or non-data paths.
+
+### Non-scope
+
+No dependency locking, final workflow decomposition, cadence redesign, anomaly diagnostics, source-query/parser changes, buyer ranking, F-350 enrichment, purpose-specific analytics, sold-state verification, or optional-vehicle reintroduction.
 
 ---
 
@@ -125,7 +124,7 @@ Define archive/evidence retention, compact history, bounded repository growth, d
 
 **Status:** approved, not started.
 
-Lock dependencies; separate tests from collection; complete inputs/cadence; add anomaly diagnostics; and improve generated-data discipline. Earlier single-pair controls remain interim.
+Lock dependencies; separate tests from collection; complete inputs/cadence; add anomaly diagnostics; and finalize generated-data discipline. Earlier single-pair and Audit 07 pre-commit controls remain interim inputs to this package.
 
 ---
 
