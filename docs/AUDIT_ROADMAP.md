@@ -15,8 +15,8 @@ This document preserves the owner-approved sequence for turning the repository i
 | 04 | AutoTrader Collector Audit and Refactor | Complete and merged |
 | 05 | Kijiji Collector Replacement | Complete and merged |
 | 06 | Identity, Deduplication and Listing Lifecycle | Complete and merged |
-| 07 | Storage, Retention and Repository Hygiene | Implemented; deterministic validation and owner merge pending |
-| 08 | CI and Workflow Hardening | Approved, not started |
+| 07 | Storage, Retention and Repository Hygiene | Complete and merged |
+| 08 | CI and Workflow Hardening | Implemented; deterministic validation and owner merge pending |
 | 09 | F-350 Buyer Intelligence | Approved, not started |
 | 10 | Secondary Purpose Outputs | Approved, not started |
 | 11 | Optional Search Reintroduction | Approved final stage |
@@ -95,36 +95,36 @@ Duplicate candidates remain `candidate_only_not_merged`. Retired state is an ope
 
 ## Audit 07 — Storage, Retention and Repository Hygiene
 
-**Status:** implemented on `ai/audit-07-storage-retention`; deterministic exact-head validation and owner merge remain pending.
+**Status:** complete and merged through PR #9.
 
-### Scope
-
-- retain eight timestamped source CSVs per active vehicle/source
-- retain four timestamped manual-review CSVs per active vehicle
-- preserve all current `*_latest` evidence in place
-- compact listing price history to the newest thirteen raw observations plus cumulative totals, extrema, first/current values, and a chained SHA-256 digest
-- retain at most 500 retired listings per source and no retired tombstone older than 365 days
-- preserve bounded, cumulative SHA-256 deletion ledgers
-- remove active-vehicle legacy `price_history_*.json` and historical merged CSVs through governed deletion evidence
-- cap individual managed files at 50 MiB and active managed data at 500 MiB
-- require source health, retention verification, and staged-path validation before generated-data commits
-- leave paused F-150/Tundra data untouched
-
-### Acceptance
-
-Repository growth must be measurable and bounded; current evidence and lifecycle continuity must survive; deletion evidence must identify path, reason, size, and SHA-256; compacted history must retain truthful aggregate semantics; and staged generated-data diffs must reject paused, ungoverned, or non-data paths.
-
-### Non-scope
-
-No dependency locking, final workflow decomposition, cadence redesign, anomaly diagnostics, source-query/parser changes, buyer ranking, F-350 enrichment, purpose-specific analytics, sold-state verification, or optional-vehicle reintroduction.
+Delivered eight source snapshots per active source, four manual-review snapshots per active vehicle, compacted price observations with cumulative digests, bounded retired tombstones and deletion ledgers, active-data size gates, governed legacy-file deletion, and staged-path validation while leaving paused data untouched.
 
 ---
 
 ## Audit 08 — CI and Workflow Hardening
 
-**Status:** approved, not started.
+**Status:** implemented on `ai/audit-08-ci-workflow-hardening`; exact-head deterministic validation and owner merge remain pending.
 
-Lock dependencies; separate tests from collection; complete inputs/cadence; add anomaly diagnostics; and finalize generated-data discipline. Earlier single-pair and Audit 07 pre-commit controls remain interim inputs to this package.
+### Scope
+
+- exact Python dependency lock and Python runtime version
+- exact GitHub Action commit SHAs
+- reusable code CI separated from collection
+- separate generated-data pull-request validation
+- schedule/manual-only collection with reusable CI preflight
+- explicit full/single-pair, active-vehicle, source, publication, anomaly-policy, and operator-note inputs
+- baseline-aware anomaly schema v1
+- generated-data publication manifest schema v1
+- health, anomaly, retention, staged-path, manifest, whitespace, and remote-ref gates before push
+- short-lived failure evidence and bounded full-run diagnostics
+
+### Acceptance
+
+Pull requests must never execute collectors; collection must not start before reusable CI passes; moving dependency/action references must be absent; paused vehicles must fail plan/publication validation; critical anomalies must remain visible and enforceable; publication manifests must match staged governed paths; and generated-data pull requests must receive actual integrity validation rather than acknowledgement-only success.
+
+### Non-scope
+
+No source-query/parser, vehicle-criteria, evidence-equation, identity/lifecycle, retention-limit, buyer-ranking, F-350 enrichment, purpose-output, sold-state, or optional-vehicle change.
 
 ---
 

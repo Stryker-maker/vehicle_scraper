@@ -8,7 +8,7 @@ Its primary purpose is an informed early-2020s diesel Ford F-350 purchase. It al
 
 **Functional collection prototype under structured audit.**
 
-The repository validates governed scope, runs enabled sources independently, preserves adapter and canonical evidence, reconciles every fetched listing object, tracks explainable listing lifecycle, applies bounded retention, and produces accepted-record review datasets. It is not a finished appraisal, recommendation, or automatic vehicle-selection system.
+The repository validates governed scope, runs enabled sources independently, preserves adapter and canonical evidence, reconciles every fetched listing object, tracks explainable listing lifecycle, applies bounded retention, uses reproducible CI/collection workflows, and produces accepted-record review datasets. It is not a finished appraisal, recommendation, or automatic vehicle-selection system.
 
 Important boundaries:
 
@@ -19,7 +19,7 @@ Important boundaries:
 - Duplicate matches are explainable candidates only and never merge canonical records.
 - `missing` and `retired` are operational lifecycle inferences, not source claims that a vehicle sold.
 - Historical merged/ranked CSV files are not current recommendations.
-- Historical `price_history_*.json` files are not used by supported output and are removed for active vehicles by the retention pass.
+- Historical `price_history_*.json` files are not used by supported output and are removed for active vehicles by governed retention.
 
 See `docs/LIMITATIONS_REGISTER.md` for tracked limitations.
 
@@ -42,7 +42,7 @@ See `docs/LIMITATIONS_REGISTER.md` for tracked limitations.
 - Ford F-150
 - Toyota Tundra
 
-Paused vehicles retain historical data and governed criteria but do not run or receive current evidence. Audit 07 retention does not modify their data.
+Paused vehicles retain historical data and governed criteria but do not run or receive current evidence. Retention and publication validation do not modify their data.
 
 ## Supported outputs
 
@@ -67,6 +67,9 @@ data/<vehicle>/retention/latest.json
 data/<vehicle>/retention/deletion_ledger.json
 data/run_status/latest.json
 data/run_status/latest.md
+data/run_status/anomalies_latest.json
+data/run_status/anomalies_latest.md
+data/run_status/publication_latest.json
 data/retention/latest.json
 ```
 
@@ -75,8 +78,6 @@ The supported manual-review CSV is built from accepted canonical records joined 
 Do not use `data/<vehicle>/merged/*.csv` as current recommendations. Historical merged CSVs are disabled legacy output and are deleted for active vehicles by governed retention with SHA-256 deletion evidence.
 
 ## Evidence boundaries
-
-The canonical equation is:
 
 ```text
 fetched_records = accepted_records + rejected_records + parse_failures
@@ -101,7 +102,6 @@ Kijiji query origin never becomes listing geography. Listing location is listing
 - Cross-source duplicate candidates are high, medium, or low confidence with visible reasons and `candidate_only_not_merged`.
 - Lifecycle states are `active`, `missing`, `reappeared`, and `retired`.
 - Retirement requires at least three consecutive successful source-run misses and at least fourteen elapsed days.
-- Actual timestamps and elapsed seconds/days replace artificial week semantics.
 - Price history retains total counts and first/previous/current/minimum/maximum values while keeping the newest thirteen raw observations plus a chained SHA-256 compaction digest.
 - Retired tombstones are limited to 500 per source and 365 days since last successful observation.
 
@@ -111,49 +111,43 @@ Both source status files use schema version `8`; adapter schema remains `1`.
 
 `storage_retention.py` provides storage-retention schema version `1`.
 
-For each active vehicle, a governed full run retains:
+For each active vehicle, a governed full run retains eight timestamped source CSVs per source, four timestamped manual-review CSVs, and all current `*_latest` evidence. File deletions record path, reason, size, SHA-256, run ID, and time. Detailed ledgers retain the latest 100 records while cumulative counts, bytes, and chained digests continue.
 
-- eight timestamped AutoTrader source CSVs
-- eight timestamped Kijiji source CSVs
-- four timestamped manual-review CSVs
-- all current `*_latest` adapter, canonical, status, identity, review, and health artifacts
+Repository-growth gates are 50 MiB per managed file and 500 MiB total active managed data.
 
-The retention pass removes older matching archives, active-vehicle `price_history_*.json`, and historical merged CSVs. Every file deletion records path, reason, size, SHA-256, run ID, and time. Detailed ledgers retain the latest 100 records while cumulative counts, bytes, and chained digests continue.
+## Reproducible workflows
 
-Repository-growth gates are:
+Audit 08 separates three workflows:
 
-- maximum individual managed file: 50 MiB
-- maximum active managed data: 500 MiB
+- `.github/workflows/ci.yml` — reusable deterministic CI for non-data pull-request changes, manual CI, and collection preflight
+- `.github/workflows/generated-data.yml` — integrity and retention validation for `data/**` pull-request changes
+- `.github/workflows/scrape.yml` — schedule/manual collection only; it has no pull-request trigger
 
-The deletion and compaction digests are accounting evidence; they do not reconstruct removed raw content.
+Python is fixed to `3.11.13`. `requirements.lock` contains exact dependency pins, and GitHub-owned actions use exact commit SHAs.
+
+Scheduled full collection runs Mondays at 08:00 UTC. Manual inputs are `collection_scope`, active `vehicle_key`, `source`, `publish_generated_data`, `anomaly_policy`, and optional `operator_note`.
+
+A full run snapshots prior health, writes baseline-aware anomaly schema v1, applies health/anomaly/retention/publication gates, and writes publication manifest schema v1 before a generated-data push. A remote branch change during collection blocks publication.
+
+A `single_pair` run validates one active governed source pair, uploads seven-day temporary evidence, and never publishes generated data.
 
 ## Current execution flow
 
-1. Validate registry schema v2 and all config schema-v2 files.
-2. Validate Kijiji hubs and build the governed full or single-pair plan.
-3. Run structured and hostile tests.
-4. Run the direct AutoTrader or Kijiji adapter.
-5. Preserve request, page, raw object, rejection, parse-failure, and canonical evidence.
-6. Update identity/lifecycle only after a successful reconciled source run; roll back on failure.
-7. Build cross-source duplicate candidates without merging records.
-8. Build manual review from accepted canonical plus current identity evidence.
-9. For a full run, write consolidated health and fail if any source is unhealthy.
-10. Apply and verify retention, stage only `data/`, reject paused/ungoverned/non-data paths, and commit only a governed data diff.
-
-## Workflow modes
-
-The workflow is `.github/workflows/scrape.yml`.
-
-- Scheduled full run: Mondays at 08:00 UTC and commits governed active-scope generated data.
-- Manual full run: `validation_mode=full`; commits only with `commit_generated_data=true`.
-- Narrow validation: `validation_mode=single_pair`; one governed source pair, seven-day temporary artifact, no data commit.
-- Pull requests: compile, validate, and run deterministic tests only.
-- Generated-data follow-up: acknowledgement only; collectors do not rerun.
+1. Reusable deterministic CI validates exact dependencies, compilation, registry/config state, and hostile tests.
+2. Collection validates inputs and builds a registry-governed full or single-pair plan.
+3. Direct adapters preserve request, page, raw object, rejection, parse-failure, and canonical evidence.
+4. Identity/lifecycle updates only after healthy reconciled source execution and rolls back on failure.
+5. Full runs build manual review, consolidated health, and baseline-aware anomaly evidence.
+6. Health and critical-anomaly policy gates run before retention.
+7. Retention is applied and verified.
+8. Publication validates staged paths, writes/verifies the manifest, runs `git diff --cached --check`, confirms the remote ref is unchanged, and then pushes a governed data commit.
 
 ## Local validation
 
 ```bash
-python -m pip install requests beautifulsoup4 geopy
+python dependency_lock.py --lock requirements.lock
+python -m pip install --requirement requirements.lock
+python -m pip check
 python vehicle_registry.py validate
 python vehicle_registry.py summary
 python vehicle_registry.py active-runs
@@ -173,19 +167,27 @@ Legacy command names remain aliases into the governed runtimes. Never run `merge
 ## Repository map
 
 ```text
-.github/workflows/scrape.yml  tests, collection, retention, governed data commits
-autotrader_*.py               direct AutoTrader adapter/runtime/evidence
-kijiji_*.py                   direct Kijiji adapter/runtime/evidence
-canonical_evidence.py         canonical stages and reconciliation
-identity_lifecycle.py         identity, lifecycle, compact history, duplicate candidates
-storage_retention.py          archive bounds, deletion evidence, size and staged-path gates
-phase1_reporting.py           accepted plus identity evidence manual review and health
-vehicle_registry.json/.py     operational scope and source plan
-vehicle_config.py/config_*.json governed criteria
-merge.py                      LEGACY / DISABLED merger and ranker
-data/                         generated evidence, lifecycle, retention, status, review data
-tests/                        fixtures, hostile tests, contracts
-docs/                         repository authorities
+.github/workflows/ci.yml             reusable deterministic code CI
+.github/workflows/generated-data.yml generated-data pull-request validation
+.github/workflows/scrape.yml         schedule/manual governed collection
+requirements.lock                    exact Python dependency lock
+dependency_lock.py                   dependency-lock validation
+workflow_control.py                  governed collection plan and smoke validation
+workflow_anomalies.py                baseline-aware anomaly evidence
+generated_data_publish.py            staged publication manifest and verification
+generated_data_validation.py         generated-data pull-request integrity checks
+autotrader_*.py                      direct AutoTrader adapter/runtime/evidence
+kijiji_*.py                          direct Kijiji adapter/runtime/evidence
+canonical_evidence.py                canonical stages and reconciliation
+identity_lifecycle.py                identity, lifecycle, compact history, duplicate candidates
+storage_retention.py                 archive bounds, deletion evidence, size and staged-path gates
+phase1_reporting.py                  accepted plus identity evidence manual review and health
+vehicle_registry.json/.py            operational scope and source plan
+vehicle_config.py/config_*.json      governed criteria
+merge.py                             LEGACY / DISABLED merger and ranker
+data/                                generated evidence, lifecycle, retention, status, review data
+tests/                               fixtures, hostile tests, contracts
+docs/                                repository authorities
 ```
 
 ## Documentation authority
@@ -203,6 +205,7 @@ docs/                         repository authorities
 - `AUDIT_05_KIJIJI_ADAPTER.md`
 - `AUDIT_06_IDENTITY_LIFECYCLE.md`
 - `AUDIT_07_STORAGE_RETENTION.md`
+- `AUDIT_08_CI_WORKFLOW_HARDENING.md`
 
 ## Change authority
 

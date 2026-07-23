@@ -1,20 +1,20 @@
-name: Weekly Vehicle Scrape
+name: Governed Vehicle Collection
 
 on:
-  pull_request:
   schedule:
     - cron: '0 8 * * 1'
   workflow_dispatch:
     inputs:
-      validation_mode:
-        description: Collection scope for this manual run
+      collection_scope:
+        description: Governed collection scope
         type: choice
         options: [full, single_pair]
         default: full
         required: true
       vehicle_key:
-        description: Governed vehicle key for single-pair validation
-        type: string
+        description: Active vehicle for single-pair validation
+        type: choice
+        options: [ford_f350, ram_3500, subaru_forester, honda_odyssey, kia_carnival]
         default: ford_f350
         required: true
       source:
@@ -23,170 +23,105 @@ on:
         options: [autotrader, kijiji]
         default: autotrader
         required: true
-      commit_generated_data:
-        description: Commit generated data from a manual full run
+      publish_generated_data:
+        description: Publish governed data from a manual full run
         type: boolean
         default: false
         required: true
+      anomaly_policy:
+        description: Critical anomaly handling for a manual full run
+        type: choice
+        options: [enforce, report_only]
+        default: enforce
+        required: true
+      operator_note:
+        description: Optional reason or context for the manual run
+        type: string
+        default: ''
+        required: false
+
+permissions:
+  contents: write
 
 concurrency:
-  group: vehicle-scrape-${{ github.ref }}
+  group: governed-collection-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  acknowledge-generated-data:
-    name: Acknowledge generated data
-    if: github.event_name == 'pull_request' && github.actor == 'github-actions[bot]'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - name: Confirm generated-data update
-        run: echo "Generated data commit acknowledged; code tests already passed before collection."
+  preflight:
+    name: Deterministic CI preflight
+    uses: ./.github/workflows/ci.yml
 
-  test:
-    name: Repository tests
-    if: "!(github.event_name == 'pull_request' && github.actor == 'github-actions[bot]')"
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install collector test dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install requests beautifulsoup4 geopy
-
-      - name: Compile Python sources
-        run: >-
-          python -m py_compile
-          vehicle_config.py
-          vehicle_registry.py
-          phase1_common.py
-          canonical_evidence.py
-          identity_lifecycle.py
-          storage_retention.py
-          autotrader_distance.py
-          autotrader_history.py
-          autotrader_adapter.py
-          autotrader_canonical.py
-          autotrader_run.py
-          kijiji_locations.py
-          kijiji_history.py
-          kijiji_adapter.py
-          kijiji_canonical.py
-          kijiji_run.py
-          phase1_runtime.py
-          phase1_reporting.py
-          phase1_pipeline.py
-          scraper.py
-          kijiji_scraper.py
-          merge.py
-
-      - name: Validate governed vehicle registry and configurations
-        run: python vehicle_registry.py validate --registry vehicle_registry.json
-
-      - name: Run structured tests
-        id: structured-tests
-        run: |
-          set +e
-          python -m unittest discover -s tests -v > "$RUNNER_TEMP/structured-tests.txt" 2>&1
-          status=$?
-          cat "$RUNNER_TEMP/structured-tests.txt"
-          exit "$status"
-
-      - name: Upload failed structured-test log
-        if: failure() && steps.structured-tests.outcome == 'failure'
-        uses: actions/upload-artifact@v4
-        with:
-          name: structured-test-failure-${{ github.run_id }}
-          path: ${{ runner.temp }}/structured-tests.txt
-          if-no-files-found: error
-          retention-days: 2
-
-  scrape:
-    name: Collect vehicle data
-    if: github.event_name != 'pull_request'
-    needs: test
-    runs-on: ubuntu-latest
+  collect:
+    name: Collect governed vehicle data
+    needs: preflight
+    runs-on: ubuntu-24.04
     timeout-minutes: 90
     permissions:
       contents: write
+    env:
+      COLLECTION_SCOPE: ${{ github.event_name == 'schedule' && 'full' || inputs.collection_scope }}
+      VEHICLE_KEY: ${{ github.event_name == 'schedule' && 'ford_f350' || inputs.vehicle_key }}
+      SELECTED_SOURCE: ${{ github.event_name == 'schedule' && 'autotrader' || inputs.source }}
+      PUBLISH_GENERATED_DATA: ${{ github.event_name == 'schedule' && 'true' || inputs.publish_generated_data }}
+      ANOMALY_POLICY: ${{ github.event_name == 'schedule' && 'enforce' || inputs.anomaly_policy }}
+      OPERATOR_NOTE: ${{ inputs.operator_note || '' }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Checkout collection ref
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          python-version: '3.11'
+          fetch-depth: 0
 
-      - name: Install collector dependencies
+      - name: Set up Python 3.11.13
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.11.13'
+          cache: pip
+          cache-dependency-path: requirements.lock
+
+      - name: Install locked collector dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install requests beautifulsoup4 geopy
+          python dependency_lock.py --lock requirements.lock
+          python -m pip install --disable-pip-version-check pip==25.1.1
+          python -m pip install --disable-pip-version-check --requirement requirements.lock
+          python -m pip check
 
       - name: Validate governed vehicle registry and configurations
         run: |
           python vehicle_registry.py validate --registry vehicle_registry.json
           python vehicle_registry.py summary --registry vehicle_registry.json
 
+      - name: Preserve previous health baseline
+        id: baseline
+        run: |
+          baseline="$RUNNER_TEMP/baseline-health.json"
+          if [[ -f data/run_status/latest.json ]]; then
+            cp data/run_status/latest.json "$baseline"
+          else
+            printf '{}\n' > "$baseline"
+          fi
+          echo "path=$baseline" >> "$GITHUB_OUTPUT"
+
       - name: Build governed collection plan
         id: collection-plan
-        env:
-          VALIDATION_MODE: ${{ inputs.validation_mode || 'full' }}
-          VEHICLE_KEY: ${{ inputs.vehicle_key || 'ford_f350' }}
-          SELECTED_SOURCE: ${{ inputs.source || 'autotrader' }}
         run: |
-          set -euo pipefail
           plan="$RUNNER_TEMP/source-plan.tsv"
-          if [[ "$GITHUB_EVENT_NAME" == "schedule" || "$VALIDATION_MODE" == "full" ]]; then
-            python vehicle_registry.py active-runs --registry vehicle_registry.json > "$plan"
-          else
-            python - <<'PY' > "$plan"
-          import os
-          from pathlib import Path
-          from vehicle_registry import registry_entries
-
-          root = Path.cwd()
-          vehicle_key = os.environ["VEHICLE_KEY"]
-          source = os.environ["SELECTED_SOURCE"]
-          matches = [
-              entry for entry in registry_entries(root=root)
-              if entry["vehicle_key"] == vehicle_key
-          ]
-          if len(matches) != 1:
-              raise SystemExit(f"Unknown governed vehicle_key: {vehicle_key}")
-          entry = matches[0]
-          if not entry["enabled"]:
-              raise SystemExit(f"Vehicle is paused and cannot be smoke-tested: {vehicle_key}")
-          if source not in entry["enabled_sources"]:
-              raise SystemExit(
-                  f"Source {source} is not enabled for governed vehicle {vehicle_key}"
-              )
-          print(f"{entry['config_path']}\t{source}")
-          PY
-          fi
-          test -s "$plan" || { echo "Collection plan is empty" >&2; exit 1; }
+          python workflow_control.py plan \
+            --registry vehicle_registry.json \
+            --scope "$COLLECTION_SCOPE" \
+            --vehicle-key "$VEHICLE_KEY" \
+            --source "$SELECTED_SOURCE" \
+            --output "$plan"
           echo "path=$plan" >> "$GITHUB_OUTPUT"
-          cat "$plan"
 
       - name: Collect source data with canonical and lifecycle evidence
         env:
           ORS_API_KEY: ${{ secrets.ORS_API_KEY }}
-          VALIDATION_MODE: ${{ inputs.validation_mode || 'full' }}
         run: |
           set -euo pipefail
           while IFS=$'\t' read -r config source; do
             extra=()
-            if [[ "$VALIDATION_MODE" == "single_pair" ]]; then
+            if [[ "$COLLECTION_SCOPE" == "single_pair" ]]; then
               extra+=(--fail-on-unhealthy)
             fi
             case "$source" in
@@ -204,83 +139,14 @@ jobs:
           done < "${{ steps.collection-plan.outputs.path }}"
 
       - name: Validate single-pair source and lifecycle evidence
-        if: github.event_name == 'workflow_dispatch' && inputs.validation_mode == 'single_pair'
-        env:
-          PLAN_PATH: ${{ steps.collection-plan.outputs.path }}
+        if: env.COLLECTION_SCOPE == 'single_pair'
         run: |
-          python - <<'PY'
-          import json
-          import os
-          from pathlib import Path
-
-          from phase1_common import source_status_path, status_is_current_success
-          from vehicle_config import load_vehicle_config
-
-          config_value, source = Path(os.environ["PLAN_PATH"]).read_text(
-              encoding="utf-8"
-          ).strip().split("\t")
-          root = Path.cwd()
-          config = load_vehicle_config(root / config_value)
-          status_path = source_status_path(root, config, source)
-          status = json.loads(status_path.read_text(encoding="utf-8"))
-          run_id = os.environ["GITHUB_RUN_ID"]
-          if not status_is_current_success(status, run_id):
-              raise SystemExit(f"Single-pair source status is unhealthy: {status_path}")
-          common = {
-              "schema_version": 8,
-              "source_adapter_schema_version": 1,
-              "identity_lifecycle_schema_version": 2,
-              "identity_lifecycle_status": "updated",
-              "runtime_config_projection": "direct_schema_v2",
-              "pagination_complete": True,
-              "legacy_source_ranking_disabled": True,
-              "legacy_price_history_active": False,
-          }
-          requirements = (
-              common
-              if source == "autotrader"
-              else {
-                  **common,
-                  "location_registry_version": 1,
-                  "distance_processing_disabled": True,
-                  "distance_filter_disabled": True,
-                  "location_evidence_contract": (
-                      "listing_specific_source_geography_or_unknown_"
-                      "query_origin_never_location"
-                  ),
-              }
-          )
-          mismatches = {
-              key: {"expected": expected, "actual": status.get(key)}
-              for key, expected in requirements.items()
-              if status.get(key) != expected
-          }
-          if mismatches:
-              raise SystemExit(
-                  f"{source} smoke contract failed: "
-                  + json.dumps(mismatches, sort_keys=True)
-              )
-          if int(status.get("identity_observed_current_count", -1)) != int(
-              status.get("accepted_record_count", -2)
-          ):
-              raise SystemExit("Identity current count does not match accepted records")
-          if int(status.get("query_location_count", 1)) < 1:
-              raise SystemExit("Kijiji smoke contract has no governed query locations")
-          print(
-              f"Single-pair validation passed: {config['vehicle_key']}:{source} | "
-              f"fetched={status.get('fetched_record_count')} | "
-              f"accepted={status.get('accepted_record_count')} | "
-              f"tracked={status.get('identity_tracked_listing_count')} | "
-              f"new={status.get('identity_new_listing_count')} | "
-              f"reappeared={status.get('identity_reappeared_listing_count')}"
-          )
-          PY
+          python workflow_control.py validate-single-pair \
+            --plan "${{ steps.collection-plan.outputs.path }}" \
+            --run-id "$GITHUB_RUN_ID"
 
       - name: Prepare single-pair validation artifact
-        if: github.event_name == 'workflow_dispatch' && inputs.validation_mode == 'single_pair'
-        env:
-          VEHICLE_KEY: ${{ inputs.vehicle_key }}
-          SELECTED_SOURCE: ${{ inputs.source }}
+        if: env.COLLECTION_SCOPE == 'single_pair'
         run: |
           set -euo pipefail
           artifact="$RUNNER_TEMP/smoke-artifact"
@@ -297,30 +163,46 @@ jobs:
           cp "${{ steps.collection-plan.outputs.path }}" "$artifact/source-plan.tsv"
 
       - name: Upload single-pair validation artifact
-        if: github.event_name == 'workflow_dispatch' && inputs.validation_mode == 'single_pair'
-        uses: actions/upload-artifact@v4
+        if: env.COLLECTION_SCOPE == 'single_pair'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: source-smoke-${{ inputs.vehicle_key }}-${{ inputs.source }}-${{ github.run_id }}
+          name: source-smoke-${{ env.VEHICLE_KEY }}-${{ env.SELECTED_SOURCE }}-${{ github.run_id }}
           path: ${{ runner.temp }}/smoke-artifact
           if-no-files-found: error
           retention-days: 7
 
       - name: Build evidence-backed manual-review files
-        if: github.event_name == 'schedule' || inputs.validation_mode == 'full'
+        if: env.COLLECTION_SCOPE == 'full'
         run: python phase1_pipeline.py build-manual-review --registry vehicle_registry.json
 
       - name: Write consolidated reconciliation and run-health report
-        if: github.event_name == 'schedule' || inputs.validation_mode == 'full'
+        if: env.COLLECTION_SCOPE == 'full'
         run: |
           python phase1_pipeline.py report-health --registry vehicle_registry.json
           cat data/run_status/latest.md >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Fail visibly before any generated-data commit
-        if: github.event_name == 'schedule' || inputs.validation_mode == 'full'
+      - name: Build baseline-aware anomaly report
+        if: env.COLLECTION_SCOPE == 'full'
+        run: |
+          python workflow_anomalies.py build \
+            --baseline "${{ steps.baseline.outputs.path }}" \
+            --current data/run_status/latest.json \
+            --run-id "$GITHUB_RUN_ID"
+          cat data/run_status/anomalies_latest.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fail visibly on unhealthy source evidence
+        if: env.COLLECTION_SCOPE == 'full'
         run: python phase1_pipeline.py check-health
 
+      - name: Enforce critical anomaly policy
+        if: env.COLLECTION_SCOPE == 'full'
+        run: |
+          python workflow_anomalies.py check \
+            --report data/run_status/anomalies_latest.json \
+            --policy "$ANOMALY_POLICY"
+
       - name: Apply and verify bounded storage retention
-        if: github.event_name == 'schedule' || inputs.validation_mode == 'full'
+        if: env.COLLECTION_SCOPE == 'full'
         run: |
           python storage_retention.py apply --registry vehicle_registry.json
           python storage_retention.py verify --registry vehicle_registry.json
@@ -328,22 +210,56 @@ jobs:
           import json
           from pathlib import Path
 
-          report = json.loads(Path("data/retention/latest.json").read_text())
-          print("## Storage retention")
+          report = json.loads(Path('data/retention/latest.json').read_text())
+          print('## Storage retention')
           print(f"- Status: {report['verification_status']}")
           print(f"- Managed files: {report['managed_file_count']}")
           print(f"- Managed bytes: {report['managed_bytes']}")
           print(f"- Deleted this run: {report['deleted_file_count']} files / {report['deleted_bytes']} bytes")
           PY
 
+      - name: Upload full-run diagnostics
+        if: always() && env.COLLECTION_SCOPE == 'full'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: full-run-diagnostics-${{ github.run_id }}
+          path: |
+            data/run_status/
+            data/retention/
+            ${{ steps.collection-plan.outputs.path }}
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Commit and push governed generated data
-        if: github.event_name == 'schedule' || (inputs.validation_mode == 'full' && inputs.commit_generated_data)
+        if: env.COLLECTION_SCOPE == 'full' && env.PUBLISH_GENERATED_DATA == 'true'
         run: |
           set -euo pipefail
+          test "$GITHUB_REF_TYPE" = "branch"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add data/
           python storage_retention.py validate-staged --registry vehicle_registry.json
+          if git diff --staged --quiet; then
+            echo "No governed generated-data changes to publish."
+            exit 0
+          fi
+          python generated_data_publish.py prepare \
+            --registry vehicle_registry.json \
+            --run-id "$GITHUB_RUN_ID" \
+            --source-sha "$GITHUB_SHA" \
+            --event-name "$GITHUB_EVENT_NAME" \
+            --ref-name "$GITHUB_REF_NAME"
+          git add data/run_status/publication_latest.json
+          python storage_retention.py validate-staged --registry vehicle_registry.json
+          python generated_data_publish.py verify-staged --registry vehicle_registry.json
+          git diff --cached --check
+          git diff --cached --name-status
           git diff --cached --stat
-          git diff --staged --quiet || git commit -m "Weekly scrape $(date +'%Y-%m-%d')"
-          git push
+          git fetch origin "$GITHUB_REF_NAME"
+          remote_sha=$(git rev-parse "origin/$GITHUB_REF_NAME")
+          if [[ "$remote_sha" != "$GITHUB_SHA" ]]; then
+            echo "Remote ref changed during collection: expected $GITHUB_SHA, found $remote_sha" >&2
+            exit 1
+          fi
+          git commit -m "Vehicle data run $GITHUB_RUN_ID $(date -u +'%Y-%m-%d')"
+          git push origin "HEAD:$GITHUB_REF_NAME"
