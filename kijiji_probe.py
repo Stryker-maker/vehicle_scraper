@@ -57,7 +57,10 @@ def response_summary(response: Any, requested_url: str) -> dict[str, Any]:
     soup = BeautifulSoup(text, "html.parser")
     scripts = soup.find_all("script")
     lowered = text.casefold()
-    response_headers = getattr(response, "headers", {}) or {}
+    response_headers = {
+        str(name).casefold(): value
+        for name, value in dict(getattr(response, "headers", {}) or {}).items()
+    }
     title = soup.title.get_text(" ", strip=True) if soup.title else None
     script_inventory = []
     for index, script in enumerate(scripts):
@@ -91,9 +94,9 @@ def response_summary(response: Any, requested_url: str) -> dict[str, Any]:
         "response_sha256": hashlib.sha256(encoded).hexdigest(),
         "page_title": title,
         "public_response_headers": {
-            name: response_headers.get(name)
+            name: response_headers[name]
             for name in PUBLIC_RESPONSE_HEADERS
-            if response_headers.get(name) is not None
+            if name in response_headers
         },
         "script_count": len(scripts),
         "script_types": sorted(
