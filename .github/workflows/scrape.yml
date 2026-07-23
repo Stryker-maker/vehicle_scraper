@@ -72,6 +72,7 @@ jobs:
           phase1_common.py
           canonical_evidence.py
           identity_lifecycle.py
+          storage_retention.py
           autotrader_distance.py
           autotrader_history.py
           autotrader_adapter.py
@@ -228,7 +229,7 @@ jobs:
           common = {
               "schema_version": 8,
               "source_adapter_schema_version": 1,
-              "identity_lifecycle_schema_version": 1,
+              "identity_lifecycle_schema_version": 2,
               "identity_lifecycle_status": "updated",
               "runtime_config_projection": "direct_schema_v2",
               "pagination_complete": True,
@@ -314,15 +315,35 @@ jobs:
           python phase1_pipeline.py report-health --registry vehicle_registry.json
           cat data/run_status/latest.md >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Commit and push collected data and evidence
+      - name: Fail visibly before any generated-data commit
+        if: github.event_name == 'schedule' || inputs.validation_mode == 'full'
+        run: python phase1_pipeline.py check-health
+
+      - name: Apply and verify bounded storage retention
+        if: github.event_name == 'schedule' || inputs.validation_mode == 'full'
+        run: |
+          python storage_retention.py apply --registry vehicle_registry.json
+          python storage_retention.py verify --registry vehicle_registry.json
+          python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("data/retention/latest.json").read_text())
+          print("## Storage retention")
+          print(f"- Status: {report['verification_status']}")
+          print(f"- Managed files: {report['managed_file_count']}")
+          print(f"- Managed bytes: {report['managed_bytes']}")
+          print(f"- Deleted this run: {report['deleted_file_count']} files / {report['deleted_bytes']} bytes")
+          PY
+
+      - name: Commit and push governed generated data
         if: github.event_name == 'schedule' || (inputs.validation_mode == 'full' && inputs.commit_generated_data)
         run: |
+          set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add data/
+          python storage_retention.py validate-staged --registry vehicle_registry.json
+          git diff --cached --stat
           git diff --staged --quiet || git commit -m "Weekly scrape $(date +'%Y-%m-%d')"
           git push
-
-      - name: Fail visibly when any expected source run is unhealthy
-        if: github.event_name == 'schedule' || inputs.validation_mode == 'full'
-        run: python phase1_pipeline.py check-health

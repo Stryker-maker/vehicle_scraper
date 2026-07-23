@@ -3,7 +3,7 @@
 ## Status
 
 **Baseline date:** July 23, 2026  
-**Baseline source:** `main` through Audit 05, updated by Audit 06 implementation  
+**Baseline source:** `main` through Audit 06, updated by Audit 07 implementation  
 **Project state:** functional collection prototype under structured audit
 
 This document records current supported behaviour. Future-package behaviour is labelled separately.
@@ -29,9 +29,14 @@ The repository can:
 - restore prior lifecycle artifacts when a source run is unhealthy
 - keep source IDs distinct from explicit unverified VIN claims
 - produce explainable, non-destructive cross-source duplicate candidates
-- track actual first/last seen time, elapsed days, missing/reappeared/retired state, and price observations
+- track actual first/last-seen time, elapsed days, missing/reappeared/retired state, and price observations
+- compact price observations while preserving truthful total and price summaries
+- prune old/excess retired tombstones with bounded deletion evidence
 - build unranked manual review from accepted canonical plus current identity evidence
 - fail closed when canonical or identity evidence is missing, corrupt, wrong-run, or count-mismatched
+- retain bounded timestamped source/manual-review archives
+- remove active-vehicle legacy history/merged CSVs with SHA-256 deletion evidence
+- enforce managed file/data-size limits and staged generated-data path governance
 - perform narrow validation without committing generated data
 
 ## Supported source boundaries
@@ -52,18 +57,37 @@ Both adapter schemas are version `1`. Canonical evidence schema is version `1`. 
 
 ## Identity and lifecycle boundary
 
-Identity/lifecycle schema version `1` provides:
+Identity/lifecycle schema version `2` provides:
 
 - `source_identifier_claim_not_vin`
 - explicit VIN evidence statuses
 - strict and loose comparison fingerprints
 - lifecycle states `active`, `missing`, `reappeared`, and `retired`
 - actual UTC timestamps and elapsed seconds/days
-- unique-run observation and price history semantics
+- unique-run observation and price semantics
+- latest thirteen raw price observations plus compacted count/digest and aggregate values
+- at most 500 retired listings/source and a 365-day retired tombstone age limit
+- bounded cumulative state-deletion evidence
 - high/medium/low duplicate candidates with visible reasons
 - `candidate_only_not_merged`
 
 Retirement requires at least three consecutive successful-run misses and fourteen elapsed days. Missing/retired are operational inferences, not sold claims. Failed runs do not advance lifecycle.
+
+## Storage-retention boundary
+
+Storage-retention schema version `1` provides:
+
+- eight timestamped source CSVs per active vehicle/source
+- four timestamped manual-review CSVs per active vehicle
+- preservation of all current `*_latest` evidence
+- active-vehicle removal of `price_history_*.json` and historical merged CSVs
+- deletion records with path, reason, category, size, SHA-256, run, and time
+- cumulative bounded deletion ledgers retaining the latest 100 detailed records
+- 50 MiB maximum individual managed file
+- 500 MiB maximum active managed data
+- staged-path rejection for non-data, paused-vehicle, and ungoverned-vehicle changes
+
+Audit 07 does not modify paused F-150/Tundra data. Compaction/deletion digests prove accounting order but do not reconstruct removed raw content.
 
 ## Current unsupported capability
 
@@ -76,7 +100,7 @@ The repository still cannot reliably establish:
 - independent truth of source claims or Kijiji geography
 - routable Kijiji distance
 - F-350 engine/idle hours, cab/box/SRW/DRW, and verified history enrichment
-- bounded retention or repository growth
+- fully locked/reproducible dependency and workflow architecture
 - purpose-specific decision outputs
 
 ## Governing vehicle scope
@@ -91,7 +115,7 @@ The repository still cannot reliably establish:
 | Ford F-150 | Paused | Optional curiosity | 4 | AutoTrader, Kijiji when enabled |
 | Toyota Tundra | Paused | Optional curiosity | 4 | AutoTrader, Kijiji when enabled |
 
-F-150 and Tundra must not receive current data, evidence, lifecycle, review, or status updates until Audit 11.
+F-150 and Tundra must not receive current data, evidence, lifecycle, review, status, or retention deletion updates until their owner-approved package.
 
 ## Component inventory
 
@@ -101,11 +125,12 @@ F-150 and Tundra must not receive current data, evidence, lifecycle, review, or 
 |---|---|
 | `vehicle_registry.json` / `vehicle_registry.py` | operational scope and source plan |
 | `config_*.json` / `vehicle_config.py` | criteria, source settings, hub validation |
-| `.github/workflows/scrape.yml` | tests, full collection, narrow validation, data commits |
+| `.github/workflows/scrape.yml` | tests, collection, health/retention gates, governed data commits |
 | `autotrader_*.py` | direct AutoTrader adapter/runtime/evidence |
 | `kijiji_*.py` | direct Kijiji adapter/runtime/evidence |
 | `canonical_evidence.py` | canonical IDs, stages, reasons, reconciliation |
-| `identity_lifecycle.py` | VIN evidence, fingerprints, lifecycle, observations, duplicate candidates |
+| `identity_lifecycle.py` | VIN evidence, fingerprints, lifecycle, compact history, duplicate candidates |
+| `storage_retention.py` | archive bounds, deletion evidence, size and staged-path gates |
 | `phase1_reporting.py` | identity-backed manual review and health schema v6 |
 | `phase1_common.py` | supported fields, paths, warnings, health predicate |
 | `tests/` | fixtures, hostile tests, governance/workflow contracts |
@@ -117,9 +142,9 @@ F-150 and Tundra must not receive current data, evidence, lifecycle, review, or 
 | `scraper.py` / `kijiji_scraper.py` | compatibility aliases into governed runtimes |
 | `phase1_runtime.py` | retained legacy utilities/tests; not active direct-source path |
 | `legacy_runtime_config()` | historical compatibility projection; unused by active adapters |
-| `price_history_*.json` | historical only; not read or rewritten by supported output |
+| `price_history_*.json` | historical only; removed for active vehicles by retention |
 | `merge.py` | disabled historical merger/ranker |
-| `data/<vehicle>/merged/*.csv` | historical only |
+| `data/<vehicle>/merged/*.csv` | historical only; removed for active vehicles by retention |
 | `trim_tiers.json` | descriptive legacy configuration, not recommendation authority |
 
 ## Supported data products
@@ -145,6 +170,14 @@ data/<vehicle>/identity_lifecycle/<source>/current_latest.jsonl
 data/<vehicle>/identity_lifecycle/<source>/events_latest.jsonl
 data/<vehicle>/identity_lifecycle/<source>/summary_latest.json
 data/<vehicle>/identity_lifecycle/duplicate_candidates_latest.jsonl
+```
+
+Retention evidence:
+
+```text
+data/<vehicle>/retention/latest.json
+data/<vehicle>/retention/deletion_ledger.json
+data/retention/latest.json
 ```
 
 Run health:
@@ -175,19 +208,24 @@ Current code/tests are intended to guarantee:
 14. duplicate candidates never merge or remove records
 15. lifecycle time is actual elapsed time, not fake weeks
 16. supported review requires current matching identity evidence
-17. supported output has no ranking authority
-18. narrow validation makes no generated-data commit
+17. price-observation and retired-state growth is bounded
+18. timestamped archives and active managed data are bounded
+19. every retention deletion has digest-backed evidence
+20. generated-data commits reject paused, ungoverned, and non-data paths
+21. supported output has no ranking authority
+22. narrow validation makes no generated-data commit
 
 ## Explicit non-guarantees
 
-`SUCCESS`, `active`, `retired`, format-valid VIN, or high-confidence duplicate candidate does not guarantee marketplace completeness, independently verified identity, sold status, availability, condition, fair value, or purchase suitability.
+`SUCCESS`, `active`, `retired`, format-valid VIN, high-confidence duplicate candidate, or retention verification does not guarantee marketplace completeness, independently verified identity, sold status, availability, condition, fair value, purchase suitability, or raw reconstruction of compacted/deleted evidence.
 
 ## Last operating evidence
 
 - Audit 03 full validation: 10/10 source pairs healthy, 381 accepted collector-emitted rows, no stale rows.
 - Audit 04 narrow AutoTrader run `29954526608`: 174 objects = 22 accepted + 150 rejected + 2 parse failures.
 - Audit 05 narrow Kijiji run `29968206030`: 441 objects = 11 accepted + 430 rejected + 0 parse failures; query geography stayed separate.
-- Audit 06 uses deterministic/hostile validation because it changes state semantics rather than marketplace requests. No additional external scrape is required unless source integration evidence contradicts the tests.
+- Audit 06 exact-head deterministic/hostile validation passed 66 tests; no external scrape was required because source-fetch behaviour did not change.
+- Audit 07 similarly changes deterministic storage/state and commit-gate behaviour rather than source requests; external collection is not required unless integration evidence contradicts tests.
 
 ## Repository change authority
 

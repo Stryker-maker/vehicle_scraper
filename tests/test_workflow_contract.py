@@ -19,7 +19,7 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("vehicle_registry.py validate", self.workflow)
         self.assertIn("vehicle_registry.py active-runs", self.workflow)
         self.assertGreaterEqual(
-            self.workflow.count("--registry vehicle_registry.json"), 4
+            self.workflow.count("--registry vehicle_registry.json"), 7
         )
         self.assertIn("build-manual-review", self.workflow)
         self.assertIn("report-health", self.workflow)
@@ -35,6 +35,7 @@ class WorkflowContractTests(unittest.TestCase):
             "actions/upload-artifact@v4", "smoke-artifact",
             "Single-pair validation passed", "identity_lifecycle_status",
             "identity_observed_current_count", "identity_lifecycle",
+            '"identity_lifecycle_schema_version": 2',
         ):
             self.assertIn(value, self.workflow)
         self.assertIn(
@@ -59,18 +60,45 @@ class WorkflowContractTests(unittest.TestCase):
 
     def test_pull_requests_do_not_run_collectors(self):
         self.assertIn("if: github.event_name != 'pull_request'", self.workflow)
-        self.assertIn("vehicle_config.py", self.workflow)
-        self.assertIn("canonical_evidence.py", self.workflow)
-        self.assertIn("identity_lifecycle.py", self.workflow)
+        for value in (
+            "vehicle_config.py",
+            "canonical_evidence.py",
+            "identity_lifecycle.py",
+            "storage_retention.py",
+        ):
+            self.assertIn(value, self.workflow)
         self.assertIn(
             "Validate governed vehicle registry and configurations", self.workflow
         )
 
-    def test_full_collection_commits_supported_evidence(self):
-        self.assertIn("canonical and lifecycle evidence", self.workflow)
-        self.assertIn("evidence-backed manual-review files", self.workflow)
-        self.assertIn("consolidated reconciliation", self.workflow)
-        self.assertIn("git add data/", self.workflow)
+    def test_full_run_retention_and_health_gate_precede_commit(self):
+        for value in (
+            "Fail visibly before any generated-data commit",
+            "storage_retention.py apply",
+            "storage_retention.py verify",
+            "storage_retention.py validate-staged",
+            "git diff --cached --stat",
+            "git add data/",
+        ):
+            self.assertIn(value, self.workflow)
+        health_index = self.workflow.index(
+            "Fail visibly before any generated-data commit"
+        )
+        retention_index = self.workflow.index(
+            "Apply and verify bounded storage retention"
+        )
+        commit_index = self.workflow.index(
+            "Commit and push governed generated data"
+        )
+        self.assertLess(health_index, retention_index)
+        self.assertLess(retention_index, commit_index)
+
+    def test_single_pair_never_reaches_retention_or_commit_steps(self):
+        self.assertIn(
+            "if: github.event_name == 'schedule' || inputs.validation_mode == 'full'",
+            self.workflow,
+        )
+        self.assertIn("retention-days: 7", self.workflow)
 
 
 if __name__ == "__main__":

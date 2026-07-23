@@ -287,7 +287,7 @@ def status_is_current_success(status: dict[str, Any], run_id: str) -> bool:
         and int(status.get("accepted_record_count", 0)) > 0
         and status.get("evidence_reconciliation_status") == "reconciled"
         and status.get("canonical_evidence_schema_version") == 1
-        and status.get("identity_lifecycle_schema_version") == 1
+        and status.get("identity_lifecycle_schema_version") == 2
         and status.get("identity_lifecycle_status") == "updated"
         and int(status.get("identity_observed_current_count", -1))
         == int(status.get("accepted_record_count", 0))
