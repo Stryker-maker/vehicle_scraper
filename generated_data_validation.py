@@ -5,11 +5,13 @@ import json
 from pathlib import Path
 from typing import Any
 
+from f350_buyer_validation import validate_buyer_artifacts
 from generated_data_publish import MANIFEST_PATH, PUBLICATION_SCHEMA_VERSION
 from storage_retention import validate_generated_data_paths, verify_retention
 from vehicle_registry import DEFAULT_REGISTRY_PATH, registry_entries
 
 GENERATED_DATA_VALIDATION_SCHEMA_VERSION = 1
+BUYER_INTELLIGENCE_PREFIX = "data/ford_f350/buyer_intelligence/"
 
 
 def _load_json(path: Path) -> dict[str, Any] | None:
@@ -102,6 +104,22 @@ def validate_generated_data_change(
             elif status.get("schema_version") != 8:
                 errors.append(f"source_status_schema_mismatch:{changed}")
 
+    buyer_validation: dict[str, Any] | None = None
+    if any(path.startswith(BUYER_INTELLIGENCE_PREFIX) for path in changed_paths):
+        try:
+            buyer_validation = validate_buyer_artifacts(root=root)
+        except (OSError, ValueError, json.JSONDecodeError) as exc:
+            errors.append(
+                "buyer_intelligence_validation_exception:"
+                f"{type(exc).__name__}:{exc}"
+            )
+        else:
+            if buyer_validation.get("validation_status") != "pass":
+                errors.extend(
+                    f"buyer_intelligence:{value}"
+                    for value in buyer_validation.get("validation_errors", [])
+                )
+
     retention = verify_retention(root=root, registry_path=registry_path)
     if retention.get("verification_status") != "pass":
         errors.extend(
@@ -115,6 +133,10 @@ def validate_generated_data_change(
         "changed_paths": changed_paths,
         "validation_errors": errors,
         "retention_verification_status": retention.get("verification_status"),
+        "buyer_intelligence_validation_status": (
+            None if buyer_validation is None else buyer_validation.get("validation_status")
+        ),
+        "buyer_intelligence_validation": buyer_validation,
     }
 
 

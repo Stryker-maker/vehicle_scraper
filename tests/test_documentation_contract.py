@@ -28,6 +28,7 @@ class DocumentationContractTests(unittest.TestCase):
             "AUDIT_06_IDENTITY_LIFECYCLE.md",
             "AUDIT_07_STORAGE_RETENTION.md",
             "AUDIT_08_CI_WORKFLOW_HARDENING.md",
+            "AUDIT_09_F350_BUYER_INTELLIGENCE.md",
         ]
         readme = self.read("README.md")
         for path in required:
@@ -58,6 +59,13 @@ class DocumentationContractTests(unittest.TestCase):
             "workflow_anomalies.py",
             "generated_data_publish.py",
             "generated_data_validation.py",
+            "f350_buyer_intelligence.py",
+            "f350_owner_overrides.json",
+            "investigation_latest.jsonl",
+            "seller_questions_latest.jsonl",
+            "asking-price quartiles",
+            "not an appraisal",
+            "Owner overrides never rewrite",
             "fetched_records = accepted_records + rejected_records + parse_failures",
             "autotrader_adapter_response_listing_objects",
             "kijiji_adapter_json_ld_listing_objects",
@@ -90,6 +98,18 @@ class DocumentationContractTests(unittest.TestCase):
             "Publication manifest schema version 1",
             "Generated-data validation schema version 1",
             "Dependency-lock schema version 1",
+            "F-350 buyer-intelligence schema version 1",
+            "source_text_reported_unverified",
+            "km_per_engine_hour",
+            "idle_hour_percent",
+            "price_band_comparable_count",
+            "projection_slope_cad_per_10000_km",
+            "projection_r_squared",
+            "computed_classification",
+            "owner_classification_override",
+            "seller_question_count",
+            "owner_usage_scenario_not_odometer_or_value_guarantee",
+            "asking_price_context_not_appraisal_or_future_value",
             "published_paths",
             "critical_anomaly_count",
         ):
@@ -104,7 +124,8 @@ class DocumentationContractTests(unittest.TestCase):
             "| 05 | Kijiji Collector Replacement | Complete and merged |",
             "| 06 | Identity, Deduplication and Listing Lifecycle | Complete and merged |",
             "| 07 | Storage, Retention and Repository Hygiene | Complete and merged |",
-            "| 08 | CI and Workflow Hardening | Implemented; deterministic validation and owner merge pending |",
+            "| 08 | CI and Workflow Hardening | Complete and merged |",
+            "| 09 | F-350 Buyer Intelligence | Implemented; deterministic and narrow validation pending |",
             "| 11 | Optional Search Reintroduction | Approved final stage |",
         ):
             self.assertIn(row, roadmap)
@@ -112,13 +133,22 @@ class DocumentationContractTests(unittest.TestCase):
     def test_limitations_have_unique_identifiers(self):
         register = self.read("docs/LIMITATIONS_REGISTER.md")
         identifiers = re.findall(r"LIM-\d{3}", register)
-        self.assertGreaterEqual(len(set(identifiers)), 43)
+        self.assertGreaterEqual(len(set(identifiers)), 47)
         table_identifiers = re.findall(r"\| (LIM-\d{3}) \|", register)
         self.assertEqual(len(table_identifiers), len(set(table_identifiers)))
-        for identifier in ("LIM-034", "LIM-039", "LIM-040", "LIM-043"):
+        for identifier in (
+            "LIM-034",
+            "LIM-039",
+            "LIM-040",
+            "LIM-043",
+            "LIM-044",
+            "LIM-045",
+            "LIM-046",
+            "LIM-047",
+        ):
             self.assertIn(identifier, register)
 
-    def test_legacy_merger_history_and_acknowledgement_are_not_supported(self):
+    def test_legacy_merger_history_tiers_and_acknowledgement_are_not_supported(self):
         merger = self.read("merge.py")
         collection = self.read(".github/workflows/scrape.yml")
         generated = self.read(".github/workflows/generated-data.yml")
@@ -129,8 +159,11 @@ class DocumentationContractTests(unittest.TestCase):
         self.assertIn("Acknowledgement-only generated-data workflow", legacy)
         self.assertIn("generated_data_validation.py", generated)
         self.assertNotIn("acknowledge-generated-data", collection + generated)
+        self.assertIn("trim_tiers.json", legacy)
+        self.assertIn("not a valid purchase hierarchy", legacy)
+        self.assertIn("does not use `trim_tier`", legacy)
 
-    def test_phase1_guidance_covers_current_workflows(self):
+    def test_phase1_guidance_covers_current_workflows_and_f350_investigation(self):
         guidance = self.read("PHASE1_MANUAL_REVIEW.md")
         for value in (
             "active interim operating guidance",
@@ -144,6 +177,13 @@ class DocumentationContractTests(unittest.TestCase):
             "publication_latest.json",
             "anomalies_latest.json",
             "Python `3.11.13`",
+            "investigation_latest.jsonl",
+            "seller_questions_latest.jsonl",
+            "km_per_engine_hour",
+            "price_band_comparable_count",
+            "computed_classification",
+            "owner classification override",
+            "true cold start",
         ):
             self.assertIn(value, guidance)
 
@@ -154,6 +194,7 @@ class DocumentationContractTests(unittest.TestCase):
             "AUDIT_06_IDENTITY_LIFECYCLE.md",
             "AUDIT_07_STORAGE_RETENTION.md",
             "AUDIT_08_CI_WORKFLOW_HARDENING.md",
+            "AUDIT_09_F350_BUYER_INTELLIGENCE.md",
         ):
             self.assertIn("Stop and revise before merge", self.read(path))
         audit05 = self.read("AUDIT_05_KIJIJI_ADAPTER.md")
@@ -168,6 +209,20 @@ class DocumentationContractTests(unittest.TestCase):
             "generated-data pull requests",
         ):
             self.assertIn(value, audit08)
+        audit09 = self.read("AUDIT_09_F350_BUYER_INTELLIGENCE.md").lower()
+        for value in (
+            "source_text_reported_unverified",
+            "kilometres_per_engine_hour",
+            "idle_hour_percent",
+            "observed quartiles",
+            "ordinary least-squares",
+            "not sale-price evidence",
+            "seller questions",
+            "classification override requires a reason",
+            "computed classification",
+            "does not emit `rank`, `score`",
+        ):
+            self.assertIn(value, audit09)
 
 
 if __name__ == "__main__":
