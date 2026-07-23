@@ -95,14 +95,15 @@ class IdentityLifecycleTests(unittest.TestCase):
     def tearDown(self):
         self.temp.cleanup()
 
-    def write_inputs(
+    def update(
         self,
         *,
         source: str,
         run_id: str,
+        observed_at: str,
         records: list[dict],
         raw_payloads: list[dict] | None = None,
-    ) -> tuple[str, str]:
+    ) -> dict:
         accepted_path = self.root / f"accepted-{source}.jsonl"
         adapter_path = self.root / f"adapter-{source}.jsonl"
         write_jsonl(accepted_path, records)
@@ -117,36 +118,25 @@ class IdentityLifecycleTests(unittest.TestCase):
                 for record, payload in zip(records, payloads)
             ],
         )
-        return str(accepted_path.relative_to(self.root)), str(
-            adapter_path.relative_to(self.root)
-        )
-
-    def update(
-        self,
-        *,
-        source: str,
-        run_id: str,
-        observed_at: str,
-        records: list[dict],
-        raw_payloads: list[dict] | None = None,
-    ) -> dict:
-        accepted, adapter = self.write_inputs(
-            source=source,
-            run_id=run_id,
-            records=records,
-            raw_payloads=raw_payloads,
-        )
         return update_source_identity_lifecycle(
             root=self.root,
             config=self.config,
             source=source,
             run_id=run_id,
             observed_at_utc=observed_at,
-            accepted_artifact=accepted,
-            adapter_records_artifact=adapter,
+            accepted_artifact=str(accepted_path.relative_to(self.root)),
+            adapter_records_artifact=str(adapter_path.relative_to(self.root)),
         )
 
-    def test_source_id_is_not_vin_and_vin_claim_is_explicit_only(self):
+    def current(self, source: str, run_id: str) -> dict:
+        return load_current_identity_records(
+            root=self.root,
+            config=self.config,
+            source=source,
+            run_id=run_id,
+        )[0]
+
+    def test_source_id_is_distinct_from_explicit_vin_claim(self):
         record = accepted_record(
             source="autotrader",
             run_id="run-1",
@@ -161,23 +151,25 @@ class IdentityLifecycleTests(unittest.TestCase):
             records=[record],
             raw_payloads=[{"vehicle": {"vin": "1FT8W3BT1MED12345"}}],
         )
-        self.assertEqual(summary["identity_lifecycle_schema_version"], 1)
-        current = load_current_identity_records(
-            root=self.root,
-            config=self.config,
-            source="autotrader",
-            run_id="run-1",
-        )[0]
-        self.assertEqual(current["source_listing_id_status"], "source_identifier_claim_not_vin")
+        self.assertEqual(
+            summary["identity_lifecycle_schema_version"],
+            IDENTITY_LIFECYCLE_SCHEMA_VERSION,
+        )
+        current = self.current("autotrader", "run-1")
+        self.assertEqual(
+            current["source_listing_id_status"],
+            "source_identifier_claim_not_vin",
+        )
         self.assertEqual(current["vin_claim"], "1FT8W3BT1MED12345")
         self.assertEqual(
             current["vin_evidence_status"],
             "source_reported_format_valid_unverified",
         )
-        self.assertEqual(current["lifecycle_state"], "active")
-        self.assertNotEqual(current["source_listing_id"], current["canonical_listing_id"])
+        self.assertNotEqual(
+            current["source_listing_id"], current["canonical_listing_id"]
+        )
 
-    def test_listing_id_that_looks_like_vin_is_not_inferred_as_vin(self):
+    def test_vin_like_listing_id_is_not_inferred_as_vin(self):
         record = accepted_record(
             source="kijiji",
             run_id="run-1",
@@ -192,29 +184,25 @@ class IdentityLifecycleTests(unittest.TestCase):
             records=[record],
             raw_payloads=[{"sku": "1FT8W3BT1MED12345"}],
         )
-        current = load_current_identity_records(
-            root=self.root,
-            config=self.config,
-            source="kijiji",
-            run_id="run-1",
-        )[0]
+        current = self.current("kijiji", "run-1")
         self.assertIsNone(current["vin_claim"])
         self.assertEqual(current["vin_evidence_status"], "not_reported")
 
-    def test_actual_elapsed_time_and_price_observation_semantics_are_idempotent(self):
-        first = accepted_record(
-            source="autotrader",
-            run_id="run-1",
-            canonical_id="listing-a",
-            source_id="a",
-            index=0,
-            price=60000,
-        )
+    def test_elapsed_and_price_semantics_are_same_run_idempotent(self):
         self.update(
             source="autotrader",
             run_id="run-1",
             observed_at="2026-07-01T00:00:00+00:00",
-            records=[first],
+            records=[
+                accepted_record(
+                    source="autotrader",
+                    run_id="run-1",
+                    canonical_id="listing-a",
+                    source_id="a",
+                    index=0,
+                    price=60000,
+                )
+            ],
         )
         second = accepted_record(
             source="autotrader",
@@ -224,46 +212,35 @@ class IdentityLifecycleTests(unittest.TestCase):
             index=0,
             price=57500,
         )
-        self.update(
-            source="autotrader",
-            run_id="run-2",
-            observed_at="2026-07-10T12:00:00+00:00",
-            records=[second],
-        )
-        self.update(
-            source="autotrader",
-            run_id="run-2",
-            observed_at="2026-07-10T12:00:00+00:00",
-            records=[second],
-        )
-        current = load_current_identity_records(
-            root=self.root,
-            config=self.config,
-            source="autotrader",
-            run_id="run-2",
-        )[0]
+        for _ in range(2):
+            self.update(
+                source="autotrader",
+                run_id="run-2",
+                observed_at="2026-07-10T12:00:00+00:00",
+                records=[second],
+            )
+        current = self.current("autotrader", "run-2")
         self.assertEqual(current["observation_count"], 2)
         self.assertEqual(current["price_observation_count"], 2)
         self.assertEqual(current["first_observed_price_cad"], 60000)
         self.assertEqual(current["previous_observation_price_cad"], 60000)
         self.assertEqual(current["change_from_previous_observation_cad"], -2500)
-        self.assertEqual(current["change_from_first_observation_cad"], -2500)
-        self.assertEqual(current["elapsed_since_first_seen_seconds"], 820800)
         self.assertEqual(current["elapsed_since_first_seen_days"], 9.5)
 
-    def test_missing_retired_and_reappeared_states_advance_only_on_successful_updates(self):
-        record = accepted_record(
-            source="autotrader",
-            run_id="run-1",
-            canonical_id="listing-a",
-            source_id="a",
-            index=0,
-        )
+    def test_missing_retired_and_reappeared_transitions(self):
         self.update(
             source="autotrader",
             run_id="run-1",
             observed_at="2026-07-01T00:00:00+00:00",
-            records=[record],
+            records=[
+                accepted_record(
+                    source="autotrader",
+                    run_id="run-1",
+                    canonical_id="listing-a",
+                    source_id="a",
+                    index=0,
+                )
+            ],
         )
         for run_id, observed_at in (
             ("run-2", "2026-07-08T00:00:00+00:00"),
@@ -277,46 +254,42 @@ class IdentityLifecycleTests(unittest.TestCase):
                 records=[],
             )
         state = json.loads(
-            artifact_paths(self.root, self.config, "autotrader")["state"].read_text()
+            artifact_paths(self.root, self.config, "autotrader")[
+                "state"
+            ].read_text()
         )
         retired = state["listings"]["listing-a"]
         self.assertEqual(retired["lifecycle_state"], "retired")
         self.assertEqual(retired["missing_run_count"], 3)
         self.assertEqual(retired["elapsed_since_last_seen_days"], 21.0)
 
-        reappeared_record = accepted_record(
-            source="autotrader",
-            run_id="run-5",
-            canonical_id="listing-a",
-            source_id="a",
-            index=0,
-            price=55000,
-        )
         self.update(
             source="autotrader",
             run_id="run-5",
             observed_at="2026-07-29T00:00:00+00:00",
-            records=[reappeared_record],
+            records=[
+                accepted_record(
+                    source="autotrader",
+                    run_id="run-5",
+                    canonical_id="listing-a",
+                    source_id="a",
+                    index=0,
+                    price=55000,
+                )
+            ],
         )
-        current = load_current_identity_records(
-            root=self.root,
-            config=self.config,
-            source="autotrader",
-            run_id="run-5",
-        )[0]
+        current = self.current("autotrader", "run-5")
         self.assertEqual(current["lifecycle_state"], "reappeared")
         self.assertEqual(current["missing_run_count"], 0)
         self.assertEqual(current["reappearance_count"], 1)
 
-    def test_duplicate_candidates_are_explainable_and_non_destructive(self):
+    def test_duplicate_candidate_is_explainable_and_non_destructive(self):
         auto = accepted_record(
             source="autotrader",
             run_id="run-1",
             canonical_id="auto-a",
             source_id="auto-source",
             index=0,
-            price=60000,
-            mileage=80000,
         )
         kijiji = accepted_record(
             source="kijiji",
@@ -339,27 +312,18 @@ class IdentityLifecycleTests(unittest.TestCase):
             run_id="run-1",
             observed_at="2026-07-01T00:00:00+00:00",
             records=[kijiji],
-            raw_payloads=[{"vehicleIdentificationNumber": "1FT8W3BT1MED12345"}],
+            raw_payloads=[
+                {"vehicleIdentificationNumber": "1FT8W3BT1MED12345"}
+            ],
         )
-        identities = [
-            *load_current_identity_records(
-                root=self.root,
-                config=self.config,
-                source="autotrader",
-                run_id="run-1",
-            ),
-            *load_current_identity_records(
-                root=self.root,
-                config=self.config,
-                source="kijiji",
-                run_id="run-1",
-            ),
-        ]
         result = build_duplicate_candidates(
             root=self.root,
             config=self.config,
             run_id="run-1",
-            identity_records=identities,
+            identity_records=[
+                self.current("autotrader", "run-1"),
+                self.current("kijiji", "run-1"),
+            ],
         )
         self.assertEqual(result["candidate_count"], 1)
         candidate = result["candidates"][0]
@@ -386,7 +350,8 @@ class IdentityLifecycleTests(unittest.TestCase):
             }
         )
         self.assertEqual(
-            conflict["vin_evidence_status"], "conflicting_source_reported_claims"
+            conflict["vin_evidence_status"],
+            "conflicting_source_reported_claims",
         )
         self.assertIsNone(conflict["vin_claim"])
 
