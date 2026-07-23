@@ -6,6 +6,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from identity_lifecycle import artifact_paths
 from kijiji_run import run_kijiji
 
 
@@ -32,13 +33,11 @@ class KijijiRuntimeTests(unittest.TestCase):
             },
             "sources": {
                 "autotrader": {
-                    "make": "test",
-                    "model": "vehicle",
+                    "make": "test", "model": "vehicle",
                     "search_locations": ["Calgary, AB"],
                 },
                 "kijiji": {
-                    "make": "Test",
-                    "model": "Vehicle",
+                    "make": "Test", "model": "Vehicle",
                     "search_locations": ["Edmonton, AB"],
                 },
             },
@@ -64,14 +63,14 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--run-id", required=True)
 parser.add_argument("--report-run-id")
 args = parser.parse_args()
-root = Path.cwd()
-key = "test_vehicle"
+root = Path.cwd(); key = "test_vehicle"
 row = {
-    "year": "2020", "make": "Test", "model": "Vehicle",
+    "year": "2020", "make": "Test", "model": "Vehicle", "trim": "Example",
     "price": "25000", "mileage": "100000", "fuel": "Gas",
-    "dealer_address": "", "dealer_address_evidence_status": "unknown",
-    "location": "", "location_evidence_status": "unknown",
-    "distance_km": "", "distance_method": "disabled_listing_location_not_routed",
+    "dealer": "Example Seller", "dealer_address": "",
+    "dealer_address_evidence_status": "unknown", "location": "",
+    "location_evidence_status": "unknown", "distance_km": "",
+    "distance_method": "disabled_listing_location_not_routed",
     "distance_evidence_status": "disabled_no_verified_route",
     "listing_id": "listing-1", "url_region_hint": "calgary",
     "url_region_status": "unverified_url_evidence",
@@ -82,10 +81,7 @@ row = {
 latest = root / "data" / key / "latest" / f"{key}_kijiji_latest.csv"
 latest.parent.mkdir(parents=True, exist_ok=True)
 with latest.open("w", encoding="utf-8", newline="") as handle:
-    writer = csv.DictWriter(handle, fieldnames=list(row))
-    writer.writeheader()
-    writer.writerow(row)
-
+    writer = csv.DictWriter(handle, fieldnames=list(row)); writer.writeheader(); writer.writerow(row)
 base = root / "data" / key / "adapter_evidence" / "kijiji"
 base.mkdir(parents=True, exist_ok=True)
 request_path = base / "requests_latest.jsonl"
@@ -102,14 +98,11 @@ request = {
 }
 record = {
     "adapter_schema_version": 1, "vehicle_key": key, "source": "kijiji",
-    "run_id": args.run_id, "source_record_index": 0,
-    "record_stage": "accepted",
-    "provenance": {
-        "query_location": "Edmonton, AB", "query_location_id": "1700202",
-        "query_page": 1, "request_url": row["request_url"],
-    },
-    "raw_payload": {"sku": "listing-1"}, "parsed_row": row,
-    "rejection_reasons": [], "parse_failure_reasons": [],
+    "run_id": args.run_id, "source_record_index": 0, "record_stage": "accepted",
+    "provenance": {"query_location": "Edmonton, AB", "query_location_id": "1700202",
+        "query_page": 1, "request_url": row["request_url"]},
+    "raw_payload": {"sku": "listing-1", "vin": "1FT8W3BT1MED12345"},
+    "parsed_row": row, "rejection_reasons": [], "parse_failure_reasons": [],
 }
 request_path.write_text(json.dumps(request) + "\n", encoding="utf-8")
 records_path.write_text(json.dumps(record) + "\n", encoding="utf-8")
@@ -127,11 +120,9 @@ report = {
     "listing_specific_location_records": 0, "unknown_location_records": 1,
     "reconciled": True,
     "reconciliation_equation": "fetched_records = accepted_records + rejected_records + parse_failures",
-    "artifacts": {
-        "requests": str(request_path.relative_to(root)),
+    "artifacts": {"requests": str(request_path.relative_to(root)),
         "records": str(records_path.relative_to(root)),
-        "reconciliation": str(reconciliation_path.relative_to(root)),
-    },
+        "reconciliation": str(reconciliation_path.relative_to(root))},
 }
 reconciliation_path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
 ''',
@@ -139,49 +130,48 @@ reconciliation_path.write_text(json.dumps(report, indent=2) + "\n", encoding="ut
         )
         return path
 
-    def test_direct_runtime_status_and_config_isolation(self):
+    def test_direct_runtime_status_identity_and_config_isolation(self):
         original = self.config_path.read_bytes()
-        script = self.fake_adapter()
         status = run_kijiji(
             root=self.root,
             config_path=self.config_path,
-            command=[sys.executable, str(script), "--run-id", "run-1"],
+            command=[sys.executable, str(self.fake_adapter()), "--run-id", "run-1"],
             run_id="run-1",
         )
         self.assertEqual(status["execution_status"], "success")
-        self.assertEqual(status["schema_version"], 7)
+        self.assertEqual(status["schema_version"], 8)
         self.assertEqual(status["source_adapter_schema_version"], 1)
+        self.assertEqual(status["identity_lifecycle_schema_version"], 1)
+        self.assertEqual(status["identity_lifecycle_status"], "updated")
+        self.assertEqual(status["identity_observed_current_count"], 1)
+        self.assertEqual(status["identity_new_listing_count"], 1)
         self.assertEqual(status["location_registry_version"], 1)
-        self.assertEqual(status["runtime_config_projection"], "direct_schema_v2")
-        self.assertTrue(status["pagination_complete"])
-        self.assertEqual(status["query_location_count"], 1)
-        self.assertEqual(status["fetched_record_count"], 1)
-        self.assertEqual(status["accepted_record_count"], 1)
         self.assertEqual(status["unknown_location_record_count"], 1)
         self.assertEqual(status["evidence_reconciliation_status"], "reconciled")
-        self.assertTrue(status["legacy_source_ranking_disabled"])
         self.assertTrue(status["distance_processing_disabled"])
+        self.assertFalse(status["legacy_price_history_active"])
         self.assertEqual(self.config_path.read_bytes(), original)
+        self.assertTrue(
+            artifact_paths(self.root, self.config, "kijiji")["state"].exists()
+        )
 
-    def test_adapter_run_mismatch_degrades_with_visible_reason(self):
-        script = self.fake_adapter()
+    def test_adapter_run_mismatch_degrades_without_identity_update(self):
         status = run_kijiji(
             root=self.root,
             config_path=self.config_path,
             command=[
-                sys.executable,
-                str(script),
-                "--run-id",
-                "run-1",
-                "--report-run-id",
-                "other-run",
+                sys.executable, str(self.fake_adapter()), "--run-id", "run-1",
+                "--report-run-id", "other-run",
             ],
             run_id="run-1",
         )
         self.assertEqual(status["execution_status"], "degraded")
         self.assertIn("canonical_evidence_failed", status["failure_reasons"])
         self.assertIn("run_id mismatch", status["canonical_evidence_error"])
-        self.assertEqual(status["evidence_reconciliation_status"], "not_reconciled")
+        self.assertEqual(status["identity_lifecycle_status"], "not_updated")
+        self.assertFalse(
+            artifact_paths(self.root, self.config, "kijiji")["state"].exists()
+        )
 
 
 if __name__ == "__main__":
