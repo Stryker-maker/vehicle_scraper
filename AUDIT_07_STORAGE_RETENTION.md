@@ -82,7 +82,7 @@ A full scheduled or explicitly approved manual run must:
 3. apply retention
 4. verify retention
 5. stage only `data/`
-6. reject staged paused-vehicle, ungoverned-vehicle, or non-data paths
+6. run `storage_retention.py validate-staged` to reject paused-vehicle, ungoverned-vehicle, or non-data paths
 7. print the staged diff summary
 8. commit only when a governed data diff exists
 
