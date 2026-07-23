@@ -35,14 +35,17 @@ def governed_config(vehicle_key: str) -> dict:
             "kijiji": {
                 "make": "Test",
                 "model": "Vehicle",
-                "search_locations": ["Red Deer, AB"],
+                "search_locations": ["Edmonton, AB"],
             },
         },
     }
 
 
 def registry_entry(
-    vehicle_key: str, config_path: str, *, enabled: bool = True,
+    vehicle_key: str,
+    config_path: str,
+    *,
+    enabled: bool = True,
     enabled_sources: list[str] | None = None,
 ) -> dict:
     entry = {
@@ -92,9 +95,14 @@ class VehicleRegistryTests(unittest.TestCase):
         self.assertEqual(len(runs), 10)
         self.assertEqual(
             runs[:2],
-            [("config_f350.json", "autotrader"), ("config_f350.json", "kijiji")],
+            [
+                ("config_f350.json", "autotrader"),
+                ("config_f350.json", "kijiji"),
+            ],
         )
-        self.assertFalse(any("f150" in path or "tundra" in path for path, _ in runs))
+        self.assertFalse(
+            any("f150" in path or "tundra" in path for path, _ in runs)
+        )
         for entry in entries:
             self.assertEqual(entry["cadence"], "weekly")
             self.assertEqual(entry["enabled_sources"], ["autotrader", "kijiji"])
@@ -132,10 +140,16 @@ class VehicleRegistryTests(unittest.TestCase):
     def test_registry_rejects_invalid_operational_metadata(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            (root / "config.json").write_text(json.dumps(governed_config("test_vehicle")))
+            (root / "config.json").write_text(
+                json.dumps(governed_config("test_vehicle"))
+            )
             entry = registry_entry("test_vehicle", "config.json")
             entry["cadence"] = "sometimes"
-            registry = {"schema_version": 2, "profile": "test", "vehicles": [entry]}
+            registry = {
+                "schema_version": 2,
+                "profile": "test",
+                "vehicles": [entry],
+            }
             (root / "vehicle_registry.json").write_text(json.dumps(registry))
             with self.assertRaisesRegex(ValueError, "invalid cadence"):
                 registry_entries(root=root)
@@ -143,13 +157,17 @@ class VehicleRegistryTests(unittest.TestCase):
     def test_registry_source_plan_honors_enabled_sources(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            (root / "config.json").write_text(json.dumps(governed_config("test_vehicle")))
+            (root / "config.json").write_text(
+                json.dumps(governed_config("test_vehicle"))
+            )
             registry = {
                 "schema_version": 2,
                 "profile": "test",
                 "vehicles": [
                     registry_entry(
-                        "test_vehicle", "config.json", enabled_sources=["autotrader"]
+                        "test_vehicle",
+                        "config.json",
+                        enabled_sources=["autotrader"],
                     )
                 ],
             }
@@ -162,10 +180,16 @@ class VehicleRegistryTests(unittest.TestCase):
     def test_paused_vehicle_requires_reason(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            (root / "config.json").write_text(json.dumps(governed_config("test_vehicle")))
+            (root / "config.json").write_text(
+                json.dumps(governed_config("test_vehicle"))
+            )
             entry = registry_entry("test_vehicle", "config.json", enabled=False)
             entry.pop("pause_reason")
-            registry = {"schema_version": 2, "profile": "test", "vehicles": [entry]}
+            registry = {
+                "schema_version": 2,
+                "profile": "test",
+                "vehicles": [entry],
+            }
             (root / "vehicle_registry.json").write_text(json.dumps(registry))
             with self.assertRaisesRegex(ValueError, "requires pause_reason"):
                 registry_entries(root=root)

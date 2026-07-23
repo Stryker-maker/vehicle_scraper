@@ -11,21 +11,24 @@ Read with:
 - `docs/AUDIT_ROADMAP.md`
 - `AUDIT_03_CANONICAL_EVIDENCE.md`
 - `AUDIT_04_AUTOTRADER_ADAPTER.md`
+- `AUDIT_05_KIJIJI_ADAPTER.md`
 
 ## Current controls
 
 - `vehicle_registry.json` schema v2 controls enabled vehicles and sources.
-- Approved `config_*.json` files use schema v2 and must remain unchanged.
+- Approved `config_*.json` files use schema v2 and must remain unchanged during execution.
 - AutoTrader reads schema v2 directly through `autotrader_run.py`.
-- Kijiji still receives a disposable compatibility projection until Audit 05.
+- Kijiji reads schema v2 directly through `kijiji_run.py`; no text patching or `exec` remains.
+- Kijiji query labels must resolve through location-registry version 1.
 - Source execution is bounded by a 75-minute timeout.
 - Fresh output must meet the minimum source schema.
 - Canonical schema v1 separates raw, normalized, accepted, rejected, and parse-failure artifacts.
 - Rejections and parse failures carry machine-readable reasons.
-- A healthy source requires reconciliation and at least one accepted record.
+- A healthy source requires reconciliation, complete configured pagination, and at least one accepted record.
 - Supported manual review is built only from accepted current-run evidence.
 - Manual review contains no `rank` or `score`.
-- Kijiji geography remains quarantined.
+- Kijiji query origin is provenance only; listing geography is listing-specific source evidence or unknown.
+- Kijiji distance remains disabled.
 - Historical merged files remain disabled.
 
 ## Evidence files
@@ -41,12 +44,12 @@ data/<vehicle>/evidence/<source>/parse_failures_latest.jsonl
 data/<vehicle>/evidence/<source>/reconciliation_latest.json
 ```
 
-AutoTrader also writes:
+Both direct adapters also write:
 
 ```text
-data/<vehicle>/adapter_evidence/autotrader/requests_latest.jsonl
-data/<vehicle>/adapter_evidence/autotrader/records_latest.jsonl
-data/<vehicle>/adapter_evidence/autotrader/reconciliation_latest.json
+data/<vehicle>/adapter_evidence/<source>/requests_latest.jsonl
+data/<vehicle>/adapter_evidence/<source>/records_latest.jsonl
+data/<vehicle>/adapter_evidence/<source>/reconciliation_latest.json
 ```
 
 The required equation is:
@@ -55,27 +58,23 @@ The required equation is:
 fetched_records = accepted_records + rejected_records + parse_failures
 ```
 
-AutoTrader `fetched_records` now means `autotrader_adapter_response_listing_objects`. Kijiji remains `legacy_collector_emitted_csv_rows` until Audit 05.
+AutoTrader `fetched_records` means `autotrader_adapter_response_listing_objects`.
 
-## AutoTrader evidence
+Kijiji `fetched_records` means `kijiji_adapter_json_ld_listing_objects`.
 
-AutoTrader preserves:
+## Source evidence
 
-- query location, page, offset, and request URL
-- request attempts and failed pages
-- duplicate source identities as explicit rejections
-- parse failures before accepted CSV output
-- criteria rejection reasons
-- complete/incomplete pagination state
-- routed, geodesic, or unavailable distance evidence
+AutoTrader preserves query location/page/offset/request URL, attempts, failed pages, duplicates, parse failures, criteria rejections, pagination state, and routed/geodesic/unavailable distance evidence. AutoTrader status uses schema version `6`.
 
-A geodesic estimate is never labelled as routed driving distance. AutoTrader source status uses schema version `6`, adapter schema version `1`, and `runtime_config_projection: direct_schema_v2`.
+Kijiji preserves validated query hub/page/request URL/item index, attempts, failed pages, duplicates, parse failures, criteria rejections, pagination state, URL region evidence, and listing-specific/unknown geography counts. Kijiji status uses schema version `7`.
+
+A geodesic estimate is never labelled as routed driving distance. A Kijiji query hub or URL region is never treated as listing location.
 
 ## What Phase 1 does not prove
 
-Phase 1 does not prove complete national marketplace coverage, independent truth of source claims, correct Kijiji geography, VIN/cross-source vehicle identity, lifecycle state, current availability, mechanical condition, fair value, or purchase suitability.
+Phase 1 does not prove complete marketplace coverage, independent truth of source claims, verified Kijiji geography, routable Kijiji distance, VIN/cross-source vehicle identity, lifecycle state, current availability, mechanical condition, fair value, or purchase suitability.
 
-For AutoTrader, complete pagination applies only to the configured queries and locations. For Kijiji, request/response completeness remains unproven.
+Complete pagination applies only to the configured queries and validated hubs. `source_reported_listing_specific_unverified` means the source supplied listing-specific geography; it does not independently verify that geography.
 
 A source or row labelled `clean` has only passed the current limited warning rules.
 
@@ -93,12 +92,12 @@ Ford F-150 and Toyota Tundra remain paused and must not receive current data upd
 
 A full run executes the complete registry plan, builds manual review and consolidated health, and may commit generated data. Scheduled runs commit automatically; manual full runs require `commit_generated_data=true`.
 
-A single-pair validation run executes one governed vehicle/source pair, validates that source status, uploads only its current status/evidence as an artifact, and makes no repository commit. Audit 04 uses:
+A single-pair validation run executes one governed vehicle/source pair, validates that source status, uploads only its current status/evidence as an artifact, and makes no repository commit. Audit 05 uses:
 
 ```text
 validation_mode: single_pair
 vehicle_key: ford_f350
-source: autotrader
+source: kijiji
 commit_generated_data: false
 ```
 
@@ -117,7 +116,7 @@ Use:
 - `data/run_status/latest.json`
 - `data/run_status/latest.md`
 
-Do not treat historical merged files, source IDs, accepted status, or Kijiji search origins as verified recommendations, VINs, or listing geography.
+Do not treat historical merged files, source IDs, accepted status, Kijiji query hubs, URL regions, or unverified listing geography as recommendations, VINs, or independently verified location.
 
 ## Manual review guidance
 
@@ -136,4 +135,4 @@ Confirm the live listing, actual location, price, mileage, identity, history, se
 - `normalized_record_ref`
 - `source_completed_at_utc`
 
-Phase 1 remains interim until both source adapters, identity/lifecycle, retention, workflow hardening, and purpose-specific outputs are completed.
+Phase 1 remains interim until identity/lifecycle, retention, workflow hardening, and purpose-specific outputs are completed.

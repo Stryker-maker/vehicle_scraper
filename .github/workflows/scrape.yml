@@ -65,6 +65,11 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Install collector test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests beautifulsoup4 geopy
+
       - name: Compile Python sources
         run: >-
           python -m py_compile
@@ -77,7 +82,11 @@ jobs:
           autotrader_adapter.py
           autotrader_canonical.py
           autotrader_run.py
-          phase1_kijiji_runner.py
+          kijiji_locations.py
+          kijiji_history.py
+          kijiji_adapter.py
+          kijiji_canonical.py
+          kijiji_run.py
           phase1_runtime.py
           phase1_reporting.py
           phase1_pipeline.py
@@ -89,7 +98,22 @@ jobs:
         run: python vehicle_registry.py validate --registry vehicle_registry.json
 
       - name: Run structured tests
-        run: python -m unittest discover -s tests -v
+        id: structured-tests
+        run: |
+          set +e
+          python -m unittest discover -s tests -v > "$RUNNER_TEMP/structured-tests.txt" 2>&1
+          status=$?
+          cat "$RUNNER_TEMP/structured-tests.txt"
+          exit "$status"
+
+      - name: Upload failed structured-test log
+        if: failure() && steps.structured-tests.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: structured-test-failure-${{ github.run_id }}
+          path: ${{ runner.temp }}/structured-tests.txt
+          if-no-files-found: error
+          retention-days: 2
 
   scrape:
     name: Collect vehicle data
@@ -181,11 +205,14 @@ jobs:
                   "${extra[@]}"
                 ;;
               kijiji)
-                python phase1_pipeline.py run-source \
-                  --source kijiji \
+                extra=()
+                if [[ "$VALIDATION_MODE" == "single_pair" ]]; then
+                  extra+=(--fail-on-unhealthy)
+                fi
+                python kijiji_run.py \
                   --config "$config" \
                   --timeout-seconds 4500 \
-                  -- python phase1_kijiji_runner.py --config "$config"
+                  "${extra[@]}"
                 ;;
               *)
                 echo "Unsupported source in collection plan: $source" >&2
@@ -216,24 +243,39 @@ jobs:
           run_id = os.environ["GITHUB_RUN_ID"]
           if not status_is_current_success(status, run_id):
               raise SystemExit(f"Single-pair source status is unhealthy: {status_path}")
-          if source == "autotrader":
-              requirements = {
-                  "schema_version": 6,
-                  "source_adapter_schema_version": 1,
-                  "runtime_config_projection": "direct_schema_v2",
-                  "pagination_complete": True,
-                  "legacy_source_ranking_disabled": True,
+          common = {
+              "source_adapter_schema_version": 1,
+              "runtime_config_projection": "direct_schema_v2",
+              "pagination_complete": True,
+              "legacy_source_ranking_disabled": True,
+          }
+          requirements = (
+              {**common, "schema_version": 6}
+              if source == "autotrader"
+              else {
+                  **common,
+                  "schema_version": 7,
+                  "location_registry_version": 1,
+                  "distance_processing_disabled": True,
+                  "distance_filter_disabled": True,
+                  "location_evidence_contract": (
+                      "listing_specific_source_geography_or_unknown_"
+                      "query_origin_never_location"
+                  ),
               }
-              mismatches = {
-                  key: {"expected": expected, "actual": status.get(key)}
-                  for key, expected in requirements.items()
-                  if status.get(key) != expected
-              }
-              if mismatches:
-                  raise SystemExit(
-                      "AutoTrader smoke contract failed: "
-                      + json.dumps(mismatches, sort_keys=True)
-                  )
+          )
+          mismatches = {
+              key: {"expected": expected, "actual": status.get(key)}
+              for key, expected in requirements.items()
+              if status.get(key) != expected
+          }
+          if mismatches:
+              raise SystemExit(
+                  f"{source} smoke contract failed: "
+                  + json.dumps(mismatches, sort_keys=True)
+              )
+          if int(status.get("query_location_count", 1)) < 1:
+              raise SystemExit("Kijiji smoke contract has no governed query locations")
           print(
               f"Single-pair validation passed: {config['vehicle_key']}:{source} | "
               f"fetched={status.get('fetched_record_count')} | "
@@ -287,8 +329,8 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          # Single-pair smoke runs never reach this step. Scheduled and explicitly approved
-          # full runs may commit active-scope generated data and evidence.
+          # Single-pair smoke runs never reach this step. Scheduled and explicitly
+          # approved full runs may commit active-scope generated data and evidence.
           git add data/
           git diff --staged --quiet || git commit -m "Weekly scrape $(date +'%Y-%m-%d')"
           git push
