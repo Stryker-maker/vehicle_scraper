@@ -3,91 +3,72 @@
 ## Status
 
 **Baseline date:** July 23, 2026  
-**Baseline source:** `main` through Audit 06, updated by Audit 07 implementation  
+**Baseline source:** `main` through Audit 07, updated by Audit 08 implementation  
 **Project state:** functional collection prototype under structured audit
 
 This document records current supported behaviour. Future-package behaviour is labelled separately.
 
 ## Higher purpose
 
-The repository is intended to become a continuously usable vehicle-market information tool that gathers listings, preserves trust evidence, supports repeatable comparison, assists human purchase investigation, and provides lightweight owned-vehicle monitoring without opaque recommendation logic.
-
-The primary use case remains an informed early-2020s diesel Ford F-350 purchase.
+The repository is intended to become a continuously usable vehicle-market information tool that gathers listings, preserves trust evidence, supports repeatable comparison, assists human purchase investigation, and provides lightweight owned-vehicle monitoring without opaque recommendation logic. The primary use case remains an informed early-2020s diesel Ford F-350 purchase.
 
 ## Current supported capability
 
 The repository can:
 
 - validate registry/config schema v2 and Kijiji hub registry v1
-- derive governed full or single-pair source plans
+- derive governed full or single-pair source plans and reject paused/invalid selections
 - run both sources directly from approved config without mutation
-- preserve request/page, raw object, rejection, parse-failure, and canonical evidence
+- preserve request/page, raw object, rejection, parse-failure, canonical, identity, and lifecycle evidence
 - enforce `fetched = accepted + rejected + parse failures`
-- preserve truthful AutoTrader distance methods
-- keep Kijiji query origin separate from listing-specific-or-unknown geography
-- update source-scoped identity/lifecycle only after a healthy source run
-- restore prior lifecycle artifacts when a source run is unhealthy
+- preserve truthful AutoTrader distance methods and listing-specific-or-unknown Kijiji geography
 - keep source IDs distinct from explicit unverified VIN claims
-- produce explainable, non-destructive cross-source duplicate candidates
-- track actual first/last-seen time, elapsed days, missing/reappeared/retired state, and price observations
-- compact price observations while preserving truthful total and price summaries
-- prune old/excess retired tombstones with bounded deletion evidence
-- build unranked manual review from accepted canonical plus current identity evidence
-- fail closed when canonical or identity evidence is missing, corrupt, wrong-run, or count-mismatched
-- retain bounded timestamped source/manual-review archives
-- remove active-vehicle legacy history/merged CSVs with SHA-256 deletion evidence
-- enforce managed file/data-size limits and staged generated-data path governance
+- produce explainable non-destructive duplicate candidates
+- track actual elapsed lifecycle and compact price observations without losing aggregate semantics
+- bound timestamped archives, retired tombstones, deletion ledgers, managed file size, and total active data
+- build fail-closed unranked manual review
+- run reusable deterministic CI with exact Python and action dependencies
+- separate code CI, generated-data validation, and collection triggers
+- produce baseline-aware anomaly evidence
+- publish generated data only after health, anomaly, retention, staged-path, manifest, whitespace, and remote-ref gates
 - perform narrow validation without committing generated data
 
-## Supported source boundaries
+## Supported schema boundaries
 
-AutoTrader fetched scope:
+- Registry/config: schema v2
+- Kijiji location registry: v1
+- Source adapters: schema v1
+- Canonical evidence: schema v1
+- Identity/lifecycle: schema v2
+- Source status: schema v8
+- Consolidated health: schema v6
+- Storage retention: schema v1
+- Workflow control: schema v1
+- Anomaly evidence: schema v1
+- Publication manifest: schema v1
+- Generated-data validation: schema v1
 
-```text
-autotrader_adapter_response_listing_objects
-```
+AutoTrader fetched scope is `autotrader_adapter_response_listing_objects`. Kijiji fetched scope is `kijiji_adapter_json_ld_listing_objects`. Neither proves complete marketplace coverage.
 
-Kijiji fetched scope:
+## Reproducible workflow boundary
 
-```text
-kijiji_adapter_json_ld_listing_objects
-```
+The active workflow set is:
 
-Both adapter schemas are version `1`. Canonical evidence schema is version `1`. Both source statuses use schema version `8`.
+| Workflow | Trigger | Responsibility |
+|---|---|---|
+| `.github/workflows/ci.yml` | non-data PR, manual, reusable call | exact dependency validation, compilation, governance checks, deterministic/hostile tests |
+| `.github/workflows/generated-data.yml` | `data/**` PR | generated-data path, retention, status, health, anomaly, and manifest validation |
+| `.github/workflows/scrape.yml` | Monday schedule or manual dispatch | governed collection, reporting, anomalies, retention, and optional publication |
 
-## Identity and lifecycle boundary
+Collection has no pull-request trigger and cannot start before reusable CI succeeds. Python is fixed to `3.11.13`; `requirements.lock` uses exact pins; GitHub-owned actions use exact commit SHAs.
 
-Identity/lifecycle schema version `2` provides:
+Scheduled full collection runs Monday at 08:00 UTC. Manual inputs explicitly control scope, active vehicle, source, publication, anomaly policy, and operator note.
 
-- `source_identifier_claim_not_vin`
-- explicit VIN evidence statuses
-- strict and loose comparison fingerprints
-- lifecycle states `active`, `missing`, `reappeared`, and `retired`
-- actual UTC timestamps and elapsed seconds/days
-- unique-run observation and price semantics
-- latest thirteen raw price observations plus compacted count/digest and aggregate values
-- at most 500 retired listings/source and a 365-day retired tombstone age limit
-- bounded cumulative state-deletion evidence
-- high/medium/low duplicate candidates with visible reasons
-- `candidate_only_not_merged`
+## Generated-data publication boundary
 
-Retirement requires at least three consecutive successful-run misses and fourteen elapsed days. Missing/retired are operational inferences, not sold claims. Failed runs do not advance lifecycle.
+A full run snapshots the prior health report, produces current health and anomaly evidence, and cannot publish until source health, anomaly policy, retention, governed staged paths, publication-manifest agreement, whitespace, and remote-ref stability pass.
 
-## Storage-retention boundary
-
-Storage-retention schema version `1` provides:
-
-- eight timestamped source CSVs per active vehicle/source
-- four timestamped manual-review CSVs per active vehicle
-- preservation of all current `*_latest` evidence
-- active-vehicle removal of `price_history_*.json` and historical merged CSVs
-- deletion records with path, reason, category, size, SHA-256, run, and time
-- cumulative bounded deletion ledgers retaining the latest 100 detailed records
-- 50 MiB maximum individual managed file
-- 500 MiB maximum active managed data
-- staged-path rejection for non-data, paused-vehicle, and ungoverned-vehicle changes
-
-Audit 07 does not modify paused F-150/Tundra data. Compaction/deletion digests prove accounting order but do not reconstruct removed raw content.
+`data/run_status/publication_latest.json` records the run ID, source SHA, workflow event, target ref, exact published paths, and change-type counts. A changed remote branch blocks the push. Data-only pull requests receive actual validation rather than acknowledgement-only success.
 
 ## Current unsupported capability
 
@@ -99,9 +80,9 @@ The repository still cannot reliably establish:
 - verified sold/removal state
 - independent truth of source claims or Kijiji geography
 - routable Kijiji distance
-- F-350 engine/idle hours, cab/box/SRW/DRW, and verified history enrichment
-- fully locked/reproducible dependency and workflow architecture
+- F-350 engine/idle hours, cab, box, SRW/DRW, or verified history enrichment
 - purpose-specific decision outputs
+- three consecutive scheduled active-profile runs without manual repair
 
 ## Governing vehicle scope
 
@@ -115,117 +96,61 @@ The repository still cannot reliably establish:
 | Ford F-150 | Paused | Optional curiosity | 4 | AutoTrader, Kijiji when enabled |
 | Toyota Tundra | Paused | Optional curiosity | 4 | AutoTrader, Kijiji when enabled |
 
-F-150 and Tundra must not receive current data, evidence, lifecycle, review, status, or retention deletion updates until their owner-approved package.
+F-150 and Tundra must not receive current collection, evidence, lifecycle, review, retention deletion, or publication updates until Audit 11.
 
-## Component inventory
-
-### Authoritative and active
+## Active component inventory
 
 | Component | Present responsibility |
 |---|---|
 | `vehicle_registry.json` / `vehicle_registry.py` | operational scope and source plan |
 | `config_*.json` / `vehicle_config.py` | criteria, source settings, hub validation |
-| `.github/workflows/scrape.yml` | tests, collection, health/retention gates, governed data commits |
-| `autotrader_*.py` | direct AutoTrader adapter/runtime/evidence |
-| `kijiji_*.py` | direct Kijiji adapter/runtime/evidence |
-| `canonical_evidence.py` | canonical IDs, stages, reasons, reconciliation |
+| `.github/workflows/ci.yml` | reusable deterministic code CI |
+| `.github/workflows/generated-data.yml` | generated-data PR validation |
+| `.github/workflows/scrape.yml` | schedule/manual collection and publication |
+| `requirements.lock` / `dependency_lock.py` | exact Python environment |
+| `workflow_control.py` | registry-governed inputs, plan, smoke validation |
+| `workflow_anomalies.py` | baseline-aware anomaly evidence and policy |
+| `generated_data_publish.py` | publication manifest and staged verification |
+| `generated_data_validation.py` | data-PR integrity validation |
+| `autotrader_*.py` / `kijiji_*.py` | direct source adapters/runtimes/evidence |
+| `canonical_evidence.py` | canonical stages and reconciliation |
 | `identity_lifecycle.py` | VIN evidence, fingerprints, lifecycle, compact history, duplicate candidates |
 | `storage_retention.py` | archive bounds, deletion evidence, size and staged-path gates |
 | `phase1_reporting.py` | identity-backed manual review and health schema v6 |
-| `phase1_common.py` | supported fields, paths, warnings, health predicate |
-| `tests/` | fixtures, hostile tests, governance/workflow contracts |
+| `tests/` | fixtures, hostile tests, governance and workflow contracts |
 
-### Compatibility / historical
+## Compatibility and historical components
 
-| Component | Rule |
-|---|---|
-| `scraper.py` / `kijiji_scraper.py` | compatibility aliases into governed runtimes |
-| `phase1_runtime.py` | retained legacy utilities/tests; not active direct-source path |
-| `legacy_runtime_config()` | historical compatibility projection; unused by active adapters |
-| `price_history_*.json` | historical only; removed for active vehicles by retention |
-| `merge.py` | disabled historical merger/ranker |
-| `data/<vehicle>/merged/*.csv` | historical only; removed for active vehicles by retention |
-| `trim_tiers.json` | descriptive legacy configuration, not recommendation authority |
-
-## Supported data products
-
-Manual review:
-
-```text
-data/<vehicle>/manual_review/<vehicle>_manual_review_latest.csv
-```
-
-Adapter and canonical evidence:
-
-```text
-data/<vehicle>/adapter_evidence/<source>/...
-data/<vehicle>/evidence/<source>/...
-```
-
-Identity/lifecycle evidence:
-
-```text
-data/<vehicle>/identity_lifecycle/<source>/state_latest.json
-data/<vehicle>/identity_lifecycle/<source>/current_latest.jsonl
-data/<vehicle>/identity_lifecycle/<source>/events_latest.jsonl
-data/<vehicle>/identity_lifecycle/<source>/summary_latest.json
-data/<vehicle>/identity_lifecycle/duplicate_candidates_latest.jsonl
-```
-
-Retention evidence:
-
-```text
-data/<vehicle>/retention/latest.json
-data/<vehicle>/retention/deletion_ledger.json
-data/retention/latest.json
-```
-
-Run health:
-
-```text
-data/<vehicle>/run_status/<source>_latest.json
-data/run_status/latest.json
-data/run_status/latest.md
-```
+`scraper.py` and `kijiji_scraper.py` are compatibility aliases. `phase1_runtime.py` and `legacy_runtime_config()` are historical utilities. `price_history_*.json`, historical merged CSVs, and `merge.py` are not supported output or recommendation authority. `trim_tiers.json` remains descriptive legacy configuration pending Audit 09.
 
 ## Present operational guarantees
 
 Current code/tests are intended to guarantee:
 
-1. one registry controls enabled vehicles and sources
-2. invalid registry/config/hub state fails before collection
-3. direct adapters cannot mutate approved config
-4. paused vehicles and disabled sources are omitted
-5. runtime is bounded and stale output is not current
-6. every returned listing object is accepted, rejected, or a parse failure
-7. canonical counts reconcile with machine-readable reasons
-8. AutoTrader distance evidence is explicit
-9. Kijiji query origin never becomes listing geography
-10. identity updates only after healthy source execution
-11. unhealthy source runs restore prior identity state
-12. source listing IDs are never VINs
-13. explicit VIN claims remain unverified evidence
-14. duplicate candidates never merge or remove records
-15. lifecycle time is actual elapsed time, not fake weeks
-16. supported review requires current matching identity evidence
-17. price-observation and retired-state growth is bounded
-18. timestamped archives and active managed data are bounded
-19. every retention deletion has digest-backed evidence
-20. generated-data commits reject paused, ungoverned, and non-data paths
-21. supported output has no ranking authority
-22. narrow validation makes no generated-data commit
+1. registry/config authority and paused scope are preserved
+2. pull requests cannot execute collectors
+3. collection cannot bypass deterministic CI preflight
+4. Python and GitHub Action dependencies are exact
+5. source objects reconcile with explicit evidence
+6. source-ID/VIN, geography, distance, duplicate, and lifecycle boundaries remain truthful
+7. current manual review fails closed on evidence mismatch
+8. state and repository growth are bounded with deletion evidence
+9. anomaly evidence remains visible and critical policy is enforceable
+10. generated publication paths match a run-tied manifest
+11. non-data, paused, ungoverned, malformed, whitespace-invalid, or stale-ref publication fails
+12. supported output has no purchase-ranking authority
 
 ## Explicit non-guarantees
 
-`SUCCESS`, `active`, `retired`, format-valid VIN, high-confidence duplicate candidate, or retention verification does not guarantee marketplace completeness, independently verified identity, sold status, availability, condition, fair value, purchase suitability, or raw reconstruction of compacted/deleted evidence.
+`SUCCESS`, `active`, `retired`, format-valid VIN, high-confidence duplicate candidate, clean anomaly report, retention pass, or publication manifest does not guarantee marketplace completeness, independently verified identity, sold status, availability, condition, fair value, or purchase suitability.
 
 ## Last operating evidence
 
 - Audit 03 full validation: 10/10 source pairs healthy, 381 accepted collector-emitted rows, no stale rows.
 - Audit 04 narrow AutoTrader run `29954526608`: 174 objects = 22 accepted + 150 rejected + 2 parse failures.
 - Audit 05 narrow Kijiji run `29968206030`: 441 objects = 11 accepted + 430 rejected + 0 parse failures; query geography stayed separate.
-- Audit 06 exact-head deterministic/hostile validation passed 66 tests; no external scrape was required because source-fetch behaviour did not change.
-- Audit 07 similarly changes deterministic storage/state and commit-gate behaviour rather than source requests; external collection is not required unless integration evidence contradicts tests.
+- Audits 06 and 07 passed exact-head deterministic/hostile validation because they changed state/storage semantics rather than source requests.
+- Audit 08 changes workflow orchestration and publication controls; its final acceptance requires exact-head CI and a narrow manual collection validation of the new collection workflow.
 
 ## Repository change authority
 
