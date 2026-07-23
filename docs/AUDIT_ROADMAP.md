@@ -17,13 +17,13 @@ This document preserves the owner-approved sequence for turning the repository i
 | 06 | Identity, Deduplication and Listing Lifecycle | Complete and merged |
 | 07 | Storage, Retention and Repository Hygiene | Complete and merged |
 | 08 | CI and Workflow Hardening | Complete and merged |
-| 09 | F-350 Buyer Intelligence | Implemented; deterministic and narrow validation pending |
-| 10 | Secondary Purpose Outputs | Approved, not started |
+| 09 | F-350 Buyer Intelligence | Complete and merged |
+| 10 | Secondary Purpose Outputs | Implemented; deterministic and narrow validation pending |
 | 11 | Optional Search Reintroduction | Approved final stage |
 
 ## Global completion criteria
 
-The audit is not complete until optional vehicles remain paused unless approved; registry/config authority is preserved; both adapters reconcile returned objects; parsing and exclusions are visible; Kijiji geography is listing-specific or unknown; source listing IDs remain distinct from VIN; identity/lifecycle semantics are explainable; generated-data and state growth are bounded; dependencies and workflows are reproducible; documentation matches code; F-350 evidence supports investigation; and three consecutive scheduled active-profile runs complete without manual repair.
+The audit is not complete until optional vehicles remain paused unless approved; registry/config authority is preserved; both adapters reconcile returned objects; parsing and exclusions are visible; Kijiji geography is listing-specific or unknown; source listing IDs remain distinct from VIN; identity/lifecycle semantics are explainable; generated-data and state growth are bounded; dependencies and workflows are reproducible; documentation matches code; F-350 evidence supports investigation; secondary purposes have profile-specific outputs; and three consecutive scheduled active-profile runs complete without manual repair.
 
 ---
 
@@ -105,56 +105,48 @@ Delivered eight source snapshots per active source, four manual-review snapshots
 
 **Status:** complete and merged through PR #10.
 
-Delivered:
-
-- exact Python dependency lock and Python runtime version
-- exact GitHub Action commit SHAs
-- reusable code CI separated from collection
-- separate generated-data pull-request validation
-- schedule/manual-only collection with reusable CI preflight
-- explicit full/single-pair, active-vehicle, source, publication, anomaly-policy, and operator-note inputs
-- baseline-aware anomaly schema v1
-- generated-data publication manifest schema v1
-- health, anomaly, retention, staged-path, manifest, whitespace, and remote-ref gates before push
-- short-lived failure evidence and bounded full-run diagnostics
-
-Pull requests cannot execute collectors; collection cannot start before reusable CI passes; paused vehicles fail plan/publication validation; critical anomalies remain visible and enforceable; publication manifests match staged governed paths; and generated-data pull requests receive integrity validation rather than acknowledgement-only success.
+Delivered exact dependency/action pins, reusable code CI, generated-data validation, schedule/manual-only collection, explicit inputs, baseline-aware anomalies, publication manifests, and pre-push health/anomaly/retention/path/manifest/whitespace/ref gates.
 
 ---
 
 ## Audit 09 — F-350 Buyer Intelligence
 
-**Status:** implemented on `ai/audit-09-f350-buyer-intelligence`; exact-head deterministic validation, narrow live validation, owner review, and merge remain pending.
+**Status:** complete and merged through PR #11.
 
-### Scope
+Delivered current-run canonical/raw/identity joins, unverified F-350 configuration/history/use claims, explicit missing evidence, guarded engine-hour context, asking-price bands and regression context, five-year mileage scenarios, explainable non-ranked classifications, seller questions, owner notes/overrides, rich buyer artifacts, generated-data validation integration, and narrow live validation.
 
-- current-run fail-closed joins across source status, accepted canonical evidence, raw adapter payloads, and identity/lifecycle evidence
-- source-text evidence for trim, packages, cab, box, SRW/DRW, drivetrain, engine hours, idle hours, service-history claims, accident/title claims, and prior-use claims
-- explicit evidence completeness and missing-investigation fields
-- guarded kilometres-per-engine-hour and idle-hour percentage context
-- observed asking-price quartiles with visible cohort basis and comparable count
-- transparent mileage-adjusted asking-price regression with sample count, slope, intercept, and `r_squared`
-- five-year owner mileage scenario based on 5,000–8,000 km per year
-- explainable non-ranked classifications and visible reasons
-- evidence-gap and concern-driven seller questions
-- owner dispositions, notes, tags, and reasoned classification overrides that preserve source and computed evidence
-- rich JSONL, review CSV, seller-question JSONL, and JSON/Markdown market-summary artifacts
-
-### Acceptance
-
-Missing values must remain unknown; every extracted value must retain unverified evidence status; stale or disconnected artifacts must fail closed; price bands and projections must expose samples and interpretation limits; seller questions must trace to gaps or concerns; owner overrides must remain separate from computed evidence; supported outputs must contain no rank or score; and F-350 workflow integration must not create secondary-purpose or optional-vehicle outputs.
-
-### Non-scope
-
-No source-query/parser, vehicle-criteria, canonical-equation, identity/lifecycle-threshold, retention-limit, independent VIN/history/configuration verification, external history-report purchase, repair-cost prediction, RAM/Forester/Odyssey/Carnival purpose output, sold-state, or F-150/Tundra change.
+Asking-price math remains non-appraisal context. Owner overrides preserve computed and source evidence.
 
 ---
 
 ## Audit 10 — Secondary Purpose Outputs
 
-**Status:** approved, not started.
+**Status:** implemented on `ai/audit-10-purpose-outputs`; exact-head deterministic validation, narrow live validation, owner review, and merge remain pending.
 
-Create purpose-specific RAM/Forester market monitoring and Odyssey/Carnival candidate outputs without inheriting F-350 assumptions.
+### Scope
+
+- governed non-generated `purpose_inputs.json` schema v1
+- RAM 3500 and Subaru Forester `owned_vehicle_value` outputs
+- Honda Odyssey and Kia Carnival `family_friend_purchase` outputs
+- current source-status/canonical/raw/identity joins
+- observed asking-price and mileage distributions
+- explainable subject comparability
+- actual previous-observation price-change context
+- explicit owner input gaps
+- explicit family-friend requirement gaps
+- practical candidate classifications with visible reasons
+- seller questions for identity, history, service, seating, family-use features, availability, and inspection
+- profile-specific JSONL, CSV, JSON, and Markdown artifacts
+- fail-closed artifact validation and generated-data integration
+- narrow and full workflow integration
+
+### Acceptance
+
+RAM historical claims must remain unverified and historical mileage must not become current odometer; incomplete Forester inputs must prevent personalized subject context; incomplete family-friend preferences must prevent personalized shortlisting; observed lower asking bands must not be represented as verified faster-sale ranges; multi-run direction must use actual previous observations; candidates and comparables must have visible reasons; artifacts must match current source evidence; outputs must contain no rank or score; and F-350/optional-vehicle behavior must remain unchanged.
+
+### Non-scope
+
+No source-query/parser, vehicle-criteria, registry enablement, canonical-equation, identity/lifecycle-threshold, retention-limit, F-350 buyer logic, independent appraisal, transaction-price collection, time-to-sale model, repair-cost prediction, sold-state, external history-report purchase, or F-150/Tundra change.
 
 ---
 
