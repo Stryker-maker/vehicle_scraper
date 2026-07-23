@@ -1,104 +1,119 @@
+import re
 import unittest
 from pathlib import Path
 
 
 class WorkflowContractTests(unittest.TestCase):
     def setUp(self):
-        self.workflow = (
-            Path(__file__).resolve().parents[1]
-            / ".github" / "workflows" / "scrape.yml"
-        ).read_text(encoding="utf-8")
-
-    def test_generated_data_commits_receive_success_acknowledgement(self):
-        self.assertNotIn("paths-ignore", self.workflow)
-        self.assertIn("acknowledge-generated-data", self.workflow)
-        self.assertIn("github.actor == 'github-actions[bot]'", self.workflow)
-        self.assertIn("--timeout-seconds 4500", self.workflow)
-
-    def test_full_workflow_keeps_authoritative_registry_plan(self):
-        self.assertIn("vehicle_registry.py validate", self.workflow)
-        self.assertIn("vehicle_registry.py active-runs", self.workflow)
-        self.assertGreaterEqual(
-            self.workflow.count("--registry vehicle_registry.json"), 7
+        root = Path(__file__).resolve().parents[1]
+        workflows = root / ".github" / "workflows"
+        self.ci = (workflows / "ci.yml").read_text(encoding="utf-8")
+        self.collection = (workflows / "scrape.yml").read_text(encoding="utf-8")
+        self.generated = (workflows / "generated-data.yml").read_text(
+            encoding="utf-8"
         )
-        self.assertIn("build-manual-review", self.workflow)
-        self.assertIn("report-health", self.workflow)
-        self.assertNotIn("vehicle_registry.py active-configs", self.workflow)
-        self.assertNotIn("config_f150.json", self.workflow)
-        self.assertNotIn("config_tundra.json", self.workflow)
-        self.assertNotIn("config_f350.json", self.workflow)
+        self.all_workflows = "\n".join((self.ci, self.collection, self.generated))
 
-    def test_single_pair_validation_is_narrow_non_committing_and_identity_aware(self):
+    def test_ci_is_reusable_and_pull_request_collection_is_impossible(self):
+        self.assertIn("workflow_call:", self.ci)
+        self.assertIn("pull_request:", self.ci)
+        self.assertIn("paths-ignore:", self.ci)
+        self.assertIn("- 'data/**'", self.ci)
+        self.assertNotIn("pull_request:", self.collection)
+        self.assertIn("uses: ./.github/workflows/ci.yml", self.collection)
+        self.assertIn("needs: preflight", self.collection)
+
+    def test_generated_data_has_a_separate_pull_request_validator(self):
+        self.assertIn("name: Generated Data Validation", self.generated)
+        self.assertIn("pull_request:", self.generated)
+        self.assertIn("- 'data/**'", self.generated)
+        self.assertIn("generated_data_validation.py", self.generated)
+        self.assertIn("generated-data-paths.txt", self.generated)
+        self.assertNotIn("acknowledge-generated-data", self.all_workflows)
+
+    def test_actions_are_pinned_to_exact_commit_shas(self):
+        action_lines = [
+            line.strip()
+            for line in self.all_workflows.splitlines()
+            if "uses: actions/" in line
+        ]
+        self.assertGreaterEqual(len(action_lines), 8)
+        for line in action_lines:
+            self.assertRegex(line, r"uses: actions/[a-z-]+@[0-9a-f]{40}$")
+            self.assertNotRegex(line, r"@v\d")
+
+    def test_locked_python_environment_is_used_everywhere(self):
+        for workflow in (self.ci, self.collection, self.generated):
+            self.assertIn("python-version: '3.11.13'", workflow)
+            self.assertIn("requirements.lock", workflow)
+            self.assertIn("pip==25.1.1", workflow)
+            self.assertIn("dependency_lock.py", workflow)
+        self.assertIn("python -m pip check", self.all_workflows)
+
+    def test_manual_inputs_and_schedule_are_explicit(self):
+        self.assertIn("cron: '0 8 * * 1'", self.collection)
         for value in (
-            "validation_mode", "single_pair", "vehicle_key",
-            "commit_generated_data", "--fail-on-unhealthy",
-            "actions/upload-artifact@v4", "smoke-artifact",
-            "Single-pair validation passed", "identity_lifecycle_status",
-            "identity_observed_current_count", "identity_lifecycle",
-            '"identity_lifecycle_schema_version": 2',
+            "collection_scope:",
+            "options: [full, single_pair]",
+            "vehicle_key:",
+            "options: [ford_f350, ram_3500, subaru_forester, honda_odyssey, kia_carnival]",
+            "source:",
+            "options: [autotrader, kijiji]",
+            "publish_generated_data:",
+            "anomaly_policy:",
+            "options: [enforce, report_only]",
+            "operator_note:",
         ):
-            self.assertIn(value, self.workflow)
-        self.assertIn(
-            "github.event_name == 'schedule' || "
-            "(inputs.validation_mode == 'full' && inputs.commit_generated_data)",
-            self.workflow,
-        )
+            self.assertIn(value, self.collection)
+        self.assertNotIn("config_f150.json", self.collection)
+        self.assertNotIn("config_tundra.json", self.collection)
 
-    def test_both_sources_use_direct_adapter_runtime(self):
+    def test_governed_plan_and_single_pair_remain_narrow(self):
         for value in (
-            "autotrader_run.py", "autotrader_adapter.py",
-            "autotrader_canonical.py", "autotrader_distance.py",
-            "autotrader_history.py", "kijiji_run.py", "kijiji_adapter.py",
-            "kijiji_canonical.py", "kijiji_locations.py", "kijiji_history.py",
-            "identity_lifecycle.py", "direct_schema_v2", "pagination_complete",
-            "location_registry_version", "query_origin_never_location",
+            "workflow_control.py plan",
+            "workflow_control.py validate-single-pair",
+            "--fail-on-unhealthy",
+            "smoke-artifact",
+            "retention-days: 7",
+            "autotrader_run.py",
+            "kijiji_run.py",
         ):
-            self.assertIn(value, self.workflow)
-        self.assertNotIn("phase1_kijiji_runner.py", self.workflow)
-        self.assertNotIn("python scraper.py --config", self.workflow)
-        self.assertNotIn("python kijiji_scraper.py --config", self.workflow)
+            self.assertIn(value, self.collection)
+        self.assertIn("if: env.COLLECTION_SCOPE == 'single_pair'", self.collection)
+        self.assertIn("if: env.COLLECTION_SCOPE == 'full'", self.collection)
 
-    def test_pull_requests_do_not_run_collectors(self):
-        self.assertIn("if: github.event_name != 'pull_request'", self.workflow)
+    def test_health_anomaly_retention_and_publish_gates_are_ordered(self):
         for value in (
-            "vehicle_config.py",
-            "canonical_evidence.py",
-            "identity_lifecycle.py",
-            "storage_retention.py",
-        ):
-            self.assertIn(value, self.workflow)
-        self.assertIn(
-            "Validate governed vehicle registry and configurations", self.workflow
-        )
-
-    def test_full_run_retention_and_health_gate_precede_commit(self):
-        for value in (
-            "Fail visibly before any generated-data commit",
+            "phase1_pipeline.py check-health",
+            "workflow_anomalies.py build",
+            "workflow_anomalies.py check",
             "storage_retention.py apply",
             "storage_retention.py verify",
             "storage_retention.py validate-staged",
-            "git diff --cached --stat",
-            "git add data/",
+            "generated_data_publish.py prepare",
+            "generated_data_publish.py verify-staged",
+            "git diff --cached --check",
+            "remote_sha=$(git rev-parse",
         ):
-            self.assertIn(value, self.workflow)
-        health_index = self.workflow.index(
-            "Fail visibly before any generated-data commit"
-        )
-        retention_index = self.workflow.index(
-            "Apply and verify bounded storage retention"
-        )
-        commit_index = self.workflow.index(
-            "Commit and push governed generated data"
-        )
-        self.assertLess(health_index, retention_index)
-        self.assertLess(retention_index, commit_index)
+            self.assertIn(value, self.collection)
+        health = self.collection.index("Fail visibly on unhealthy source evidence")
+        anomaly = self.collection.index("Enforce critical anomaly policy")
+        retention = self.collection.index("Apply and verify bounded storage retention")
+        publish = self.collection.index("Commit and push governed generated data")
+        self.assertLess(health, anomaly)
+        self.assertLess(anomaly, retention)
+        self.assertLess(retention, publish)
 
-    def test_single_pair_never_reaches_retention_or_commit_steps(self):
-        self.assertIn(
-            "if: github.event_name == 'schedule' || inputs.validation_mode == 'full'",
-            self.workflow,
-        )
-        self.assertIn("retention-days: 7", self.workflow)
+    def test_failure_artifacts_are_short_lived_and_pinned(self):
+        self.assertIn("structured-test-failure-${{ github.run_id }}", self.ci)
+        self.assertIn("generated-data-validation-failure-${{ github.run_id }}", self.generated)
+        self.assertIn("full-run-diagnostics-${{ github.run_id }}", self.collection)
+        self.assertIn("retention-days: 3", self.ci)
+        self.assertIn("retention-days: 3", self.generated)
+        self.assertIn("retention-days: 14", self.collection)
+
+    def test_no_unpinned_action_reference_remains(self):
+        self.assertEqual(re.findall(r"uses:\s+actions/[^@\s]+@v\d+", self.all_workflows), [])
 
 
 if __name__ == "__main__":
