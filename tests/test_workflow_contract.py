@@ -82,7 +82,24 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("if: env.COLLECTION_SCOPE == 'single_pair'", self.collection)
         self.assertIn("if: env.COLLECTION_SCOPE == 'full'", self.collection)
 
-    def test_health_anomaly_retention_and_publish_gates_are_ordered(self):
+    def test_f350_buyer_intelligence_is_ci_compiled_and_scope_gated(self):
+        self.assertIn("f350_buyer_intelligence.py", self.ci)
+        for value in (
+            "Build F-350 buyer intelligence for narrow validation",
+            "if: env.COLLECTION_SCOPE == 'single_pair' && env.VEHICLE_KEY == 'ford_f350'",
+            "--source \"$SELECTED_SOURCE\"",
+            "--overrides f350_owner_overrides.json",
+            "data/$VEHICLE_KEY/buyer_intelligence",
+            "Build transparent F-350 buyer intelligence",
+            "data/ford_f350/buyer_intelligence/market_summary_latest.md",
+        ):
+            self.assertIn(value, self.collection)
+        self.assertNotIn("ram_3500/buyer_intelligence", self.collection)
+        self.assertNotIn("subaru_forester/buyer_intelligence", self.collection)
+        self.assertNotIn("honda_odyssey/buyer_intelligence", self.collection)
+        self.assertNotIn("kia_carnival/buyer_intelligence", self.collection)
+
+    def test_health_buyer_anomaly_retention_and_publish_gates_are_ordered(self):
         for value in (
             "phase1_pipeline.py check-health",
             "workflow_anomalies.py build",
@@ -97,10 +114,12 @@ class WorkflowContractTests(unittest.TestCase):
         ):
             self.assertIn(value, self.collection)
         health = self.collection.index("Fail visibly on unhealthy source evidence")
+        buyer = self.collection.index("Build transparent F-350 buyer intelligence")
         anomaly = self.collection.index("Enforce critical anomaly policy")
         retention = self.collection.index("Apply and verify bounded storage retention")
         publish = self.collection.index("Commit and push governed generated data")
-        self.assertLess(health, anomaly)
+        self.assertLess(health, buyer)
+        self.assertLess(buyer, anomaly)
         self.assertLess(anomaly, retention)
         self.assertLess(retention, publish)
 
