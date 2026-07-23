@@ -2,25 +2,28 @@
 
 ## Purpose
 
-This document describes governed workflow orchestration, source execution, evidence boundaries, identity/lifecycle state, F-350 buyer intelligence, bounded retention, supported reporting, and authority limits.
+This document describes governed workflow orchestration, source execution, canonical and identity evidence, F-350 buyer intelligence, secondary-purpose outputs, bounded retention, publication, and authority limits.
 
 ## 1. Operational authority
 
-`vehicle_registry.json` schema v2 controls enabled/paused state, source plan, purpose, priority, cadence metadata, and analysis profile. Each schema-v2 `config_*.json` controls criteria, origin, and source-specific queries. Kijiji labels must resolve through location-registry version 1.
+`vehicle_registry.json` schema v2 controls enabled/paused state, source plan, purpose, priority, cadence metadata, and analysis profile. Each schema-v2 `config_*.json` controls acceptance criteria, origin, and source-specific queries. Kijiji labels must resolve through location-registry version 1.
 
-`f350_owner_overrides.json` schema v1 controls only explicit owner annotations and classification overrides for current F-350 listing claims. It is not collection, canonical, identity, or market-calculation authority.
+Non-generated analysis inputs are separate from collection authority:
+
+- `f350_owner_overrides.json` schema v1 controls only F-350 owner annotations and reasoned classification overrides.
+- `purpose_inputs.json` schema v1 records owner-reported subject context or family-friend preferences for the four secondary vehicles.
+
+Neither file can change source claims, canonical evidence, identity state, source acceptance, or query plans.
 
 ## 2. Reproducible workflow architecture
 
 The repository separates three workflows:
 
-- `.github/workflows/ci.yml` — reusable deterministic code CI for non-data pull-request changes, manual CI, and collection preflight
-- `.github/workflows/generated-data.yml` — pull-request validation for `data/**` changes
-- `.github/workflows/scrape.yml` — scheduled/manual collection only; it has no pull-request trigger
+- `.github/workflows/ci.yml` — reusable deterministic code CI
+- `.github/workflows/generated-data.yml` — validation for `data/**` pull-request changes
+- `.github/workflows/scrape.yml` — scheduled/manual collection only; no pull-request trigger
 
-All use Ubuntu 24.04, Python `3.11.13`, exact `requirements.lock` pins, and GitHub-owned actions pinned to exact commit SHAs.
-
-Collection cannot start until reusable CI succeeds. Scheduled collection runs Mondays at 08:00 UTC. Manual collection exposes explicit full/single-pair, active vehicle, source, publication, anomaly-policy, and operator-note inputs. `workflow_control.py` resolves every plan from the registry and rejects paused, unknown, disabled, empty, or malformed plans.
+All use Ubuntu 24.04, Python `3.11.13`, exact `requirements.lock` pins, and GitHub-owned actions pinned to exact commit SHAs. Collection cannot begin before reusable CI succeeds.
 
 ## 3. Direct source paths
 
@@ -30,7 +33,7 @@ Collection cannot start until reusable CI succeeds. Scheduled collection runs Mo
 schema-v2 config
   → autotrader_run.py
     → autotrader_adapter.py
-      → requests/pages/response listing objects
+      → request/page/response listing objects
       → adapter evidence schema v1
     → autotrader_canonical.py
       → canonical evidence schema v1
@@ -38,7 +41,7 @@ schema-v2 config
     → source status schema v8
 ```
 
-Fetched scope is `autotrader_adapter_response_listing_objects`. Request attempts, pagination, duplicates, exclusions, parse failures, and route/geodesic/unavailable distance evidence remain explicit.
+Fetched scope is `autotrader_adapter_response_listing_objects`.
 
 ### Kijiji
 
@@ -47,7 +50,7 @@ schema-v2 config
   → kijiji_run.py
     → kijiji_locations.py validated hub plan
     → kijiji_adapter.py
-      → requests/pages/JSON-LD listing objects
+      → request/page/JSON-LD listing objects
       → adapter evidence schema v1
     → kijiji_canonical.py
       → canonical evidence schema v1
@@ -55,7 +58,7 @@ schema-v2 config
     → source status schema v8
 ```
 
-Fetched scope is `kijiji_adapter_json_ld_listing_objects`. Query hub is provenance only, URL region is separate unverified evidence, listing geography is listing-specific source evidence or unknown, and distance remains disabled.
+Fetched scope is `kijiji_adapter_json_ld_listing_objects`. Query hub remains provenance only. Listing geography is listing-specific unverified evidence or unknown; Kijiji distance remains disabled.
 
 ## 4. Canonical boundary
 
@@ -63,109 +66,114 @@ Fetched scope is `kijiji_adapter_json_ld_listing_objects`. Query hub is provenan
 fetched_records = accepted_records + rejected_records + parse_failures
 ```
 
-Canonical schema v1 preserves raw payload evidence, null-safe normalized values, stable source-scoped canonical listing IDs, run observations, field evidence statuses, explicit reasons, and reconciliation. Canonical IDs identify listing claims within a source; they are not VINs or physical-vehicle identity.
+Canonical schema v1 preserves raw payload evidence, null-safe normalized values, stable source-scoped canonical IDs, observations, field evidence statuses, reasons, and reconciliation. Canonical IDs identify source listing claims; they are not VINs or physical-vehicle identity.
 
 ## 5. Identity and lifecycle boundary
 
-`identity_lifecycle.py` runs only after collection, freshness, schema, pagination, canonical reconciliation, accepted/output agreement, and config isolation pass.
+`identity_lifecycle.py` runs only after freshness, schema, pagination, reconciliation, accepted/output agreement, and config isolation pass.
 
-Per-source state records source-ID/VIN separation, explicit VIN evidence, explainable fingerprints, `active`/`missing`/`reappeared`/`retired` states, exact timestamps, elapsed time, and run-idempotent price observations. Retirement requires three consecutive successful-source-run misses and fourteen elapsed days. These states are operational inferences, not source-confirmed sold/removal claims.
+Identity schema v2 records source-ID/VIN separation, explicit VIN evidence, explainable fingerprints, `active`/`missing`/`reappeared`/`retired` states, actual timestamps, and run-idempotent price observations. Any unhealthy source result restores prior identity state.
 
-Before each source run, identity artifacts are snapshotted. Any unhealthy result restores prior state; failed runs cannot advance missing or retirement counters.
+Retirement requires three consecutive successful-source-run misses and fourteen elapsed days. Price state preserves aggregate history plus the newest thirteen raw observations and compaction evidence. Retired state remains an operational inference, not a sold claim.
 
-Identity schema v2 keeps total price-observation counts, first/previous/current/minimum/maximum price, the newest thirteen raw observations, and count/digest evidence for compacted observations. It keeps at most 500 retired listings per source and no retired tombstone more than 365 days past last successful observation. Digests prove accounting order, not raw reconstructability.
+## 6. General reporting
 
-## 6. Duplicate candidates and general reporting
-
-After current source identities are available, `phase1_reporting.py` builds high/medium/low cross-source duplicate candidates with visible reasons and `candidate_only_not_merged`. Candidates never delete, suppress, rewrite, or merge canonical records.
-
-Manual review joins accepted canonical records one-to-one with current identity records. Wrong-run, wrong-schema, missing, corrupt, or count-mismatched identity evidence excludes the source and triggers the fail-closed guard. Source status remains schema v8; consolidated health remains schema v6.
+`phase1_reporting.py` builds non-destructive duplicate candidates and the general manual-review CSV. Manual review joins accepted canonical records one-to-one with current identity records and fails closed on missing, wrong-run, wrong-schema, corrupt, or count-mismatched evidence.
 
 ## 7. F-350 buyer-intelligence boundary
 
-`f350_buyer_intelligence.py` schema v1 runs only for `ford_f350`. It joins four current-run evidence layers by source and canonical listing ID:
+`f350_buyer_intelligence.py` schema v1 runs only for `ford_f350` and joins:
 
 ```text
-source status schema v8
-  + accepted canonical record schema v1
-  + preserved adapter raw payload schema v1
-  + identity/lifecycle current record schema v2
-  → F-350 buyer-intelligence schema v1
+source status v8
+  + accepted canonical evidence v1
+  + matching raw adapter payload v1
+  + current identity/lifecycle v2
+  + F-350 owner override input v1
+  → F-350 buyer intelligence v1
 ```
 
-It fails closed when source status is stale/unhealthy/wrong-schema; accepted, identity, or status counts disagree; adapter record indices are discontinuous; raw payload evidence is missing; or a canonical listing lacks matching identity evidence.
+It may expose unverified source-text claims for truck configuration, engine/idle hours, service/history, and prior use. It provides visible asking-price quartiles, descriptive mileage regression, seller questions, and explainable non-ranked classifications. Missing evidence stays unknown. Asking-price calculations are not appraisal, transaction-price, or future-value authority.
 
-Historical manual-review CSVs, legacy `rank`, legacy `score`, legacy week fields, and `trim_tiers.json` are not buyer-intelligence inputs or purchase authority.
+## 8. Secondary-purpose boundary
 
-### Source-text configuration and history evidence
-
-The buyer layer examines canonical normalized fields together with the matching raw adapter payload. It may expose unverified source-text claims for trim, STX/FX4/Tremor packages, cab, box, SRW/DRW, drivetrain, total engine hours, idle hours, service-record availability, accident/title language, and prior-use language.
-
-Every extracted value retains an explicit unverified evidence status. Missing values remain unknown and become visible investigation gaps. Package claims are separate from trim claims.
-
-### Derived usage context
-
-When inputs exist and are internally possible:
+`purpose_outputs.py` schema v1 runs only for the four active secondary vehicles and joins:
 
 ```text
-kilometres_per_engine_hour = mileage_km / engine_hours
-idle_hour_percent = idle_hours / engine_hours × 100
+source status v8
+  + accepted canonical evidence v1
+  + matching raw adapter payload v1
+  + current identity/lifecycle v2
+  + purpose_inputs.json v1
+  → secondary-purpose output v1
 ```
 
-These are usage-context calculations, not condition proof. Idle hours greater than engine hours produce a warning and no percentage.
+`purpose_output_validation.py` schema v1 re-joins the underlying current evidence and fails on disconnected IDs, wrong sources, missing references, count drift, wrong profile, malformed artifacts, or any `rank`/`score` key or column.
 
-### Observed asking-price context
+### Owned-vehicle value profile
 
-Price cohorts are selected transparently: exact year, then year ±1, then 2020–2023, then all current accepted F-350 claims. A cohort needs at least three listings before quartile position is reported.
+`ram_3500` and `subaru_forester` use `owned_vehicle_value`.
 
-Buyer intelligence exposes first quartile, median, third quartile, comparable count, cohort basis, interquartile position, and difference from median. Values are current asking-price claims from configured queries, not sale prices, appraisal, or complete-market evidence.
+Output includes current accepted comparables, subject-profile comparability, asking-price/mileage distributions, actual previous-observation price changes, and missing owner inputs.
 
-When at least five valid price/mileage pairs with adequate mileage variation exist, ordinary least squares provides a mileage-adjusted asking-price context. It exposes sample count, slope per 10,000 km, intercept, projected asking-price context, and `r_squared`. It is descriptive context, not future value or causal depreciation evidence.
+Comparability labels are:
 
-### Owner-use scenario, classifications, and questions
+- `close_subject_comparable`
+- `partial_subject_comparable`
+- `broad_market_context`
+- `subject_profile_incomplete`
+- `insufficient_configuration_evidence`
 
-The owner-use scenario adds 25,000–40,000 km over five years, based on expected annual use of 5,000–8,000 km. It is not an odometer or value guarantee.
+The RAM profile preserves historical owner-reported context as unverified. Its historic “just over 400,000 km” statement never becomes current odometer. The Forester remains broad market context until the owner supplies its subject profile.
 
-Computed labels are explainable and non-ranked: `investigate_priority`, `investigate_with_evidence_gaps`, `investigate_price_concern`, `concern_review`, `market_context_only`, or `insufficient_evidence`. Every label carries visible reasons.
-
-Seller questions are generated from missing evidence or visible concerns and remain separate from source evidence and owner answers.
-
-### Owner override boundary
-
-Owner fields are `owner_disposition`, `owner_note`, `owner_tags`, `classification_override`, and `override_reason`. Classification override values are limited and require a reason. Output preserves both computed and overridden classifications. Owner input cannot rewrite source claims, canonical evidence, identity, calculations, or computed reasons.
-
-## 8. Storage-retention boundary
-
-After full-run source health and F-350 buyer-intelligence construction pass, `storage_retention.py` schema v1 preserves current `*_latest` evidence, keeps eight timestamped source CSVs per active vehicle/source and four manual-review CSVs per active vehicle, removes older matching archives and active-vehicle legacy history/merged CSVs, records SHA-256 deletion evidence, bounds detailed deletion history to 100 records, enforces 50 MiB per managed file and 500 MiB total active managed data, and leaves paused F-150/Tundra data untouched.
-
-Buyer-intelligence outputs are current `*_latest` artifacts; they do not create timestamped archives in Audit 09.
-
-## 9. Anomaly boundary
-
-Before collection, the workflow snapshots the previously committed health report. `workflow_anomalies.py` schema v1 compares current health with that baseline and writes:
+The Q1-to-median lower asking band carries:
 
 ```text
-data/run_status/anomalies_latest.json
-data/run_status/anomalies_latest.md
+lower_observed_asking_band_not_verified_faster_sale_range_or_sale_probability
 ```
 
-It reports unhealthy sources, severe accepted/fetched collapses, material count shifts, elevated parse-failure rates, quality-warning growth, and pagination/request anomalies when those metrics are present. Missing or same-run baselines remain explicit. Critical anomalies block scheduled publication and manual publication under `enforce`; `report_only` is an explicit manual policy and never hides the report.
+Price-change direction uses only listings with real previous price observations. Fewer than three produces `insufficient_multi_run_history`. It is asking-price change context, not market-value trend or sale evidence.
 
-## 10. Generated-data publication boundary
+### Family-friend purchase profile
 
-A publishable full run must pass reusable CI, registry/config validation, governed planning, source/canonical/identity processing, reporting, source health, F-350 buyer-intelligence construction, anomaly policy, retention, staged-path validation, publication-manifest verification, whitespace checks, and a remote-ref unchanged check.
+`honda_odyssey` and `kia_carnival` use `family_friend_purchase`.
 
-`generated_data_publish.py` schema v1 writes:
+The output may expose unverified seating, cargo-feature, sliding-door, service, accident/title, seller, location, and distance claims already supported by source evidence. It generates practical seller questions and candidate labels:
 
-```text
-data/run_status/publication_latest.json
-```
+- `candidate_pending_requirements`
+- `candidate_outside_stated_preferences`
+- `candidate_with_evidence_gaps`
+- `candidate_for_manual_review`
 
-The manifest records run ID, source commit SHA, workflow event, target ref, exact published paths, and change-type counts. It must exactly match the staged governed data paths. No data change means no commit; a changed remote ref blocks the push.
+Incomplete friend preferences force `candidate_pending_requirements`; operational config acceptance is not treated as personalized shortlisting. No truck-specific engine-hour, cab, box, SRW/DRW, towing, diesel, or modification assumption is imported.
 
-Generated-data pull requests run `.github/workflows/generated-data.yml`, which validates active/paused scope, retention, changed source status, health, anomaly evidence, and publication-manifest membership. Data-only changes do not receive acknowledgement-only success.
+## 9. Workflow placement
 
-## 11. Current data flow
+A secondary-vehicle `single_pair` run builds and validates only the selected vehicle's purpose output and places it in the seven-day smoke artifact. It never publishes generated data.
+
+After a full run's consolidated source-health gate passes, the workflow builds and validates:
+
+1. F-350 buyer intelligence
+2. RAM 3500 value monitoring
+3. Subaru Forester value monitoring
+4. Honda Odyssey candidate review
+5. Kia Carnival candidate review
+
+Only then may anomaly enforcement, retention, staging, manifest verification, and publication continue.
+
+## 10. Storage and retention boundary
+
+`storage_retention.py` schema v1 bounds active generated data and preserves current `*_latest` purpose artifacts. Audit 10 does not create timestamped purpose-output archives. Paused F-150/Tundra data remains outside collection and deletion scope.
+
+## 11. Anomaly and publication boundaries
+
+`workflow_anomalies.py` schema v1 compares current health with the previous committed baseline. Anomaly evidence is a workflow diagnostic, not a vehicle-quality conclusion.
+
+A publishable full run must pass reusable CI, registry/config validation, governed planning, source/canonical/identity processing, general reporting, source health, F-350 and secondary-purpose validation, anomaly policy, retention, staged-path validation, publication-manifest verification, whitespace checks, and remote-ref stability.
+
+Generated-data pull requests revalidate any changed F-350 or secondary-purpose artifact against current underlying evidence.
+
+## 12. Current data flow
 
 ```mermaid
 flowchart TD
@@ -179,80 +187,61 @@ flowchart TD
     CE --> IL[Identity/lifecycle v2]
     IL --> MR[Manual review]
     MR --> H[Health v6]
-    H --> A[Anomaly evidence v1]
     H --> BI[F-350 buyer intelligence v1]
+    H --> PO[Secondary-purpose outputs v1]
     CE --> BI
+    CE --> PO
     IL --> BI
+    IL --> PO
     AR --> BI
     KR --> BI
+    AR --> PO
+    KR --> PO
     O[f350_owner_overrides.json v1] --> BI
-    A --> HG[Health/anomaly gates]
-    BI --> HG
-    HG --> SR[Retention v1]
+    PI[purpose_inputs.json v1] --> PO
+    H --> A[Anomaly evidence v1]
+    BI --> G[Analysis gates]
+    PO --> G
+    A --> G
+    G --> SR[Retention v1]
     SR --> S[Stage governed data]
     S --> PM[Publication manifest v1]
     PM --> V[Manifest/path/whitespace/remote-ref verification]
     V --> GC[Governed generated-data commit]
 ```
 
-## 12. Artifact map
+## 13. Artifact map
 
-Adapter and canonical evidence:
-
-```text
-data/<vehicle>/adapter_evidence/<source>/...
-data/<vehicle>/evidence/<source>/...
-```
-
-Identity/lifecycle evidence:
+F-350:
 
 ```text
-data/<vehicle>/identity_lifecycle/<source>/state_latest.json
-data/<vehicle>/identity_lifecycle/<source>/current_latest.jsonl
-data/<vehicle>/identity_lifecycle/<source>/events_latest.jsonl
-data/<vehicle>/identity_lifecycle/<source>/summary_latest.json
-data/<vehicle>/identity_lifecycle/duplicate_candidates_latest.jsonl
+data/ford_f350/buyer_intelligence/...
 ```
 
-F-350 buyer intelligence:
+Owned vehicle value:
 
 ```text
-data/ford_f350/buyer_intelligence/investigation_latest.jsonl
-data/ford_f350/buyer_intelligence/investigation_latest.csv
-data/ford_f350/buyer_intelligence/seller_questions_latest.jsonl
-data/ford_f350/buyer_intelligence/market_summary_latest.json
-data/ford_f350/buyer_intelligence/market_summary_latest.md
+data/<ram_3500|subaru_forester>/purpose_output/value_monitor/...
 ```
 
-Retention, review, health, anomaly, and publication evidence:
+Family candidate review:
 
 ```text
-data/<vehicle>/retention/latest.json
-data/<vehicle>/retention/deletion_ledger.json
-data/<vehicle>/manual_review/<vehicle>_manual_review_latest.csv
-data/<vehicle>/run_status/<source>_latest.json
-data/retention/latest.json
-data/run_status/latest.json
-data/run_status/latest.md
-data/run_status/anomalies_latest.json
-data/run_status/anomalies_latest.md
-data/run_status/publication_latest.json
+data/<honda_odyssey|kia_carnival>/purpose_output/family_candidate/...
 ```
 
-## 13. Authority boundaries
+Common evidence remains under adapter, canonical, identity, manual-review, run-status, retention, anomaly, and publication paths.
 
-- Registry controls operational scope; configs control criteria/query plans.
-- Source values, VIN claims, extracted configuration claims, and normalized values are evidence, not verified truth.
-- Query provenance is not listing geography.
-- Accepted means eligible for manual review, not recommended.
-- Duplicate candidate means compare manually, not merge.
-- Missing/retired do not prove sold status.
-- Price quartiles describe asking claims, not sale price or appraisal.
-- Regression describes a current sample relationship, not future value.
-- Evidence completeness describes presence, not truth or condition.
-- Seller questions are prompts, not defect findings.
-- Owner overrides change review disposition/classification only; they do not change evidence.
-- Anomaly policy governs workflow publication, not vehicle quality or purchase suitability.
-- Publication manifests prove staged-path accounting, not marketplace truth.
-- Audit 09 owns F-350 buyer intelligence; Audit 10 owns other purpose outputs; Audit 11 owns optional vehicles.
+## 14. Authority boundaries
+
+- Registry controls operational scope; configs control criteria and query plans.
+- Non-generated owner/friend inputs control only purpose interpretation.
+- Source and extracted values remain unverified evidence.
+- Accepted means eligible for review, not recommended.
+- Asking-price distributions are not appraisal or transaction-price evidence.
+- A lower asking band is not a verified faster-sale range.
+- Missing owner/friend inputs cannot be inferred.
+- Comparability and candidate labels are explainable review categories, not ranks or scores.
+- Seller questions are prompts, not defect findings or verified answers.
+- Audit 09 owns F-350 buyer intelligence; Audit 10 owns secondary purposes; Audit 11 owns optional vehicles.
 - The owner retains purchase, merge, and roadmap authority.
