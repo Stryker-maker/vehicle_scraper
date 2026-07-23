@@ -23,7 +23,10 @@ class DependencyLockTests(unittest.TestCase):
     def test_ranges_and_duplicate_packages_fail(self):
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / "requirements.lock"
-            path.write_text("requests>=2\nrequests==2.34.2\n", encoding="utf-8")
+            path.write_text(
+                "requests>=2\nrequests==2.34.2\nrequests==2.34.2\n",
+                encoding="utf-8",
+            )
             report = validate_lock(path)
             self.assertEqual(report["validation_status"], "fail")
             self.assertTrue(
