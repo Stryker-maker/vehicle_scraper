@@ -5,6 +5,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from canonical_evidence import write_jsonl
 from f350_buyer_intelligence import CSV_FIELDS, artifact_paths
@@ -131,17 +132,25 @@ class BuyerArtifactValidationTests(unittest.TestCase):
         )
         return paths
 
+    def validate_fixture(self, root: Path):
+        return validate_buyer_artifacts(
+            root=root,
+            config_path=Path("config_f350.json"),
+            run_id="run-1",
+            expected_sources=["autotrader"],
+            validate_source_evidence=False,
+        )
+
     def test_complete_artifact_set_passes(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             self.create_artifacts(root)
-            report = validate_buyer_artifacts(
-                root=root,
-                config_path=Path("config_f350.json"),
-                run_id="run-1",
-                expected_sources=["autotrader"],
-            )
+            report = self.validate_fixture(root)
             self.assertEqual(report["validation_status"], "pass")
+            self.assertEqual(
+                report["source_evidence_validation_status"],
+                "skipped_by_test_contract",
+            )
             self.assertEqual(report["listing_count"], 1)
             self.assertEqual(report["question_record_count"], 1)
             self.assertEqual(report["csv_row_count"], 1)
@@ -157,12 +166,7 @@ class BuyerArtifactValidationTests(unittest.TestCase):
             paths["investigation_jsonl"].write_text(
                 json.dumps(listing) + "\n", encoding="utf-8"
             )
-            report = validate_buyer_artifacts(
-                root=root,
-                config_path=Path("config_f350.json"),
-                run_id="run-1",
-                expected_sources=["autotrader"],
-            )
+            report = self.validate_fixture(root)
             self.assertEqual(report["validation_status"], "fail")
             self.assertTrue(
                 any(
@@ -182,14 +186,36 @@ class BuyerArtifactValidationTests(unittest.TestCase):
             paths["market_summary_json"].write_text(
                 json.dumps(summary), encoding="utf-8"
             )
-            report = validate_buyer_artifacts(
-                root=root,
-                config_path=Path("config_f350.json"),
-                run_id="run-1",
-                expected_sources=["autotrader"],
-            )
+            report = self.validate_fixture(root)
             self.assertIn(
                 "summary_listing_count_mismatch", report["validation_errors"]
+            )
+
+    def test_current_source_evidence_mismatch_fails(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.create_artifacts(root)
+            with mock.patch(
+                "f350_buyer_validation.load_source_bundles",
+                return_value=[],
+            ):
+                report = validate_buyer_artifacts(
+                    root=root,
+                    config_path=Path("config_f350.json"),
+                    run_id="run-1",
+                    expected_sources=["autotrader"],
+                )
+            self.assertEqual(report["validation_status"], "fail")
+            self.assertEqual(
+                report["source_evidence_validation_status"], "fail"
+            )
+            self.assertTrue(
+                any(
+                    error.startswith(
+                        "buyer_listings_not_in_current_source_evidence"
+                    )
+                    for error in report["validation_errors"]
+                )
             )
 
 
