@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document defines current supported fields and their evidence limits. Source claims, normalized values, identity fingerprints, VIN claims, lifecycle inferences, compacted history, duplicate candidates, deletion evidence, rejections, and parse failures are distinct.
+This document defines current supported fields and their evidence limits. Source claims, normalized values, identity fingerprints, VIN claims, lifecycle inferences, compacted history, duplicate candidates, deletion evidence, anomaly evidence, publication evidence, rejections, and parse failures are distinct.
 
 ## Registry and configuration
 
@@ -21,13 +21,9 @@ fetched_records = accepted_records + rejected_records + parse_failures
 
 Neither boundary proves full marketplace coverage.
 
-## Adapter evidence schema version 1
+## Adapter and canonical evidence
 
-Both sources write `requests_latest.jsonl`, `records_latest.jsonl`, and `reconciliation_latest.json` under `data/<vehicle>/adapter_evidence/<source>/`. Record stages are `accepted`, `rejected`, and `parse_failure`.
-
-## Canonical evidence schema version 1
-
-Each source writes raw, normalized, accepted, rejected, parse-failure, and reconciliation artifacts under `data/<vehicle>/evidence/<source>/`.
+Both adapters use schema version `1` and write request, record, and reconciliation evidence. Canonical evidence schema version `1` writes raw, normalized, accepted, rejected, parse-failure, and reconciliation artifacts.
 
 Key canonical fields include `canonical_listing_id`, `observation_id`, `source_listing_id`, `source_listing_id_status`, `source_adapter_record_ref`, `query_provenance`, `field_evidence`, `rejection_reasons`, and `parse_failure_reasons`.
 
@@ -37,123 +33,98 @@ Key canonical fields include `canonical_listing_id`, `observation_id`, `source_l
 
 Per-source identity artifacts are under `data/<vehicle>/identity_lifecycle/<source>/`.
 
-### Identity fields
+Identity fields include `source_listing_id_status`, `vin_claim`, `vin_evidence_status`, `vin_raw_claims`, `identity_fingerprint_strict`, `identity_fingerprint_loose`, and `identity_fingerprint_components`. Fingerprints are comparison evidence, not merge authority.
 
-- `source_listing_id_status` — source ID remains distinct from VIN
-- `vin_claim` — explicit source-reported format-valid VIN claim or null
-- `vin_evidence_status` — `source_reported_format_valid_unverified`, `source_reported_invalid_format_unverified`, `conflicting_source_reported_claims`, or `not_reported`
-- `vin_raw_claims` — explicit raw VIN claims
-- `identity_fingerprint_strict` — deterministic strict comparison fingerprint
-- `identity_fingerprint_loose` — deterministic broader comparison fingerprint
-- `identity_fingerprint_components` — visible components used by fingerprints
+Lifecycle fields include `lifecycle_state`, `lifecycle_state_reason`, first/last/evaluation timestamps, elapsed seconds/days, `missing_run_count`, `reappearance_count`, and `observation_count`. States are `active`, `missing`, `reappeared`, and `retired`. Retirement requires three consecutive successful-run misses and fourteen elapsed days; it is not a sold claim.
 
-Fingerprints are comparison evidence, not merge authority.
+Price fields include `price_observation_count`, `retained_price_observation_count`, `compacted_price_observation_count`, `price_observation_retention_limit`, `price_observation_compaction_digest_sha256`, `price_observations_compacted_through_at_utc`, `first_observed_price_cad`, `first_price_observed_at_utc`, `previous_observation_price_cad`, `current_price_cad`, `minimum_observed_price_cad`, `maximum_observed_price_cad`, `change_from_previous_observation_cad`, and `change_from_first_observation_cad`.
 
-### Lifecycle fields
+The newest thirteen raw observations are retained. Compacted counts and a chained digest preserve accounting evidence but cannot reconstruct removed raw observations.
 
-- `lifecycle_state` — `active`, `missing`, `reappeared`, or `retired`
-- `lifecycle_state_reason` — visible transition reason
-- `first_seen_at_utc` / `last_seen_at_utc` — exact successful-observation timestamps
-- `last_evaluated_at_utc` — latest successful lifecycle evaluation
-- `elapsed_since_first_seen_seconds` / `elapsed_since_first_seen_days`
-- `elapsed_since_last_seen_seconds` / `elapsed_since_last_seen_days`
-- `missing_run_count` — consecutive successful source runs without observation
-- `reappearance_count` — returns after missing/retired
-- `observation_count` — total unique successful-run observations, including compacted history
-
-`retired` requires at least three consecutive successful-run misses and at least fourteen actual elapsed days. It is not a sold claim.
-
-### Price observation fields
-
-- `price_observation_count` — total unique successful-run price observations
-- `retained_price_observation_count` — raw observations still present; maximum thirteen
-- `compacted_price_observation_count` — observations represented by aggregate/digest evidence
-- `price_observation_retention_limit` — currently `13`
-- `price_observation_compaction_digest_sha256` — chained digest of compacted observations
-- `price_observations_compacted_through_at_utc`
-- `first_observed_price_cad`
-- `first_price_observed_at_utc`
-- `previous_observation_price_cad`
-- `current_price_cad`
-- `minimum_observed_price_cad`
-- `maximum_observed_price_cad`
-- `change_from_previous_observation_cad`
-- `change_from_first_observation_cad`
-
-The compaction digest is ordered accounting evidence. It cannot reconstruct removed raw observations. Legacy `weeks_tracked`, `price_last_week`, `price_change_week`, and `price_history_*.json` are not supported history semantics.
-
-### Retired-state retention fields
-
-- `storage_retention_policy`
-- `state_retention_ledger`
-- `deleted_retired_listing_count_total`
-- `deleted_retired_listing_bytes_total`
-- `deletion_chain_sha256`
-- `recent_deletions`
-- `retired_listings_pruned_this_run`
-- `retired_listing_deletion_count_total`
-- `retired_listing_deletion_chain_sha256`
-
-At most 500 retired listings are retained per source, and no retained tombstone may be more than 365 days past its last successful observation. Detailed deletion evidence is limited to the newest 100 records; cumulative counts, bytes, and chained digest remain.
+Retired-state retention fields include `storage_retention_policy`, `state_retention_ledger`, `deleted_retired_listing_count_total`, `deleted_retired_listing_bytes_total`, `deletion_chain_sha256`, `recent_deletions`, `retired_listings_pruned_this_run`, `retired_listing_deletion_count_total`, and `retired_listing_deletion_chain_sha256`. At most 500 retired listings are retained per source and no retained tombstone may exceed 365 days since last successful observation.
 
 ## Duplicate candidates
 
-`duplicate_candidates_latest.jsonl` contains cross-source comparison candidates.
-
-- `candidate_id` — stable candidate-pair identifier
-- `confidence` — `high`, `medium`, or `low`
-- `confidence_score` — bounded comparison confidence, not purchase ranking
-- `reasons` — visible supporting evidence
-- `decision_status` — always `candidate_only_not_merged`
-- `left` / `right` — preserved source and canonical references
-
-Canonical records remain separate.
+`duplicate_candidates_latest.jsonl` contains `candidate_id`, `confidence`, `confidence_score`, `reasons`, `decision_status`, `left`, and `right`. `decision_status` is always `candidate_only_not_merged`; canonical records remain separate.
 
 ## Storage-retention schema version 1
 
-`storage_retention.py` writes:
+`storage_retention.py` writes per-vehicle retention reports/ledgers and `data/retention/latest.json`.
 
-- `data/<vehicle>/retention/latest.json`
-- `data/<vehicle>/retention/deletion_ledger.json`
-- `data/retention/latest.json`
+File deletion records include `path`, `category`, `reason`, `size_bytes`, `sha256`, `run_id`, and `deleted_at_utc`. Ledgers expose `deleted_file_count_total`, `deleted_bytes_total`, `deletion_chain_sha256`, `recent_deletions`, and `recent_deletion_limit`.
 
-### File deletion record
+Repository metrics include `managed_file_count`, `managed_bytes`, `largest_file_bytes`, `oversized_files`, `max_managed_file_bytes`, `max_active_data_bytes`, `verification_status`, and `verification_errors`.
 
-Each deletion record includes:
+Archive limits are eight timestamped source CSVs per active vehicle/source and four timestamped manual-review CSVs per active vehicle. Current `*_latest` artifacts are never archive candidates. Paused vehicle data is outside the deletion boundary.
 
-- `path`
-- `category`
-- `reason`
-- `size_bytes`
-- `sha256`
+## Workflow-control schema version 1
+
+`workflow_control.py` governs collection plans and single-pair validation.
+
+A plan row is:
+
+```text
+<config_path>\t<source>
+```
+
+Supported scopes are `full` and `single_pair`. Single-pair validation requires exactly one active registry vehicle and one enabled source. Unknown, paused, disabled, empty, duplicate, or malformed plans fail before collection.
+
+## Anomaly schema version 1
+
+`data/run_status/anomalies_latest.json` contains:
+
+- `anomaly_schema_version`
 - `run_id`
-- `deleted_at_utc`
+- `generated_at_utc`
+- `baseline_status`
+- `baseline_run_id`
+- `current_health_run_id`
+- `anomaly_status`
+- `critical_anomaly_count`
+- `warning_anomaly_count`
+- `informational_anomaly_count`
+- `anomalies`
 
-### File ledger
+Each anomaly contains `severity`, `code`, `vehicle_key`, `source`, `message`, `baseline`, `current`, and `threshold`. Severities are `critical`, `warning`, and `info`. `baseline_status` may be `available`, `unavailable`, or `same_run_not_compared`.
 
-- `deleted_file_count_total`
-- `deleted_bytes_total`
-- `deletion_chain_sha256`
-- `recent_deletions`
-- `recent_deletion_limit` — currently `100`
+Anomaly evidence is a workflow diagnostic. It does not establish vehicle quality, fair value, or purchase suitability.
 
-### Repository metrics and gates
+## Publication manifest schema version 1
 
-- `managed_file_count`
-- `managed_bytes`
-- `largest_file_bytes`
-- `oversized_files`
-- `max_managed_file_bytes` — 50 MiB
-- `max_active_data_bytes` — 500 MiB
-- `verification_status`
-- `verification_errors`
+`data/run_status/publication_latest.json` contains:
 
-### Archive limits
+- `publication_schema_version`
+- `publication_status`
+- `run_id`
+- `generated_at_utc`
+- `source_commit_sha`
+- `workflow_event`
+- `target_ref`
+- `manifest_path`
+- `published_path_count`
+- `published_paths`
+- `change_type_counts`
+- `active_vehicle_keys`
+- `paused_vehicle_keys`
 
-- `source_archive_keep_count` — `8` per active vehicle/source
-- `manual_review_archive_keep_count` — `4` per active vehicle
+The manifest must exactly match staged governed data paths other than the manifest itself. It proves publication-path accounting, not source truth.
 
-Current `*_latest` artifacts are not archive candidates. Paused vehicle data is outside the Audit 07 deletion boundary.
+## Generated-data validation schema version 1
+
+Generated-data pull-request validation reports:
+
+- `generated_data_validation_schema_version`
+- `validation_status`
+- `changed_path_count`
+- `changed_paths`
+- `validation_errors`
+- `retention_verification_status`
+
+Validation checks active/paused scope, retention, changed source statuses, changed health/anomaly evidence, and publication-manifest membership.
+
+## Dependency-lock schema version 1
+
+`requirements.lock` uses exact `package==version` entries. `dependency_lock.py` reports `dependency_lock_schema_version`, `validation_status`, `package_count`, `packages`, and `validation_errors`. Ranges, URLs, duplicates, and empty locks fail.
 
 ## Supported normalized listing fields
 
@@ -169,16 +140,12 @@ The complete supported field order is:
 
 `ranking_status` remains disabled. `duplicate_candidate_review_required` means human comparison is needed; it does not mean the records are the same physical vehicle.
 
-## Source status schema version 8
+## Runtime status schemas
 
-Both source statuses require canonical evidence schema `1`, adapter schema `1`, identity/lifecycle schema `2`, `identity_lifecycle_status: updated`, identity current count equal to accepted canonical count, fresh schema-valid output, reconciliation, pagination, uncapped execution, and config isolation.
+Source status remains schema version `8` and requires canonical schema `1`, adapter schema `1`, identity schema `2`, current accepted/identity count agreement, freshness, reconciliation, pagination, uncapped execution, and config isolation.
 
-Identity status records tracked, new, reappeared, missing, retired, and transition-event counts. Legacy price history is explicitly inactive.
-
-## Consolidated health schema version 6
-
-Full-run health aggregates source reconciliation plus identity tracked/new/reappeared/missing/retired counts.
+Consolidated health remains schema version `6` and aggregates source reconciliation plus identity tracked/new/reappeared/missing/retired counts.
 
 ## Remaining limits
 
-The repository does not establish independent VIN truth, physical-vehicle identity, sold status, marketplace completeness, mechanical condition, fair value, buyer ranking, final workflow architecture, or purpose-specific analytics.
+The repository does not establish independent VIN truth, physical-vehicle identity, sold status, marketplace completeness, mechanical condition, fair value, buyer ranking, purpose-specific analytics, or successful completion of three consecutive scheduled active-profile runs.
