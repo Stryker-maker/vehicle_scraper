@@ -62,6 +62,7 @@ This register preserves known weaknesses so they remain visible, prioritized, an
 | LIM-052 | Medium | Controlled, not fixed | Listing asking-price changes do not prove market-value direction | Actual previous observations plus non-trend contract | Audit 10/current control |
 | LIM-053 | Medium | Controlled, not fixed | Family listing text cannot verify seating, features, history, condition, or availability | Unverified/unknown evidence and seller/inspection questions | Audit 10/current control |
 | LIM-054 | High | Implemented, validation pending | Secondary artifacts could diverge from current evidence | Fail-closed underlying-evidence validator and data-PR integration | Audit 10 |
+| LIM-055 | High | Implemented, validation pending | Kijiji structured `vehicleEngine.fuelType` was ignored, falsely rejecting valid gas and diesel listings as unknown fuel | Structured engine/fuel parsing, hostile tests, sanitized response signatures, failed-run evidence artifacts, and five-profile live validation | Audit 10 corrective work |
 
 ## Reconciliation boundaries
 
