@@ -53,15 +53,32 @@ SOURCE_FIELDS = [
 ]
 MANUAL_REVIEW_FIELDS = [
     "evidence_schema_version",
+    "identity_lifecycle_schema_version",
     "vehicle_key",
     "source",
     "canonical_listing_id",
     "observation_id",
     "source_listing_id",
     "source_listing_id_status",
+    "vin_claim",
+    "vin_evidence_status",
     "source_claim_status",
     "raw_record_ref",
     "normalized_record_ref",
+    "identity_fingerprint_strict",
+    "identity_fingerprint_loose",
+    "lifecycle_state",
+    "lifecycle_state_reason",
+    "first_seen_at_utc",
+    "last_seen_at_utc",
+    "elapsed_since_first_seen_days",
+    "elapsed_since_last_seen_days",
+    "missing_run_count",
+    "reappearance_count",
+    "duplicate_candidate_count",
+    "highest_duplicate_confidence",
+    "duplicate_candidate_ids",
+    "duplicate_candidate_reasons",
     "ranking_status",
     "review_status",
     "collection_status",
@@ -104,12 +121,11 @@ MANUAL_REVIEW_FIELDS = [
     "listing_url",
     "listing_url_evidence_status",
     "observation_count",
+    "price_observation_count",
     "first_observed_price_cad",
     "previous_observation_price_cad",
     "change_from_previous_observation_cad",
     "change_from_first_observation_cad",
-    "source_price_history_text",
-    "legacy_trend_text",
     "days_on_market_claim",
 ]
 
@@ -216,10 +232,7 @@ def row_quality_warnings(
     current_year = current_year or datetime.now(timezone.utc).year
     if source.strip().lower() == "kijiji":
         location_status = row.get("location_evidence_status", "")
-        if (
-            location_status
-            == "source_reported_listing_specific_unverified"
-        ):
+        if location_status == "source_reported_listing_specific_unverified":
             warnings.append("kijiji_location_source_reported_unverified")
         else:
             warnings.append("kijiji_location_unknown")
@@ -274,6 +287,10 @@ def status_is_current_success(status: dict[str, Any], run_id: str) -> bool:
         and int(status.get("accepted_record_count", 0)) > 0
         and status.get("evidence_reconciliation_status") == "reconciled"
         and status.get("canonical_evidence_schema_version") == 1
+        and status.get("identity_lifecycle_schema_version") == 1
+        and status.get("identity_lifecycle_status") == "updated"
+        and int(status.get("identity_observed_current_count", -1))
+        == int(status.get("accepted_record_count", 0))
         and status.get("row_cap_disabled") is True
         and status.get("config_isolated") is True
     )
