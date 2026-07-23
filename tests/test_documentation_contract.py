@@ -103,7 +103,15 @@ class DocumentationContractTests(unittest.TestCase):
         identifiers = re.findall(r"\| (LIM-\d{3}) \|", register)
         self.assertEqual(len(identifiers), len(set(identifiers)))
         self.assertGreaterEqual(len(identifiers), 54)
-        for identifier in ("LIM-048", "LIM-049", "LIM-050", "LIM-051", "LIM-052", "LIM-053", "LIM-054"):
+        for identifier in (
+            "LIM-048",
+            "LIM-049",
+            "LIM-050",
+            "LIM-051",
+            "LIM-052",
+            "LIM-053",
+            "LIM-054",
+        ):
             self.assertIn(identifier, register)
 
     def test_legacy_and_operating_guidance_prevent_inference(self):
@@ -148,7 +156,7 @@ class DocumentationContractTests(unittest.TestCase):
             "candidate_pending_requirements",
             "purpose_output_validation.py",
             "no rank or score",
-            "No source-query/parser",
+            "Audit 10 does not change source requests",
         ):
             self.assertIn(value, audit10)
 
