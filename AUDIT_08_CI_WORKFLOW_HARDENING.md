@@ -2,7 +2,9 @@
 
 ## Status
 
-Implemented on `ai/audit-08-ci-workflow-hardening`; exact-head CI and owner merge remain pending.
+Complete and merged through PR #10 on July 23, 2026.
+
+Exact implementation head `3ee730be8a4c5db61e6fdec851e0945d2ee8dada` passed Repository CI run `29980927892` and narrow governed collection run `30002827204`. The broader roadmap requirement for three consecutive unattended scheduled active-profile runs remains separate global operating proof.
 
 ## Purpose
 
@@ -98,9 +100,25 @@ The manifest records run ID, source SHA, target ref, workflow event, exact publi
 
 Failure evidence is uploaded for three days. Full-run diagnostics are retained for fourteen days; single-pair smoke evidence remains seven days.
 
+## Validation evidence
+
+Repository CI run `29980927892` passed Python `3.11.13`, exact dependency-lock validation, locked installation and `pip check`, compilation, governed registry/config/hub validation, and all 83 deterministic and hostile tests.
+
+Governed Vehicle Collection run `30002827204` used:
+
+```text
+collection_scope: single_pair
+vehicle_key: ford_f350
+source: autotrader
+publish_generated_data: false
+anomaly_policy: enforce
+```
+
+Reusable CI completed before collection. Exactly one governed source pair ran. Source/canonical/identity evidence reconciled, the seven-day smoke artifact uploaded, all full-run reporting/anomaly/retention/publication steps skipped, and the branch head remained unchanged.
+
 ## Acceptance gate
 
-Audit 08 is acceptable only when deterministic tests prove:
+Audit 08 was accepted after deterministic and narrow live validation proved:
 
 - code CI, generated-data validation, and collection are separate
 - collection has no pull-request trigger
@@ -114,7 +132,7 @@ Audit 08 is acceptable only when deterministic tests prove:
 - publication manifests exactly match staged governed data
 - non-data staged publication is rejected
 - generated-data pull requests receive real integrity validation
-- source queries, parsers, pagination, geography, distance, criteria, and ranking remain unchanged
+- source queries, parsers, pagination, geography, distance, criteria, and ranking remained unchanged
 
 ## Stop conditions
 
