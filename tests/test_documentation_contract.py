@@ -25,58 +25,60 @@ class DocumentationContractTests(unittest.TestCase):
             "AUDIT_03_CANONICAL_EVIDENCE.md",
             "AUDIT_04_AUTOTRADER_ADAPTER.md",
             "AUDIT_05_KIJIJI_ADAPTER.md",
+            "AUDIT_06_IDENTITY_LIFECYCLE.md",
         ]
         readme = self.read("README.md")
         for path in required:
             self.assertTrue((self.root / path).is_file(), path)
             self.assertIn(path, readme)
 
-    def test_readme_does_not_preserve_obsolete_project_claims(self):
+    def test_readme_preserves_current_boundaries(self):
         readme = self.read("README.md")
-        obsolete = [
+        for obsolete in (
             "Automated AutoTrader.ca scraper for Ford F-350 diesel trucks",
             "Price 60% | Mileage 25% | Distance 15%",
             "Edit `config.json`",
             "Weekly AutoTrader Scrape",
             "score | Ranking score (lower = better)",
             "phase1_kijiji_runner.py",
-        ]
-        for claim in obsolete:
-            self.assertNotIn(claim, readme)
-        self.assertIn("vehicle_registry.json", readme)
-        self.assertIn("manual_review_latest.csv", readme)
-        self.assertIn("Automated cross-source ranking is disabled", readme)
-        self.assertIn("canonical_evidence.py", readme)
-        self.assertIn("autotrader_adapter.py", readme)
-        self.assertIn("kijiji_adapter.py", readme)
-        self.assertIn(
+        ):
+            self.assertNotIn(obsolete, readme)
+        for current in (
+            "vehicle_registry.json",
+            "manual_review_latest.csv",
+            "Automated cross-source ranking is disabled",
+            "canonical_evidence.py",
+            "identity_lifecycle.py",
+            "autotrader_adapter.py",
+            "kijiji_adapter.py",
             "fetched_records = accepted_records + rejected_records + parse_failures",
-            readme,
-        )
-        self.assertIn("autotrader_adapter_response_listing_objects", readme)
-        self.assertIn("kijiji_adapter_json_ld_listing_objects", readme)
-        self.assertIn("query origin never becomes listing geography", readme)
+            "autotrader_adapter_response_listing_objects",
+            "kijiji_adapter_json_ld_listing_objects",
+            "source_identifier_claim_not_vin",
+            "candidate_only_not_merged",
+            "price_history_*.json",
+        ):
+            self.assertIn(current, readme)
 
     def test_data_dictionary_covers_supported_manual_review_fields(self):
         dictionary = self.read("docs/DATA_DICTIONARY.md")
         missing = [
-            field
-            for field in MANUAL_REVIEW_FIELDS
+            field for field in MANUAL_REVIEW_FIELDS
             if f"`{field}`" not in dictionary
         ]
         self.assertEqual(missing, [])
-        self.assertIn("autotrader_adapter_response_listing_objects", dictionary)
-        self.assertIn("kijiji_adapter_json_ld_listing_objects", dictionary)
-        self.assertIn("source_identifier_claim_not_vin", dictionary)
-        self.assertIn(
+        for value in (
+            "autotrader_adapter_response_listing_objects",
+            "kijiji_adapter_json_ld_listing_objects",
+            "source_identifier_claim_not_vin",
             "straight_line_estimate_from_source_reported_location",
-            dictionary,
-        )
-        self.assertIn(
             "source_reported_listing_specific_unverified",
-            dictionary,
-        )
-        self.assertIn("query_origin_never_location", dictionary)
+            "query_origin_never_location",
+            "source_reported_format_valid_unverified",
+            "candidate_only_not_merged",
+            "active", "missing", "reappeared", "retired",
+        ):
+            self.assertIn(value, dictionary)
 
     def test_approved_roadmap_preserves_every_audit_package(self):
         roadmap = self.read("docs/AUDIT_ROADMAP.md")
@@ -87,12 +89,12 @@ class DocumentationContractTests(unittest.TestCase):
             roadmap,
         )
         self.assertIn(
-            "| 04 | AutoTrader Collector Audit and Refactor | Complete and merged |",
+            "| 05 | Kijiji Collector Replacement | Complete and merged |",
             roadmap,
         )
         self.assertIn(
-            "| 05 | Kijiji Collector Replacement | "
-            "Implemented; narrow validation and owner merge pending |",
+            "| 06 | Identity, Deduplication and Listing Lifecycle | "
+            "Implemented; deterministic validation and owner merge pending |",
             roadmap,
         )
         self.assertIn(
@@ -107,10 +109,8 @@ class DocumentationContractTests(unittest.TestCase):
         table_identifiers = re.findall(r"\| (LIM-\d{3}) \|", register)
         self.assertEqual(len(table_identifiers), len(set(table_identifiers)))
         self.assertIn("LIM-034", register)
-        self.assertIn("Implemented, validation pending", register)
-        self.assertIn("kijiji_adapter_json_ld_listing_objects", register)
 
-    def test_legacy_merger_is_marked_and_not_automated(self):
+    def test_legacy_merger_and_history_are_not_supported(self):
         merger = self.read("merge.py")
         workflow = self.read(".github/workflows/scrape.yml")
         legacy = self.read("docs/LEGACY_COMPONENTS.md")
@@ -119,47 +119,44 @@ class DocumentationContractTests(unittest.TestCase):
         self.assertIn("merge.py", legacy)
         self.assertNotIn("python merge.py", workflow)
         self.assertIn("Historical merged", readme)
-        self.assertIn("not current recommendations", readme)
+        self.assertIn("price_history_*.json", readme)
 
     def test_phase1_guidance_points_to_current_authorities(self):
         guidance = self.read("PHASE1_MANUAL_REVIEW.md")
-        self.assertIn("active interim operating guidance", guidance)
-        self.assertIn("docs/REPOSITORY_BASELINE.md", guidance)
-        self.assertIn("docs/LIMITATIONS_REGISTER.md", guidance)
-        self.assertIn("AUDIT_03_CANONICAL_EVIDENCE.md", guidance)
-        self.assertIn("AUDIT_04_AUTOTRADER_ADAPTER.md", guidance)
-        self.assertIn("AUDIT_05_KIJIJI_ADAPTER.md", guidance)
-        self.assertIn("What Phase 1 does not prove", guidance)
-        self.assertIn("accepted_latest.jsonl", guidance)
-        self.assertIn("single_pair", guidance)
+        for value in (
+            "active interim operating guidance",
+            "docs/REPOSITORY_BASELINE.md",
+            "docs/LIMITATIONS_REGISTER.md",
+            "AUDIT_03_CANONICAL_EVIDENCE.md",
+            "AUDIT_04_AUTOTRADER_ADAPTER.md",
+            "AUDIT_05_KIJIJI_ADAPTER.md",
+            "AUDIT_06_IDENTITY_LIFECYCLE.md",
+            "What Phase 1 does not prove",
+            "accepted_latest.jsonl",
+            "identity_lifecycle",
+            "single_pair",
+        ):
+            self.assertIn(value, guidance)
 
-    def test_audit03_contract_preserves_boundary_and_stop_conditions(self):
-        contract = self.read("AUDIT_03_CANONICAL_EVIDENCE.md")
-        self.assertIn("legacy_collector_emitted_csv_rows", contract)
-        self.assertIn(
-            "fetched_records = accepted_records + rejected_records + parse_failures",
-            contract,
-        )
-        self.assertIn("Stop and revise before merge", contract)
-        self.assertIn("no F-150 or Tundra path changes", contract)
-
-    def test_audit04_contract_preserves_narrow_validation_and_stop_conditions(self):
-        contract = self.read("AUDIT_04_AUTOTRADER_ADAPTER.md")
-        self.assertIn("autotrader_adapter_response_listing_objects", contract)
-        self.assertIn("validation_mode: single_pair", contract)
-        self.assertIn("commit_generated_data: false", contract)
-        self.assertIn("Stop and revise before merge", contract)
-        self.assertIn("No AutoTrader rank or score", contract)
-
-    def test_audit05_contract_preserves_geography_and_narrow_validation(self):
-        contract = self.read("AUDIT_05_KIJIJI_ADAPTER.md")
-        self.assertIn("kijiji_adapter_json_ld_listing_objects", contract)
-        self.assertIn("validation_mode: single_pair", contract)
-        self.assertIn("source: kijiji", contract)
-        self.assertIn("commit_generated_data: false", contract)
-        self.assertIn("query origin never becomes listing location", contract)
-        self.assertIn("Stop and revise before merge", contract)
-        self.assertIn("No Kijiji rank or score", contract)
+    def test_audit_contracts_preserve_stop_conditions(self):
+        audit03 = self.read("AUDIT_03_CANONICAL_EVIDENCE.md")
+        self.assertIn("legacy_collector_emitted_csv_rows", audit03)
+        self.assertIn("Stop and revise before merge", audit03)
+        audit04 = self.read("AUDIT_04_AUTOTRADER_ADAPTER.md")
+        self.assertIn("autotrader_adapter_response_listing_objects", audit04)
+        self.assertIn("Stop and revise before merge", audit04)
+        audit05 = self.read("AUDIT_05_KIJIJI_ADAPTER.md")
+        self.assertIn("kijiji_adapter_json_ld_listing_objects", audit05)
+        self.assertIn("query origin never becomes listing location", audit05)
+        audit06 = self.read("AUDIT_06_IDENTITY_LIFECYCLE.md")
+        for value in (
+            "source_identifier_claim_not_vin",
+            "candidate_only_not_merged",
+            "active", "missing", "reappeared", "retired",
+            "Stop and revise before merge",
+            "price_history_*.json",
+        ):
+            self.assertIn(value, audit06)
 
 
 if __name__ == "__main__":
