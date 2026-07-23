@@ -3,10 +3,10 @@
 ## Status
 
 **Baseline date:** July 23, 2026  
-**Baseline source:** `main` through Audit 09, updated by Audit 10 implementation  
+**Baseline source:** `main` through Audit 09, updated by Audit 10 implementation and Kijiji corrective validation  
 **Project state:** functional collection and purpose-specific analysis prototype under structured audit
 
-This document records current supported behaviour. Validation-pending Audit 10 behaviour is labelled accordingly.
+This document records current supported behaviour. Audit 10 implementation and live validation are complete on the branch; owner review and merge remain pending.
 
 ## Higher purpose
 
@@ -20,13 +20,15 @@ The repository can:
 - run both sources directly from approved config without mutation
 - reconcile every returned source object as accepted, rejected, or parse failure
 - preserve request/page, raw, canonical, identity, lifecycle, and quality evidence
+- consume explicit Kijiji structured fuel/engine evidence before conservative text fallback
+- preserve sanitized Kijiji response signatures and failed single-pair evidence artifacts
 - preserve source-ID/VIN, geography, distance, duplicate, and lifecycle boundaries
 - build fail-closed unranked general manual review
 - bound generated data, observations, retired tombstones, ledgers, and managed size
 - run exact, separated CI/data-validation/collection workflows
 - produce baseline-aware anomalies and run-tied publication manifests
 - build current-run F-350 buyer intelligence with visible evidence gaps and reasons
-- build validation-pending profile-specific outputs for RAM 3500, Subaru Forester, Honda Odyssey, and Kia Carnival
+- build profile-specific outputs for RAM 3500, Subaru Forester, Honda Odyssey, and Kia Carnival
 
 ## Supported schema boundaries
 
@@ -49,6 +51,8 @@ The repository can:
 - Secondary-purpose validation: v1
 
 AutoTrader fetched scope is `autotrader_adapter_response_listing_objects`. Kijiji fetched scope is `kijiji_adapter_json_ld_listing_objects`. Neither proves complete marketplace coverage.
+
+Kijiji JSON-LD may place fuel and engine evidence under `vehicleEngine`. Explicit structured claims are normalized conservatively; missing or unsupported values remain unknown and continue to fail criteria closed.
 
 ## F-350 boundary
 
@@ -88,7 +92,7 @@ No F-350 truck-specific assumptions apply to family vehicles.
 
 Collection has no pull-request trigger and cannot start before reusable CI succeeds.
 
-A narrow run builds only the selected vehicle's applicable F-350 or secondary-purpose output, uploads seven-day evidence, and never publishes generated data.
+A narrow run builds only the selected vehicle's applicable F-350 or secondary-purpose output, uploads seven-day evidence, and never publishes generated data. Evidence preparation and upload run under `always()` so available status and adapter evidence survive an unhealthy source result.
 
 A full run builds all current purpose outputs only after source health passes. Publication remains behind anomaly, retention, staged-path, artifact, manifest, whitespace, and remote-ref gates.
 
@@ -128,6 +132,7 @@ F-150 and Tundra receive no current collection, evidence, lifecycle, review, pur
 | `vehicle_registry.json/.py` | operational scope and source plan |
 | `config_*.json` / `vehicle_config.py` | criteria and source settings |
 | direct `autotrader_*.py` / `kijiji_*.py` | collection and evidence |
+| `kijiji_response_diagnostics.py` | sanitized response-shape evidence and visible block-page markers |
 | `canonical_evidence.py` | canonical stages and reconciliation |
 | `identity_lifecycle.py` | identity, lifecycle, compact history, duplicate candidates |
 | `phase1_reporting.py` | general review and health |
@@ -146,15 +151,18 @@ Current code/tests are intended to guarantee:
 2. pull requests cannot collect marketplace data
 3. collection cannot bypass exact CI preflight
 4. source objects and current identity evidence reconcile
-5. generated growth remains bounded
-6. generated publication remains run/path/ref governed
-7. F-350 and secondary outputs require current matching evidence
-8. missing owner/friend inputs remain explicit
-9. purpose profiles do not import one another's assumptions
-10. asking-price context is not represented as appraisal or transaction evidence
-11. lower asking bands are not represented as verified faster-sale ranges
-12. all classifications and comparability labels have visible reasons
-13. no supported output contains purchase `rank` or `score`
+5. explicit Kijiji structured fuel/engine claims are consumed before text fallback
+6. unknown Kijiji fuel/engine remains unknown and criteria fail closed
+7. failed single-pair runs preserve available source status and adapter evidence
+8. generated growth remains bounded
+9. generated publication remains run/path/ref governed
+10. F-350 and secondary outputs require current matching evidence
+11. missing owner/friend inputs remain explicit
+12. purpose profiles do not import one another's assumptions
+13. asking-price context is not represented as appraisal or transaction evidence
+14. lower asking bands are not represented as verified faster-sale ranges
+15. all classifications and comparability labels have visible reasons
+16. no supported output contains purchase `rank` or `score`
 
 ## Explicit non-guarantees
 
@@ -164,7 +172,9 @@ A successful run, active lifecycle state, complete artifact set, close comparabl
 
 - Audit 08 narrow run `30002827204` proved separated CI/collection and no publication.
 - Audit 09 narrow run `30017275049` proved current F-350 raw/canonical/identity joins and buyer outputs on exact head.
-- Audit 10 requires exact-head deterministic/hostile validation plus narrow live proof for both an owned-value profile and a family-candidate profile.
+- Audit 10 RAM AutoTrader run `30026076864` proved owned-value output.
+- Audit 10 Odyssey AutoTrader run `30032250386` proved family-candidate output.
+- Kijiji all-profile run `30051771263` proved successful collection, reconciliation, lifecycle, and applicable buyer/purpose validation for all five active profiles with publication disabled.
 
 ## Repository change authority
 
