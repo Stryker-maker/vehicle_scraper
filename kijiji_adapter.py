@@ -14,6 +14,7 @@ from bs4 import BeautifulSoup
 
 from kijiji_history import apply_price_history, load_trim_tiers, write_csv_outputs
 from kijiji_locations import LOCATION_REGISTRY_VERSION, validate_query_locations
+from kijiji_response_diagnostics import summarize_kijiji_html
 from phase1_common import utc_now, write_json
 from vehicle_config import load_vehicle_config
 
@@ -278,19 +279,55 @@ def _offers(item: dict[str, Any]) -> dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
 
-def _fuel_and_engine(text: str) -> tuple[str, str]:
-    lowered = text.casefold()
-    if "hybrid" in lowered:
+def _structured_engine_parts(item: dict[str, Any]) -> list[str]:
+    value = item.get("vehicleEngine")
+    values = value if isinstance(value, list) else [value]
+    parts: list[str] = []
+    for entry in values:
+        if isinstance(entry, dict):
+            for key in (
+                "fuelType",
+                "name",
+                "description",
+                "engineDisplacement",
+                "engineType",
+                "configuration",
+            ):
+                field = entry.get(key)
+                if isinstance(field, dict):
+                    field = field.get("value") or field.get("name")
+                if field not in (None, ""):
+                    parts.append(str(field).strip())
+        elif entry not in (None, ""):
+            parts.append(str(entry).strip())
+    return [part for part in parts if part]
+
+
+def _fuel_and_engine(item: dict[str, Any], text: str) -> tuple[str, str]:
+    structured_parts = _structured_engine_parts(item)
+    combined = " ".join([text, *structured_parts]).strip()
+    lowered = combined.casefold()
+    structured_fuel = " ".join(
+        part for part in structured_parts if part.casefold() in {
+            "gas", "gasoline", "petrol", "diesel", "hybrid", "electric"
+        }
+    ).casefold()
+    fuel_text = structured_fuel or lowered
+    if "hybrid" in fuel_text:
         fuel = "Hybrid"
-    elif "electric" in lowered:
+    elif "electric" in fuel_text:
         fuel = "Electric"
-    elif "diesel" in lowered:
+    elif "diesel" in fuel_text:
         fuel = "Diesel"
-    elif re.search(r"\b(?:gas|gasoline|petrol)\b", lowered):
+    elif re.search(r"\b(?:gas|gasoline|petrol|unleaded)\b", fuel_text):
         fuel = "Gas"
     else:
         fuel = "Unknown"
-    match = re.search(r"\b(\d+(?:\.\d+)?)\s*[lL]\b", text)
+    match = re.search(
+        r"\b(\d+(?:\.\d+)?)\s*(?:l|litre|liter)\b",
+        combined,
+        flags=re.IGNORECASE,
+    )
     return fuel, f"{match.group(1)}L" if match else "Unknown"
 
 
@@ -328,7 +365,7 @@ def parse_listing(
         return None, [], parse_failures
 
     mileage = clean_int(item.get("mileageFromOdometer"))
-    fuel, engine = _fuel_and_engine(combined)
+    fuel, engine = _fuel_and_engine(item, combined)
     location, address, location_status, address_status = extract_listing_geography(item)
     seller = item.get("seller") if isinstance(item.get("seller"), dict) else {}
     seller_name = str(seller.get("name") or seller.get("legalName") or "Unknown").strip()
@@ -474,6 +511,9 @@ def collect_kijiji(
                 request_record["http_status"] = int(response.status_code)
                 items, json_errors = extract_page_payload(response.text)
                 request_record["json_ld_errors"] = json_errors
+                request_record["response_diagnostics"] = summarize_kijiji_html(
+                    response.text
+                )
             except Exception as exc:
                 request_record["attempts"] = (
                     exc.attempts
