@@ -145,6 +145,16 @@ jobs:
             --plan "${{ steps.collection-plan.outputs.path }}" \
             --run-id "$GITHUB_RUN_ID"
 
+      - name: Build F-350 buyer intelligence for narrow validation
+        if: env.COLLECTION_SCOPE == 'single_pair' && env.VEHICLE_KEY == 'ford_f350'
+        run: |
+          python f350_buyer_intelligence.py build \
+            --config config_f350.json \
+            --run-id "$GITHUB_RUN_ID" \
+            --source "$SELECTED_SOURCE" \
+            --overrides f350_owner_overrides.json
+          cat data/ford_f350/buyer_intelligence/market_summary_latest.md >> "$GITHUB_STEP_SUMMARY"
+
       - name: Prepare single-pair validation artifact
         if: env.COLLECTION_SCOPE == 'single_pair'
         run: |
@@ -160,6 +170,10 @@ jobs:
           fi
           mkdir -p "$artifact/identity_lifecycle"
           cp -R "data/$VEHICLE_KEY/identity_lifecycle/$SELECTED_SOURCE/." "$artifact/identity_lifecycle/"
+          if [[ -d "data/$VEHICLE_KEY/buyer_intelligence" ]]; then
+            mkdir -p "$artifact/buyer_intelligence"
+            cp -R "data/$VEHICLE_KEY/buyer_intelligence/." "$artifact/buyer_intelligence/"
+          fi
           cp "${{ steps.collection-plan.outputs.path }}" "$artifact/source-plan.tsv"
 
       - name: Upload single-pair validation artifact
@@ -194,6 +208,15 @@ jobs:
         if: env.COLLECTION_SCOPE == 'full'
         run: python phase1_pipeline.py check-health
 
+      - name: Build transparent F-350 buyer intelligence
+        if: env.COLLECTION_SCOPE == 'full'
+        run: |
+          python f350_buyer_intelligence.py build \
+            --config config_f350.json \
+            --run-id "$GITHUB_RUN_ID" \
+            --overrides f350_owner_overrides.json
+          cat data/ford_f350/buyer_intelligence/market_summary_latest.md >> "$GITHUB_STEP_SUMMARY"
+
       - name: Enforce critical anomaly policy
         if: env.COLLECTION_SCOPE == 'full'
         run: |
@@ -226,6 +249,7 @@ jobs:
           path: |
             data/run_status/
             data/retention/
+            data/ford_f350/buyer_intelligence/
             ${{ steps.collection-plan.outputs.path }}
           if-no-files-found: warn
           retention-days: 14
