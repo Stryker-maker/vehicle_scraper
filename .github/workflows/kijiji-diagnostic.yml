@@ -28,7 +28,7 @@ jobs:
   probe:
     name: Capture Kijiji response evidence
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 30
     env:
       VEHICLE_KEY: ${{ github.event_name == 'workflow_dispatch' && inputs.vehicle_key || 'honda_odyssey' }}
     steps:
@@ -69,6 +69,23 @@ jobs:
             --config "${{ steps.config.outputs.path }}" \
             --output-dir "$RUNNER_TEMP/kijiji-probe" \
             --timeout-seconds 30
+
+      - name: Run exact production collector without publishing
+        run: |
+          set +e
+          python kijiji_run.py \
+            --config "${{ steps.config.outputs.path }}" \
+            --timeout-seconds 1800 \
+            --fail-on-unhealthy
+          collector_exit=$?
+          set -e
+          printf '{"collector_exit_code":%s,"vehicle_key":"%s","run_id":"%s"}\n' \
+            "$collector_exit" "$VEHICLE_KEY" "$GITHUB_RUN_ID" \
+            > "$RUNNER_TEMP/kijiji-probe/collector_exit.json"
+          if [[ -d "data/$VEHICLE_KEY" ]]; then
+            mkdir -p "$RUNNER_TEMP/kijiji-probe/collector-data"
+            cp -R "data/$VEHICLE_KEY/." "$RUNNER_TEMP/kijiji-probe/collector-data/"
+          fi
 
       - name: Upload Kijiji diagnostic artifact
         if: always()
