@@ -1,4 +1,4 @@
-# Phase 1: Canonical Evidence and Manual Review
+# Phase 1: Canonical, Identity and Manual Review Evidence
 
 **Status:** active interim operating guidance during the repository audit.
 
@@ -12,71 +12,74 @@ Read with:
 - `AUDIT_03_CANONICAL_EVIDENCE.md`
 - `AUDIT_04_AUTOTRADER_ADAPTER.md`
 - `AUDIT_05_KIJIJI_ADAPTER.md`
+- `AUDIT_06_IDENTITY_LIFECYCLE.md`
 
 ## Current controls
 
-- `vehicle_registry.json` schema v2 controls enabled vehicles and sources.
-- Approved `config_*.json` files use schema v2 and must remain unchanged during execution.
-- AutoTrader reads schema v2 directly through `autotrader_run.py`.
-- Kijiji reads schema v2 directly through `kijiji_run.py`; no text patching or `exec` remains.
-- Kijiji query labels must resolve through location-registry version 1.
-- Source execution is bounded by a 75-minute timeout.
-- Fresh output must meet the minimum source schema.
-- Canonical schema v1 separates raw, normalized, accepted, rejected, and parse-failure artifacts.
-- Rejections and parse failures carry machine-readable reasons.
-- A healthy source requires reconciliation, complete configured pagination, and at least one accepted record.
-- Supported manual review is built only from accepted current-run evidence.
+- Registry/config schema v2 controls operational scope and criteria.
+- Both sources run through direct adapters with bounded execution.
+- Canonical evidence schema v1 preserves raw, normalized, accepted, rejected, and parse-failure stages.
+- Identity/lifecycle schema v1 updates only after a successful reconciled source run.
+- Source status schema v8 requires identity current count to equal accepted count.
+- A failed or unhealthy source run cannot advance lifecycle state.
+- Source listing IDs remain `source_identifier_claim_not_vin`.
+- VIN is explicit source evidence only and remains unverified.
+- Duplicate matches are candidates only; canonical records are never merged.
 - Manual review contains no `rank` or `score`.
-- Kijiji query origin is provenance only; listing geography is listing-specific source evidence or unknown.
-- Kijiji distance remains disabled.
-- Historical merged files remain disabled.
+- Historical `price_history_*.json` and merged CSV files are not used by supported output.
+- Kijiji query origin is provenance only; listing geography is listing-specific or unknown.
 
 ## Evidence files
 
 For every enabled source pair:
 
 ```text
+data/<vehicle>/adapter_evidence/<source>/requests_latest.jsonl
+data/<vehicle>/adapter_evidence/<source>/records_latest.jsonl
+data/<vehicle>/adapter_evidence/<source>/reconciliation_latest.json
 data/<vehicle>/evidence/<source>/raw_latest.jsonl
 data/<vehicle>/evidence/<source>/normalized_latest.jsonl
 data/<vehicle>/evidence/<source>/accepted_latest.jsonl
 data/<vehicle>/evidence/<source>/rejected_latest.jsonl
 data/<vehicle>/evidence/<source>/parse_failures_latest.jsonl
 data/<vehicle>/evidence/<source>/reconciliation_latest.json
+data/<vehicle>/identity_lifecycle/<source>/state_latest.json
+data/<vehicle>/identity_lifecycle/<source>/current_latest.jsonl
+data/<vehicle>/identity_lifecycle/<source>/events_latest.jsonl
+data/<vehicle>/identity_lifecycle/<source>/summary_latest.json
 ```
 
-Both direct adapters also write:
+Per vehicle:
 
 ```text
-data/<vehicle>/adapter_evidence/<source>/requests_latest.jsonl
-data/<vehicle>/adapter_evidence/<source>/records_latest.jsonl
-data/<vehicle>/adapter_evidence/<source>/reconciliation_latest.json
+data/<vehicle>/identity_lifecycle/duplicate_candidates_latest.jsonl
+data/<vehicle>/manual_review/<vehicle>_manual_review_latest.csv
 ```
 
-The required equation is:
+The canonical equation remains:
 
 ```text
 fetched_records = accepted_records + rejected_records + parse_failures
 ```
 
-AutoTrader `fetched_records` means `autotrader_adapter_response_listing_objects`.
+AutoTrader scope is `autotrader_adapter_response_listing_objects`. Kijiji scope is `kijiji_adapter_json_ld_listing_objects`.
 
-Kijiji `fetched_records` means `kijiji_adapter_json_ld_listing_objects`.
+## Identity and lifecycle interpretation
 
-## Source evidence
-
-AutoTrader preserves query location/page/offset/request URL, attempts, failed pages, duplicates, parse failures, criteria rejections, pagination state, and routed/geodesic/unavailable distance evidence. AutoTrader status uses schema version `6`.
-
-Kijiji preserves validated query hub/page/request URL/item index, attempts, failed pages, duplicates, parse failures, criteria rejections, pagination state, URL region evidence, and listing-specific/unknown geography counts. Kijiji status uses schema version `7`.
-
-A geodesic estimate is never labelled as routed driving distance. A Kijiji query hub or URL region is never treated as listing location.
+- `active` means observed in the current successful source run.
+- `missing` means not observed in a successful source run.
+- `reappeared` means observed after missing or retired state.
+- `retired` requires three consecutive successful-run misses and fourteen elapsed days.
+- These states are operational inferences, not sold/removed claims.
+- `first_seen_at_utc`, `last_seen_at_utc`, and elapsed days are actual time values.
+- `observation_count` and `price_observation_count` count unique source-run observations, not weeks.
+- `duplicate_candidate_review_required` means human comparison is required; it does not authorize merging.
 
 ## What Phase 1 does not prove
 
-Phase 1 does not prove complete marketplace coverage, independent truth of source claims, verified Kijiji geography, routable Kijiji distance, VIN/cross-source vehicle identity, lifecycle state, current availability, mechanical condition, fair value, or purchase suitability.
+Phase 1 does not prove complete marketplace coverage, independent truth of source claims, verified VIN, physical-vehicle identity, sold status, verified Kijiji geography, routable Kijiji distance, current availability, mechanical condition, fair value, or purchase suitability.
 
-Complete pagination applies only to the configured queries and validated hubs. `source_reported_listing_specific_unverified` means the source supplied listing-specific geography; it does not independently verify that geography.
-
-A source or row labelled `clean` has only passed the current limited warning rules.
+A format-valid VIN remains `source_reported_format_valid_unverified`. A high-confidence duplicate remains `candidate_only_not_merged`. A row labelled `clean` has only passed limited warning rules.
 
 ## Active scope
 
@@ -90,49 +93,25 @@ Ford F-150 and Toyota Tundra remain paused and must not receive current data upd
 
 ## Workflow behaviour
 
-A full run executes the complete registry plan, builds manual review and consolidated health, and may commit generated data. Scheduled runs commit automatically; manual full runs require `commit_generated_data=true`.
+A full run executes the registry plan, updates source/canonical/identity evidence, builds manual review and consolidated health, and may commit generated data.
 
-A single-pair validation run executes one governed vehicle/source pair, validates that source status, uploads only its current status/evidence as an artifact, and makes no repository commit. Audit 05 uses:
-
-```text
-validation_mode: single_pair
-vehicle_key: ford_f350
-source: kijiji
-commit_generated_data: false
-```
+A `single_pair` run validates one governed vehicle/source pair, including identity/lifecycle artifacts, uploads a temporary artifact, and makes no repository commit.
 
 Generated-data commits receive acknowledgement only and do not rerun collection.
 
-## Files to use
-
-Use:
-
-- `data/<vehicle>/manual_review/<vehicle>_manual_review_latest.csv`
-- `data/<vehicle>/evidence/<source>/reconciliation_latest.json`
-- `data/<vehicle>/evidence/<source>/accepted_latest.jsonl`
-- `data/<vehicle>/evidence/<source>/rejected_latest.jsonl`
-- `data/<vehicle>/evidence/<source>/parse_failures_latest.jsonl`
-- `data/<vehicle>/run_status/<source>_latest.json`
-- `data/run_status/latest.json`
-- `data/run_status/latest.md`
-
-Do not treat historical merged files, source IDs, accepted status, Kijiji query hubs, URL regions, or unverified listing geography as recommendations, VINs, or independently verified location.
-
 ## Manual review guidance
 
-Confirm the live listing, actual location, price, mileage, identity, history, seller, condition, and availability. Review:
+Confirm the live listing, actual location, price, mileage, VIN, identity, history, seller, condition, and availability. Review:
 
+- `vin_evidence_status`
+- `lifecycle_state` and `lifecycle_state_reason`
+- `elapsed_since_first_seen_days`
+- `missing_run_count` and `reappearance_count`
+- `duplicate_candidate_count`, confidence, IDs, and reasons
 - `quality_warnings`
-- `review_status`
 - `source_claim_status`
-- `source_listing_id_status`
-- `location_evidence_status`
-- `distance_evidence_status`
-- `year_evidence_status`
-- `price_evidence_status`
-- `mileage_evidence_status`
-- `raw_record_ref`
-- `normalized_record_ref`
-- `source_completed_at_utc`
+- location/distance evidence status
+- canonical and raw evidence references
+- source completion timestamp
 
-Phase 1 remains interim until identity/lifecycle, retention, workflow hardening, and purpose-specific outputs are completed.
+Phase 1 remains interim until retention, workflow hardening, buyer intelligence, and purpose-specific outputs are complete.
