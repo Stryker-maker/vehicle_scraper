@@ -1,25 +1,27 @@
 # Vehicle Market Information Collector
 
-This repository collects used-vehicle listings from AutoTrader and Kijiji, preserves source/run evidence, tracks source-scoped listing lifecycle, bounds generated-data growth, and produces decision-safe unranked CSV files for manual review.
+This repository collects used-vehicle listings from AutoTrader and Kijiji, preserves source/run evidence, tracks source-scoped listing lifecycle, bounds generated-data growth, and produces decision-safe unranked outputs for manual review and F-350 purchase investigation.
 
 Its primary purpose is an informed early-2020s diesel Ford F-350 purchase. It also supports lightweight owned-vehicle value monitoring and a family-vehicle search for a family friend.
 
 ## Current status
 
-**Functional collection prototype under structured audit.**
+**Functional collection and F-350 investigation prototype under structured audit.**
 
-The repository validates governed scope, runs enabled sources independently, preserves adapter and canonical evidence, reconciles every fetched listing object, tracks explainable listing lifecycle, applies bounded retention, uses reproducible CI/collection workflows, and produces accepted-record review datasets. It is not a finished appraisal, recommendation, or automatic vehicle-selection system.
+The repository validates governed scope, runs enabled sources independently, preserves adapter and canonical evidence, reconciles every fetched listing object, tracks explainable listing lifecycle, applies bounded retention, uses reproducible CI/collection workflows, and builds transparent F-350 investigation context. It is not an appraisal, automatic recommendation, independent vehicle-history service, or replacement for inspection.
 
 Important boundaries:
 
 - Automated cross-source ranking is disabled.
-- Every listing requires manual verification.
+- Every listing and source claim requires manual verification.
 - Source listing IDs are source-scoped claims and are never VINs.
 - VIN values are recorded only when explicitly source-reported; they remain unverified claims.
 - Duplicate matches are explainable candidates only and never merge canonical records.
 - `missing` and `retired` are operational lifecycle inferences, not source claims that a vehicle sold.
-- Historical merged/ranked CSV files are not current recommendations.
-- Historical `price_history_*.json` files are not used by supported output and are removed for active vehicles by governed retention.
+- Asking-price bands are observed listing context, not sale prices or appraisal.
+- Mileage-adjusted projections are descriptive asking-price context, not future value.
+- Owner overrides never rewrite source or computed evidence.
+- Historical merged/ranked CSV files and legacy `price_history_*.json` are not supported outputs.
 
 See `docs/LIMITATIONS_REGISTER.md` for tracked limitations.
 
@@ -73,7 +75,17 @@ data/run_status/publication_latest.json
 data/retention/latest.json
 ```
 
-The supported manual-review CSV is built from accepted canonical records joined one-to-one with current identity/lifecycle evidence. It contains no `rank` or `score`.
+F-350-specific buyer investigation adds:
+
+```text
+data/ford_f350/buyer_intelligence/investigation_latest.jsonl
+data/ford_f350/buyer_intelligence/investigation_latest.csv
+data/ford_f350/buyer_intelligence/seller_questions_latest.jsonl
+data/ford_f350/buyer_intelligence/market_summary_latest.json
+data/ford_f350/buyer_intelligence/market_summary_latest.md
+```
+
+The general manual-review CSV is built from accepted canonical records joined one-to-one with current identity/lifecycle evidence. The F-350 investigation output additionally joins current raw adapter payloads to expose configuration, usage, history, price-band, projection, seller-question, and owner-override context. Neither output contains `rank` or `score`.
 
 Do not use `data/<vehicle>/merged/*.csv` as current recommendations. Historical merged CSVs are disabled legacy output and are deleted for active vehicles by governed retention with SHA-256 deletion evidence.
 
@@ -97,7 +109,7 @@ Kijiji query origin never becomes listing geography. Listing location is listing
 
 - `canonical_listing_id` remains a stable source-scoped listing claim.
 - `source_listing_id_status` remains `source_identifier_claim_not_vin`.
-- Explicit VIN claims are labelled `source_reported_format_valid_unverified`, invalid, conflicting, or not reported.
+- Explicit VIN claims are labelled format-valid unverified, invalid, conflicting, or not reported.
 - Strict and loose fingerprints support explainable comparison; they are not physical-vehicle identity authority.
 - Cross-source duplicate candidates are high, medium, or low confidence with visible reasons and `candidate_only_not_merged`.
 - Lifecycle states are `active`, `missing`, `reappeared`, and `retired`.
@@ -106,6 +118,23 @@ Kijiji query origin never becomes listing geography. Listing location is listing
 - Retired tombstones are limited to 500 per source and 365 days since last successful observation.
 
 Both source status files use schema version `8`; adapter schema remains `1`.
+
+## F-350 buyer intelligence
+
+`f350_buyer_intelligence.py` provides buyer-intelligence schema version `1`. It builds only from current successful source status, accepted canonical evidence, matching raw adapter payloads, and matching identity/lifecycle evidence. Stale Audit 03 review CSVs and legacy rank/history fields are not inputs.
+
+It can expose source-text claims for trim, STX/FX4/Tremor packages, cab, box, SRW/DRW, drivetrain, engine hours, idle hours, service-record availability, accident/title language, and prior-use language. Missing evidence remains unknown and becomes a visible investigation gap and seller question.
+
+When supported, it calculates kilometres per engine hour and idle-hour percentage as usage context only. It also provides:
+
+- observed asking-price quartiles with cohort basis and comparable count
+- transparent mileage-adjusted asking-price regression with sample count, slope, intercept, and `r_squared`
+- a five-year mileage scenario using the owner's expected 5,000–8,000 km per year
+- explainable non-ranked classifications and reasons
+- seller questions driven by missing evidence or visible concerns
+- owner dispositions, notes, tags, and reasoned classification overrides
+
+The computed classification remains visible when an owner override is applied. `f350_owner_overrides.json` is governed input; it never rewrites collected or computed evidence. `trim_tiers.json` remains legacy descriptive configuration and is not buyer-intelligence or purchase authority.
 
 ## Storage and retention
 
@@ -117,7 +146,7 @@ Repository-growth gates are 50 MiB per managed file and 500 MiB total active man
 
 ## Reproducible workflows
 
-Audit 08 separates three workflows:
+The repository separates three workflows:
 
 - `.github/workflows/ci.yml` — reusable deterministic CI for non-data pull-request changes, manual CI, and collection preflight
 - `.github/workflows/generated-data.yml` — integrity and retention validation for `data/**` pull-request changes
@@ -127,9 +156,9 @@ Python is fixed to `3.11.13`. `requirements.lock` contains exact dependency pins
 
 Scheduled full collection runs Mondays at 08:00 UTC. Manual inputs are `collection_scope`, active `vehicle_key`, `source`, `publish_generated_data`, `anomaly_policy`, and optional `operator_note`.
 
-A full run snapshots prior health, writes baseline-aware anomaly schema v1, applies health/anomaly/retention/publication gates, and writes publication manifest schema v1 before a generated-data push. A remote branch change during collection blocks publication.
+A full run snapshots prior health, writes baseline-aware anomaly schema v1, applies source health, builds combined F-350 buyer intelligence, then applies anomaly/retention/publication gates. A remote branch change during collection blocks publication.
 
-A `single_pair` run validates one active governed source pair, uploads seven-day temporary evidence, and never publishes generated data.
+A `single_pair` run validates one active governed source pair, uploads seven-day temporary evidence, and never publishes generated data. F-350 single-pair runs also include source-specific buyer intelligence; other vehicles do not receive F-350 outputs.
 
 ## Current execution flow
 
@@ -138,9 +167,9 @@ A `single_pair` run validates one active governed source pair, uploads seven-day
 3. Direct adapters preserve request, page, raw object, rejection, parse-failure, and canonical evidence.
 4. Identity/lifecycle updates only after healthy reconciled source execution and rolls back on failure.
 5. Full runs build manual review, consolidated health, and baseline-aware anomaly evidence.
-6. Health and critical-anomaly policy gates run before retention.
-7. Retention is applied and verified.
-8. Publication validates staged paths, writes/verifies the manifest, runs `git diff --cached --check`, confirms the remote ref is unchanged, and then pushes a governed data commit.
+6. Source health passes before combined F-350 buyer intelligence is built.
+7. Critical-anomaly policy and retention gates run.
+8. Publication validates staged paths, writes/verifies the manifest, checks whitespace, confirms the remote ref is unchanged, and then pushes a governed data commit.
 
 ## Local validation
 
@@ -155,11 +184,12 @@ python -m unittest discover -s tests -v
 python storage_retention.py verify --registry vehicle_registry.json
 ```
 
-Run governed sources:
+Run governed sources and then build current-run F-350 intelligence:
 
 ```bash
 python autotrader_run.py --config config_f350.json --timeout-seconds 4500 --fail-on-unhealthy
 python kijiji_run.py --config config_f350.json --timeout-seconds 4500 --fail-on-unhealthy
+python f350_buyer_intelligence.py build --config config_f350.json --run-id <same-run-id> --overrides f350_owner_overrides.json
 ```
 
 Legacy command names remain aliases into the governed runtimes. Never run `merge.py` to create a recommendation set.
@@ -180,10 +210,13 @@ autotrader_*.py                      direct AutoTrader adapter/runtime/evidence
 kijiji_*.py                          direct Kijiji adapter/runtime/evidence
 canonical_evidence.py                canonical stages and reconciliation
 identity_lifecycle.py                identity, lifecycle, compact history, duplicate candidates
+f350_buyer_intelligence.py           transparent F-350 investigation outputs
+f350_owner_overrides.json            governed owner annotations and overrides
 storage_retention.py                 archive bounds, deletion evidence, size and staged-path gates
 phase1_reporting.py                  accepted plus identity evidence manual review and health
 vehicle_registry.json/.py            operational scope and source plan
 vehicle_config.py/config_*.json      governed criteria
+trim_tiers.json                      legacy descriptive labels, not buyer authority
 merge.py                             LEGACY / DISABLED merger and ranker
 data/                                generated evidence, lifecycle, retention, status, review data
 tests/                               fixtures, hostile tests, contracts
@@ -206,6 +239,7 @@ docs/                                repository authorities
 - `AUDIT_06_IDENTITY_LIFECYCLE.md`
 - `AUDIT_07_STORAGE_RETENTION.md`
 - `AUDIT_08_CI_WORKFLOW_HARDENING.md`
+- `AUDIT_09_F350_BUYER_INTELLIGENCE.md`
 
 ## Change authority
 
