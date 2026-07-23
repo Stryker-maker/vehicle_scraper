@@ -2,120 +2,110 @@
 
 ## Purpose
 
-This document describes the governed execution paths, source boundaries, generated evidence, and remaining compatibility components.
+This document describes governed source execution, adapter/canonical boundaries, identity/lifecycle state, supported reporting, and authority limits.
 
 ## 1. Operational authority
 
-`vehicle_registry.json` schema v2 controls enabled/paused state, purpose, priority, cadence metadata, enabled sources, analysis profile, and pause reason.
-
-Each `config_*.json` schema-v2 file controls shared criteria, origin, and separate AutoTrader/Kijiji make, model, and query settings. `vehicle_config.py` rejects obsolete/invalid fields and requires every Kijiji query label to resolve through `kijiji_locations.py` registry version 1.
+`vehicle_registry.json` schema v2 controls enabled/paused state, source plan, purpose, priority, cadence metadata, and analysis profile. Each schema-v2 `config_*.json` controls criteria, origin, and source-specific queries. Kijiji labels must resolve through location-registry version 1.
 
 ## 2. Workflow orchestration
 
 `.github/workflows/scrape.yml` provides:
 
-- pull request: compilation, registry/config validation, structured tests
-- scheduled full run: complete registry plan and generated-data commit
-- manual full run: complete registry plan; commit only when explicitly enabled
-- manual single-pair run: one governed vehicle/source pair, source-health validation, artifact upload, no repository commit
-- generated-data PR event: acknowledgement only
+- pull requests: dependency setup, compilation, registry/config validation, deterministic/hostile tests
+- scheduled full runs: complete registry plan, reporting, health, and active-scope data commit
+- manual full runs: same plan, commit only when explicitly enabled
+- manual `single_pair`: one governed vehicle/source, source plus lifecycle validation, temporary artifact, no repository commit
+- generated-data PR events: acknowledgement only
 
-The single-pair path is a limited Audits 04–05 validation control. Audit 08 owns the final workflow architecture.
+The limited single-pair path avoids routine ten-pair validation. Audit 08 owns final workflow architecture.
 
-## 3. AutoTrader direct adapter
+## 3. Direct source paths
+
+### AutoTrader
 
 ```text
 schema-v2 config
   → autotrader_run.py
     → autotrader_adapter.py
-      → AutoTrader page requests
-      → adapter request/record/reconciliation evidence
+      → requests/pages/response listing objects
+      → adapter evidence schema v1
     → autotrader_canonical.py
       → canonical evidence schema v1
-    → source status schema v6
+    → identity_lifecycle.py
+      → identity/lifecycle schema v1
+    → source status schema v8
 ```
 
-`autotrader_adapter.py` builds explicit requests, retries bounded transient failures, records every attempt/page, paginates by size/offset, detects incomplete/repeated pages, preserves every returned listing object, records duplicate/rejection/parse reasons, produces unranked accepted rows, and never mutates config.
+Fetched scope is `autotrader_adapter_response_listing_objects`. Request attempts, pagination, duplicates, exclusions, parse failures, and route/geodesic/unavailable distance evidence remain explicit.
 
-AutoTrader fetched scope is `autotrader_adapter_response_listing_objects`.
-
-Distance methods are `route_api_address`, `route_api_city_center`, `geodesic_address`, `geodesic_city_center`, or `unavailable`; evidence status distinguishes routed, straight-line estimate, and unavailable.
-
-## 4. Kijiji direct adapter
+### Kijiji
 
 ```text
 schema-v2 config
   → kijiji_run.py
     → kijiji_locations.py validated hub plan
     → kijiji_adapter.py
-      → Kijiji Cars & Trucks page requests
-      → JSON-LD listing objects
-      → adapter request/record/reconciliation evidence
+      → requests/pages/JSON-LD listing objects
+      → adapter evidence schema v1
     → kijiji_canonical.py
       → canonical evidence schema v1
-    → source status schema v7
+    → identity_lifecycle.py
+      → identity/lifecycle schema v1
+    → source status schema v8
 ```
 
-`kijiji_adapter.py`:
+Fetched scope is `kijiji_adapter_json_ld_listing_objects`. Query hub is provenance only, URL region is separate unverified evidence, listing geography is listing-specific source evidence or unknown, and distance remains disabled.
 
-- resolves only explicit validated hub labels/slugs/location IDs
-- has no `l0` fallback
-- retries bounded transient failures and records attempts
-- paginates until empty/short page or visible incomplete stop
-- parses JSON-LD `ItemList`, `Vehicle`, `Car`, and `Product` objects
-- preserves every returned object as accepted, rejected, or parse failure
-- records duplicates and criteria exclusions with reasons
-- emits no rank or score and never mutates config or locations
+## 4. Canonical boundary
 
-Kijiji fetched scope is `kijiji_adapter_json_ld_listing_objects`.
-
-### Kijiji geography boundary
-
-Query hub, URL region, and listing geography are distinct evidence:
-
-- query hub is request provenance only
-- URL region is `unverified_url_evidence`
-- `location`/`dealer_address` are populated only from listing-specific structured source fields
-- listing-specific geography is labelled `source_reported_listing_specific_unverified`
-- missing listing geography remains null/`unknown`
-- query origin never becomes location, address, or distance
-
-Kijiji distance processing/filtering remains disabled. `distance_km` is null, method is `disabled_listing_location_not_routed`, and evidence status is `disabled_no_verified_route`.
-
-The former `phase1_kijiji_runner.py` runtime text-patching/`exec` path is removed. `kijiji_scraper.py` is only a compatibility alias into `kijiji_run.py`.
-
-## 5. Canonical evidence
-
-For every source:
+For both sources:
 
 ```text
 fetched_records = accepted_records + rejected_records + parse_failures
 ```
 
-Canonical schema v1 provides exact raw evidence, typed/null-safe values, stable source-scoped listing IDs, run observations, field evidence statuses, accepted/rejected/parse-failure artifacts, reasons, and reconciliation.
+Canonical schema v1 preserves raw payload evidence, null-safe normalized values, stable source-scoped canonical listing IDs, run observations, field evidence statuses, explicit reasons, and reconciliation.
 
-| Source | Fetched boundary |
-|---|---|
-| AutoTrader | `autotrader_adapter_response_listing_objects` |
-| Kijiji | `kijiji_adapter_json_ld_listing_objects` |
+Canonical IDs identify listing claims within a source. They are not VINs or physical-vehicle identity.
 
-Neither boundary proves complete marketplace coverage.
+## 5. Identity and lifecycle boundary
 
-## 6. Evidence-backed reporting
+`identity_lifecycle.py` runs only after collection, freshness, schema, pagination, canonical reconciliation, accepted/output agreement, and config isolation have passed.
 
-`phase1_reporting.py`:
+Per-source state records:
 
-- consumes the governed source plan
-- requires current successful status and canonical reconciliation
-- reads `accepted_latest.jsonl`, not source CSV, for manual review
-- writes unranked manual-review CSVs with evidence statuses
-- writes consolidated JSON/Markdown health on full runs
-- keeps Kijiji query origin separate from listing geography
-- treats any Kijiji listing-specific geography as unverified and requiring human confirmation
+- source listing ID status `source_identifier_claim_not_vin`
+- explicit VIN claim evidence: format-valid unverified, invalid, conflicting, or not reported
+- strict/loose explainable fingerprints
+- `active`, `missing`, `reappeared`, and `retired` lifecycle states
+- exact first/last/evaluation timestamps and elapsed seconds/days
+- run-ID-idempotent price observations
 
-Shared health requires current success, fresh valid output, accepted records, canonical schema v1, reconciliation, no cap, and config isolation. Each direct runtime additionally requires complete configured-query pagination and accepted/output count agreement before reporting success.
+Retirement requires three consecutive successful-source-run misses and fourteen elapsed days. Lifecycle states are operational inferences, not source-confirmed sold/removal claims.
 
-## Current data flow
+Before each source run, identity artifacts are snapshotted. Any unhealthy result restores the prior state; failed runs cannot advance missing or retirement counters.
+
+## 6. Duplicate candidates
+
+After all current source identities for a vehicle are available, `phase1_reporting.py` builds cross-source duplicate candidates.
+
+- confidence is high, medium, or low
+- reasons are visible
+- references to both canonical records are preserved
+- `decision_status` is `candidate_only_not_merged`
+
+Candidates do not delete, suppress, rewrite, or merge records and do not create purchase-ranking authority.
+
+## 7. Supported reporting
+
+Manual review joins accepted canonical records one-to-one with current identity/lifecycle records. A missing, wrong-run, or count-mismatched identity artifact excludes the source and triggers the fail-closed integrity guard.
+
+Supported review exposes VIN status, fingerprints, lifecycle state/reason, actual elapsed time, corrected price observations, and duplicate-candidate references. It excludes rank, score, week-named history, and legacy history text.
+
+Source status schema v8 requires identity schema v1, `identity_lifecycle_status: updated`, and identity-current count equal to accepted count. Consolidated health schema v6 aggregates canonical counts plus tracked, new, reappeared, missing, and retired counts.
+
+## 8. Current data flow
 
 ```mermaid
 flowchart TD
@@ -124,76 +114,76 @@ flowchart TD
 
     P -->|AutoTrader| AR[autotrader_run.py]
     AR --> AA[autotrader_adapter.py]
-    AA --> AP[AutoTrader responses]
-    AP --> AE[AutoTrader adapter evidence]
+    AA --> AE[AutoTrader adapter evidence v1]
     AE --> AC[autotrader_canonical.py]
-    AC --> CE[canonical evidence v1]
-    AR --> AS[source status v6]
 
     P -->|Kijiji| KR[kijiji_run.py]
     KR --> KL[kijiji_locations.py]
     KL --> KA[kijiji_adapter.py]
-    KA --> KP[Kijiji JSON-LD objects]
-    KP --> KE[Kijiji adapter evidence]
+    KA --> KE[Kijiji adapter evidence v1]
     KE --> KC[kijiji_canonical.py]
-    KC --> CE
-    KR --> KS[source status v7]
 
+    AC --> CE[canonical evidence v1]
+    KC --> CE
+    CE --> IL[identity_lifecycle.py v1]
+    IL --> IS[source status v8]
+    IL --> DC[duplicate candidates]
     CE --> MR[phase1_reporting.py]
-    AS --> MR
-    KS --> MR
+    IL --> MR
+    DC --> MR
     MR --> CSV[manual-review CSV]
-    MR --> H[full-run health JSON and Markdown]
+    MR --> H[health JSON/Markdown v6]
 ```
 
-## Artifact map
+## 9. Artifact map
 
-### Adapter evidence
+Adapter evidence:
 
-Under `data/<vehicle>/adapter_evidence/<source>/`:
+```text
+data/<vehicle>/adapter_evidence/<source>/requests_latest.jsonl
+data/<vehicle>/adapter_evidence/<source>/records_latest.jsonl
+data/<vehicle>/adapter_evidence/<source>/reconciliation_latest.json
+```
 
-| Path | Meaning |
-|---|---|
-| `requests_latest.jsonl` | query/page URL, attempts, HTTP outcomes, returned-object count, stop reason |
-| `records_latest.jsonl` | every returned listing object, raw payload, provenance, stage, reasons |
-| `reconciliation_latest.json` | pagination/request counts and adapter equality |
+Canonical evidence:
 
-### Canonical evidence
+```text
+data/<vehicle>/evidence/<source>/raw_latest.jsonl
+data/<vehicle>/evidence/<source>/normalized_latest.jsonl
+data/<vehicle>/evidence/<source>/accepted_latest.jsonl
+data/<vehicle>/evidence/<source>/rejected_latest.jsonl
+data/<vehicle>/evidence/<source>/parse_failures_latest.jsonl
+data/<vehicle>/evidence/<source>/reconciliation_latest.json
+```
 
-Under `data/<vehicle>/evidence/<source>/`:
+Identity/lifecycle evidence:
 
-| Artifact | Meaning |
-|---|---|
-| `raw_latest.jsonl` | exact adapter-boundary evidence |
-| `normalized_latest.jsonl` | typed/null-safe transformations |
-| `accepted_latest.jsonl` | current manual-review inputs |
-| `rejected_latest.jsonl` | explicit exclusions |
-| `parse_failures_latest.jsonl` | failed records with reasons |
-| `reconciliation_latest.json` | counts, fetched scope, completeness state, paths |
+```text
+data/<vehicle>/identity_lifecycle/<source>/state_latest.json
+data/<vehicle>/identity_lifecycle/<source>/current_latest.jsonl
+data/<vehicle>/identity_lifecycle/<source>/events_latest.jsonl
+data/<vehicle>/identity_lifecycle/<source>/summary_latest.json
+data/<vehicle>/identity_lifecycle/duplicate_candidates_latest.jsonl
+```
 
-### Run and review evidence
+Review and health:
 
-| Artifact | Meaning |
-|---|---|
-| `data/<vehicle>/run_status/<source>_latest.json` | source execution and evidence health |
-| `data/run_status/latest.json` | registry-wide health from a full run |
-| `data/run_status/latest.md` | readable full-run health |
-| `data/<vehicle>/manual_review/<vehicle>_manual_review_latest.csv` | supported accepted records |
-| `data/<vehicle>/merged/*.csv` | disabled historical output |
+```text
+data/<vehicle>/run_status/<source>_latest.json
+data/<vehicle>/manual_review/<vehicle>_manual_review_latest.csv
+data/run_status/latest.json
+data/run_status/latest.md
+```
 
-## Authority boundaries
+Historical merged CSVs and `price_history_*.json` are not supported inputs.
 
-- registry controls operational scope
-- approved configs control criteria/query plans
-- both active adapters read approved config directly and verify it remains unchanged
-- source values are evidence, not verified truth
-- query provenance is not listing geography
-- normalized values are transformations, not verification
-- accepted means eligible for manual review, not recommended
-- rejected and failed records remain evidence
-- source listing IDs are not VINs
-- owner retains purchase, merge, and roadmap authority
+## 10. Authority boundaries
 
-## Remaining work
-
-Audit 06 adds identity, deduplication, and lifecycle. Audit 07 defines retention. Audit 08 finalizes CI/workflow structure. Audits 09–10 create purpose-specific decision support without opaque ranking.
+- Registry controls operational scope; configs control criteria/query plans.
+- Source values, VIN claims, and normalized values are evidence, not verified truth.
+- Query provenance is not listing geography.
+- Accepted means eligible for manual review, not recommended.
+- Duplicate candidate means compare manually, not merge.
+- Missing/retired do not prove sold status.
+- Audit 07 owns retention; Audit 09 owns buyer intelligence.
+- The owner retains purchase, merge, and roadmap authority.
