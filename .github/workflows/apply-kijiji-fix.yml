@@ -50,16 +50,24 @@ jobs:
           git diff --check
           git diff --stat
 
-      - name: Commit corrections to Audit 10 branch
+      - name: Export validated scrape workflow
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: validated-kijiji-scrape-workflow-${{ github.run_id }}
+          path: .github/workflows/scrape.yml
+          if-no-files-found: error
+          retention-days: 3
+
+      - name: Commit code and tests to Audit 10 branch
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add kijiji_adapter.py kijiji_response_diagnostics.py tests/test_kijiji_structured_fields.py tests/test_kijiji_response_diagnostics.py .github/workflows/scrape.yml
+          git add kijiji_adapter.py kijiji_response_diagnostics.py tests/test_kijiji_structured_fields.py tests/test_kijiji_response_diagnostics.py
           git diff --cached --check
           if git diff --cached --quiet; then
-            echo "No Kijiji correction changes to commit."
+            echo "No Kijiji code changes to commit."
             exit 0
           fi
-          git commit -m "Fix Kijiji structured fuel parsing and failure evidence"
+          git commit -m "Fix Kijiji structured fuel parsing and response diagnostics"
           git push origin HEAD:ai/audit-10-purpose-outputs
