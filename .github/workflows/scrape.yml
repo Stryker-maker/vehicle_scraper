@@ -145,7 +145,7 @@ jobs:
             --plan "${{ steps.collection-plan.outputs.path }}" \
             --run-id "$GITHUB_RUN_ID"
 
-      - name: Build F-350 buyer intelligence for narrow validation
+      - name: Build and validate F-350 buyer intelligence for narrow validation
         if: env.COLLECTION_SCOPE == 'single_pair' && env.VEHICLE_KEY == 'ford_f350'
         run: |
           python f350_buyer_intelligence.py build \
@@ -153,6 +153,10 @@ jobs:
             --run-id "$GITHUB_RUN_ID" \
             --source "$SELECTED_SOURCE" \
             --overrides f350_owner_overrides.json
+          python f350_buyer_validation.py \
+            --config config_f350.json \
+            --run-id "$GITHUB_RUN_ID" \
+            --source "$SELECTED_SOURCE"
           cat data/ford_f350/buyer_intelligence/market_summary_latest.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Prepare single-pair validation artifact
@@ -208,13 +212,18 @@ jobs:
         if: env.COLLECTION_SCOPE == 'full'
         run: python phase1_pipeline.py check-health
 
-      - name: Build transparent F-350 buyer intelligence
+      - name: Build and validate transparent F-350 buyer intelligence
         if: env.COLLECTION_SCOPE == 'full'
         run: |
           python f350_buyer_intelligence.py build \
             --config config_f350.json \
             --run-id "$GITHUB_RUN_ID" \
             --overrides f350_owner_overrides.json
+          python f350_buyer_validation.py \
+            --config config_f350.json \
+            --run-id "$GITHUB_RUN_ID" \
+            --source autotrader \
+            --source kijiji
           cat data/ford_f350/buyer_intelligence/market_summary_latest.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Enforce critical anomaly policy
