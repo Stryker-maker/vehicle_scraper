@@ -65,7 +65,7 @@ class DocumentationContractTests(unittest.TestCase):
             "seller_questions_latest.jsonl",
             "asking-price quartiles",
             "not an appraisal",
-            "owner overrides never rewrite",
+            "Owner overrides never rewrite",
             "fetched_records = accepted_records + rejected_records + parse_failures",
             "autotrader_adapter_response_listing_objects",
             "kijiji_adapter_json_ld_listing_objects",
@@ -209,18 +209,18 @@ class DocumentationContractTests(unittest.TestCase):
             "generated-data pull requests",
         ):
             self.assertIn(value, audit08)
-        audit09 = self.read("AUDIT_09_F350_BUYER_INTELLIGENCE.md")
+        audit09 = self.read("AUDIT_09_F350_BUYER_INTELLIGENCE.md").lower()
         for value in (
             "source_text_reported_unverified",
             "kilometres_per_engine_hour",
             "idle_hour_percent",
             "observed quartiles",
-            "ordinary least squares",
-            "not appraisal",
+            "ordinary least-squares",
+            "not sale-price evidence",
             "seller questions",
             "classification override requires a reason",
             "computed classification",
-            "no rank or score",
+            "does not emit `rank`, `score`",
         ):
             self.assertIn(value, audit09)
 
