@@ -7,7 +7,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from autotrader_run import run_autotrader
-from identity_lifecycle import artifact_paths
+from identity_lifecycle import IDENTITY_LIFECYCLE_SCHEMA_VERSION, artifact_paths
 
 
 class AutoTraderRuntimeTests(unittest.TestCase):
@@ -139,7 +139,10 @@ reconciliation_path.write_text(json.dumps(report, indent=2) + "\n", encoding="ut
         self.assertEqual(status["execution_status"], "success")
         self.assertEqual(status["schema_version"], 8)
         self.assertEqual(status["source_adapter_schema_version"], 1)
-        self.assertEqual(status["identity_lifecycle_schema_version"], 1)
+        self.assertEqual(
+            status["identity_lifecycle_schema_version"],
+            IDENTITY_LIFECYCLE_SCHEMA_VERSION,
+        )
         self.assertEqual(status["identity_lifecycle_status"], "updated")
         self.assertEqual(status["identity_observed_current_count"], 1)
         self.assertEqual(status["identity_new_listing_count"], 1)
