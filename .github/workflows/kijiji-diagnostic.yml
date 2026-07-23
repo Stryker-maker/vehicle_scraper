@@ -1,6 +1,12 @@
 name: Kijiji Response Diagnostic
 
 on:
+  push:
+    branches: [ai/audit-10-purpose-outputs]
+    paths:
+      - '.github/workflows/kijiji-diagnostic.yml'
+      - 'kijiji_probe.py'
+      - 'tests/test_kijiji_probe.py'
   workflow_dispatch:
     inputs:
       vehicle_key:
@@ -18,6 +24,8 @@ jobs:
     name: Capture Kijiji response evidence
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    env:
+      VEHICLE_KEY: ${{ github.event_name == 'workflow_dispatch' && inputs.vehicle_key || 'honda_odyssey' }}
     steps:
       - name: Checkout diagnostic ref
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -38,8 +46,6 @@ jobs:
 
       - name: Resolve governed vehicle configuration
         id: config
-        env:
-          VEHICLE_KEY: ${{ inputs.vehicle_key }}
         run: |
           case "$VEHICLE_KEY" in
             ford_f350) config=config_f350.json ;;
@@ -63,7 +69,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: kijiji-response-diagnostic-${{ inputs.vehicle_key }}-${{ github.run_id }}
+          name: kijiji-response-diagnostic-${{ env.VEHICLE_KEY }}-${{ github.run_id }}
           path: ${{ runner.temp }}/kijiji-probe
           if-no-files-found: error
           retention-days: 7
