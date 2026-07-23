@@ -16,8 +16,8 @@ This document preserves the owner-approved sequence for turning the repository i
 | 05 | Kijiji Collector Replacement | Complete and merged |
 | 06 | Identity, Deduplication and Listing Lifecycle | Complete and merged |
 | 07 | Storage, Retention and Repository Hygiene | Complete and merged |
-| 08 | CI and Workflow Hardening | Implemented; deterministic validation and owner merge pending |
-| 09 | F-350 Buyer Intelligence | Approved, not started |
+| 08 | CI and Workflow Hardening | Complete and merged |
+| 09 | F-350 Buyer Intelligence | Implemented; deterministic and narrow validation pending |
 | 10 | Secondary Purpose Outputs | Approved, not started |
 | 11 | Optional Search Reintroduction | Approved final stage |
 
@@ -103,9 +103,9 @@ Delivered eight source snapshots per active source, four manual-review snapshots
 
 ## Audit 08 — CI and Workflow Hardening
 
-**Status:** implemented on `ai/audit-08-ci-workflow-hardening`; exact-head deterministic validation and owner merge remain pending.
+**Status:** complete and merged through PR #10.
 
-### Scope
+Delivered:
 
 - exact Python dependency lock and Python runtime version
 - exact GitHub Action commit SHAs
@@ -118,21 +118,35 @@ Delivered eight source snapshots per active source, four manual-review snapshots
 - health, anomaly, retention, staged-path, manifest, whitespace, and remote-ref gates before push
 - short-lived failure evidence and bounded full-run diagnostics
 
-### Acceptance
-
-Pull requests must never execute collectors; collection must not start before reusable CI passes; moving dependency/action references must be absent; paused vehicles must fail plan/publication validation; critical anomalies must remain visible and enforceable; publication manifests must match staged governed paths; and generated-data pull requests must receive actual integrity validation rather than acknowledgement-only success.
-
-### Non-scope
-
-No source-query/parser, vehicle-criteria, evidence-equation, identity/lifecycle, retention-limit, buyer-ranking, F-350 enrichment, purpose-output, sold-state, or optional-vehicle change.
+Pull requests cannot execute collectors; collection cannot start before reusable CI passes; paused vehicles fail plan/publication validation; critical anomalies remain visible and enforceable; publication manifests match staged governed paths; and generated-data pull requests receive integrity validation rather than acknowledgement-only success.
 
 ---
 
 ## Audit 09 — F-350 Buyer Intelligence
 
-**Status:** approved, not started.
+**Status:** implemented on `ai/audit-09-f350-buyer-intelligence`; exact-head deterministic validation, narrow live validation, owner review, and merge remain pending.
 
-Add transparent F-350 configuration/history/condition investigation, price bands, projections, seller questions, and manual override without opaque ranking.
+### Scope
+
+- current-run fail-closed joins across source status, accepted canonical evidence, raw adapter payloads, and identity/lifecycle evidence
+- source-text evidence for trim, packages, cab, box, SRW/DRW, drivetrain, engine hours, idle hours, service-history claims, accident/title claims, and prior-use claims
+- explicit evidence completeness and missing-investigation fields
+- guarded kilometres-per-engine-hour and idle-hour percentage context
+- observed asking-price quartiles with visible cohort basis and comparable count
+- transparent mileage-adjusted asking-price regression with sample count, slope, intercept, and `r_squared`
+- five-year owner mileage scenario based on 5,000–8,000 km per year
+- explainable non-ranked classifications and visible reasons
+- evidence-gap and concern-driven seller questions
+- owner dispositions, notes, tags, and reasoned classification overrides that preserve source and computed evidence
+- rich JSONL, review CSV, seller-question JSONL, and JSON/Markdown market-summary artifacts
+
+### Acceptance
+
+Missing values must remain unknown; every extracted value must retain unverified evidence status; stale or disconnected artifacts must fail closed; price bands and projections must expose samples and interpretation limits; seller questions must trace to gaps or concerns; owner overrides must remain separate from computed evidence; supported outputs must contain no rank or score; and F-350 workflow integration must not create secondary-purpose or optional-vehicle outputs.
+
+### Non-scope
+
+No source-query/parser, vehicle-criteria, canonical-equation, identity/lifecycle-threshold, retention-limit, independent VIN/history/configuration verification, external history-report purchase, repair-cost prediction, RAM/Forester/Odyssey/Carnival purpose output, sold-state, or F-150/Tundra change.
 
 ---
 
