@@ -65,6 +65,7 @@ jobs:
           kijiji_canonical.py
           kijiji_run.py
           f350_buyer_intelligence.py
+          f350_buyer_validation.py
           phase1_runtime.py
           phase1_reporting.py
           phase1_pipeline.py
