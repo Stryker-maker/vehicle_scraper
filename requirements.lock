@@ -1,0 +1,12 @@
+# Audit 08 reproducible Python 3.11 runtime/test dependency lock.
+# Update intentionally through a reviewed ai/* pull request.
+beautifulsoup4==4.15.0
+certifi==2026.6.17
+charset-normalizer==3.4.9
+geographiclib==2.1
+geopy==2.5.0
+idna==3.17
+requests==2.34.2
+soupsieve==2.8.4
+typing-extensions==4.16.0
+urllib3==2.7.0
