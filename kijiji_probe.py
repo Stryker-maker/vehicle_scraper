@@ -14,7 +14,7 @@ from kijiji_locations import validate_query_locations
 from phase1_common import utc_now
 from vehicle_config import load_vehicle_config
 
-PROBE_SCHEMA_VERSION = 1
+PROBE_SCHEMA_VERSION = 2
 PUBLIC_RESPONSE_HEADERS = (
     "content-type",
     "content-length",
@@ -45,6 +45,29 @@ DATA_MARKERS = (
     "listingcard",
     "/v-cars-trucks/",
 )
+HEADER_PROFILES: dict[str, dict[str, str]] = {
+    "production_adapter_v1": {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "Chrome/120 VehicleScraper/1.0"
+        ),
+        "Accept-Language": "en-CA,en;q=0.9",
+    },
+    "browser_compatible_v1": {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/120.0.0.0 Safari/537.36"
+        ),
+        "Accept": (
+            "text/html,application/xhtml+xml,application/xml;q=0.9,"
+            "image/avif,image/webp,*/*;q=0.8"
+        ),
+        "Accept-Language": "en-CA,en;q=0.9",
+        "Cache-Control": "no-cache",
+        "Pragma": "no-cache",
+    },
+}
 
 
 def _safe_name(value: str) -> str:
@@ -122,20 +145,6 @@ def run_probe(
     query_plan = validate_query_locations(source["search_locations"])
     output_dir.mkdir(parents=True, exist_ok=True)
     session = default_session()
-    headers = {
-        "User-Agent": (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/120.0.0.0 Safari/537.36"
-        ),
-        "Accept": (
-            "text/html,application/xhtml+xml,application/xml;q=0.9,"
-            "image/avif,image/webp,*/*;q=0.8"
-        ),
-        "Accept-Language": "en-CA,en;q=0.9",
-        "Cache-Control": "no-cache",
-        "Pragma": "no-cache",
-    }
     records: list[dict[str, Any]] = []
     for query in query_plan:
         url = build_search_url(
@@ -144,34 +153,40 @@ def run_probe(
             query_location=query,
             page=1,
         )
-        record: dict[str, Any] = {
-            "query_location": query["config_label"],
-            "query_location_id": query["location_id"],
-            "request_url": url,
-        }
-        try:
-            response = session.get(url, headers=headers, timeout=timeout_seconds)
-            summary = response_summary(response, url)
-            record.update(summary)
-            raw_name = f"{_safe_name(query['config_label'])}-page-1.html"
-            (output_dir / raw_name).write_text(
-                str(getattr(response, "text", "") or ""),
-                encoding="utf-8",
-            )
-            record["raw_html_file"] = raw_name
-        except Exception as exc:
-            record.update(
-                {
-                    "generated_at_utc": utc_now(),
-                    "request_error": f"{type(exc).__name__}: {exc}",
-                }
-            )
-        records.append(record)
+        for profile_name, headers in HEADER_PROFILES.items():
+            record: dict[str, Any] = {
+                "header_profile": profile_name,
+                "query_location": query["config_label"],
+                "query_location_id": query["location_id"],
+                "request_url": url,
+            }
+            try:
+                response = session.get(url, headers=headers, timeout=timeout_seconds)
+                summary = response_summary(response, url)
+                record.update(summary)
+                raw_name = (
+                    f"{_safe_name(query['config_label'])}-{profile_name}-page-1.html"
+                )
+                (output_dir / raw_name).write_text(
+                    str(getattr(response, "text", "") or ""),
+                    encoding="utf-8",
+                )
+                record["raw_html_file"] = raw_name
+            except Exception as exc:
+                record.update(
+                    {
+                        "generated_at_utc": utc_now(),
+                        "request_error": f"{type(exc).__name__}: {exc}",
+                    }
+                )
+            records.append(record)
     report = {
         "probe_schema_version": PROBE_SCHEMA_VERSION,
         "vehicle_key": config["vehicle_key"],
         "config_path": str(config_path),
-        "query_count": len(records),
+        "query_count": len(query_plan),
+        "header_profiles": sorted(HEADER_PROFILES),
+        "request_count": len(records),
         "records": records,
     }
     (output_dir / "probe_report.json").write_text(
