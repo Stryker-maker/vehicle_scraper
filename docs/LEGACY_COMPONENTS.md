@@ -4,36 +4,76 @@
 
 This document prevents old files, fields, and behaviours from being mistaken for supported capability. Retention does not imply approval.
 
+## Status classes
+
+- **Disabled legacy** — retained only when historical value justifies it; excluded from supported workflow
+- **Historical output** — older evidence; not current authority
+- **Compatibility alias** — old entry point redirected into a supported path
+- **Active supported adapter** — current governed source execution
+- **Active retention control** — bounded generated-data and deletion-evidence management
+
 ## Disabled legacy
 
 ### `merge.py`
 
-Status: **disabled legacy**. The workflow never calls it. Its listing-ID/VIN assumptions, destructive duplicate logic, field filling, and ranking cannot influence supported output.
+Status: **LEGACY / DISABLED**.
+
+The workflow never calls it. It treated source listing IDs like possible VINs, applied broad duplicate tolerances, filled fields without current evidence authority, and ranked output. Audit 06 replaced identity/dedup semantics; Audit 07 removes active-vehicle historical merged CSVs through governed SHA-256 deletion evidence. The script remains only until owner-approved code removal is separately justified.
 
 ### Historical merged CSVs
 
-`data/<vehicle>/merged/*.csv` are historical only. Do not refresh, recommend from, or infer current availability from them.
+Path: `data/<vehicle>/merged/*.csv`
+
+They are not current recommendations, graph inputs, or availability evidence. For active vehicles, Audit 07 deletes them during a governed full retention pass. Paused F-150/Tundra files remain untouched until their later owner-approved package.
+
+### Legacy source price history
+
+Paths:
+
+- `data/<vehicle>/price_history_autotrader.json`
+- `data/<vehicle>/price_history_kijiji.json`
+
+Supported runtimes do not read, migrate, or rewrite these files. Audit 07 deletes them for active vehicles with path, reason, size, SHA-256, run, and time evidence. Identity/lifecycle schema v2 is the supported history authority.
 
 ### Former Kijiji patcher
 
-`phase1_kijiji_runner.py` has been removed. Runtime text replacement and `exec` are not supported.
+`phase1_kijiji_runner.py` has been removed. Its exact text replacement and `exec` strategy is not part of the repository or workflow.
 
 ## Compatibility aliases
 
-- `scraper.py` redirects old AutoTrader commands into `autotrader_run.py`.
-- `kijiji_scraper.py` redirects old Kijiji commands into `kijiji_run.py`.
+### `scraper.py`
 
-Aliases receive the same source status, adapter/canonical evidence, identity/lifecycle, timeout, and config-isolation controls as the workflow.
+The former AutoTrader implementation is a compatibility alias into `autotrader_run.py`.
 
-## Active supported components
+### `kijiji_scraper.py`
 
-### Source adapters
+The former Kijiji implementation is a compatibility alias into `kijiji_run.py`.
 
-AutoTrader: `autotrader_adapter.py`, `autotrader_distance.py`, `autotrader_history.py`, `autotrader_canonical.py`, `autotrader_run.py`.
+Legacy command names therefore receive the same timeout, source-status, adapter-evidence, canonical-evidence, identity/lifecycle, config-isolation, and rollback controls as the workflow.
 
-Kijiji: `kijiji_locations.py`, `kijiji_adapter.py`, `kijiji_history.py`, `kijiji_canonical.py`, `kijiji_run.py`.
+## Active supported source adapters
 
-Both read schema-v2 config directly, preserve raw object/rejection/parse evidence, emit no rank/score, and cannot mutate approved config.
+### AutoTrader
+
+- `autotrader_adapter.py`
+- `autotrader_distance.py`
+- `autotrader_history.py`
+- `autotrader_canonical.py`
+- `autotrader_run.py`
+
+AutoTrader reads schema-v2 config directly, preserves request/page and response-object evidence, paginates, retries, records duplicates/rejections/parse failures, emits no rank or score, and does not mutate config.
+
+### Kijiji
+
+- `kijiji_locations.py`
+- `kijiji_adapter.py`
+- `kijiji_history.py`
+- `kijiji_canonical.py`
+- `kijiji_run.py`
+
+Kijiji reads schema-v2 config directly, validates explicit Cars & Trucks hubs, preserves JSON-LD objects and query/page provenance, records duplicates/rejections/parse failures, emits no rank or score, and never substitutes query origin for listing geography.
+
+## Shared supported controls
 
 ### Canonical evidence
 
@@ -41,34 +81,42 @@ Both read schema-v2 config directly, preserve raw object/rejection/parse evidenc
 
 ### Identity and lifecycle
 
-`identity_lifecycle.py` is the supported identity/history state model. It keeps source IDs distinct from VIN, records explicit VIN evidence, tracks actual elapsed time and lifecycle, and creates non-destructive duplicate candidates.
+`identity_lifecycle.py` schema v2 owns source-ID/VIN separation, fingerprints, non-destructive duplicate candidates, lifecycle, actual elapsed time, compact price history, retired-state bounds, and state-deletion evidence.
 
-### Manual review
+### Evidence-backed manual review
 
-`phase1_reporting.py` joins accepted canonical evidence one-to-one with current identity/lifecycle evidence. It fails closed on missing/mismatched identity artifacts.
+`phase1_reporting.py` consumes accepted canonical evidence joined with current identity/lifecycle evidence. Accepted does not mean verified or recommended.
 
-## Historical price history
+### Storage retention
 
-### `data/<vehicle>/price_history_autotrader.json`
-### `data/<vehicle>/price_history_kijiji.json`
+`storage_retention.py` schema v1 owns timestamped archive limits, active-vehicle legacy-file deletion, file deletion ledgers, managed-size gates, and staged generated-data path validation.
 
-Status: **historical output**.
+## Remaining compatibility fields
 
-Active adapters do not read, migrate, deduplicate, or rewrite these files. Supported manual review does not use them. Their listing-ID-based observations and week-named semantics are not trusted lifecycle/history authority.
+### `max_results` and `ranking_weights`
 
-The source CSV compatibility fields `weeks_tracked`, `price_last_week`, `price_change_week`, `price_change_total`, `price_history`, and `trend` may remain in raw/source schemas for compatibility, but active writers leave history values blank and identify the retirement. Supported output exposes actual observation and elapsed-time fields from identity/lifecycle artifacts.
+They are prohibited in approved configs, unused by active adapters, and may appear only in historical compatibility utilities/tests.
 
-## Other compatibility fields
+### Source `rank` and `score`
 
-- `max_results` and `ranking_weights` are prohibited in approved configs and unused by active adapters.
-- Source `rank` and `score` are not emitted by active adapters and are excluded from supported review.
-- Unknown sentinels can remain in raw evidence but normalize to null.
-- `trim_tiers.json` remains descriptive legacy configuration, not recommendation authority; Audit 09 decides its future role.
+Neither active adapter emits these. Canonical accepted evidence and supported manual review exclude both.
+
+### `weeks_tracked`, `price_last_week`, `price_change_week`
+
+These source CSV columns remain blank compatibility fields. Supported history uses actual observations and elapsed time in identity/lifecycle schema v2.
+
+### Unknown sentinels
+
+Raw artifacts may retain `Unknown`, `N/A`, or `999999`. Canonical normalization converts them to JSON null while preserving raw evidence.
+
+### `trim_tiers.json`
+
+Status: **active legacy descriptive configuration**. It is not recommendation authority. Audit 09 decides its F-350 role.
 
 ## Paused vehicle data
 
-F-150 and Tundra are paused, not legacy. Their criteria and historical data remain for Audit 11, but no current source/evidence/lifecycle/review/status data is produced while disabled.
+F-150 and Tundra are paused, not legacy. Their historical data is not modified by Audit 07 retention. Audit 11 controls any reintroduction or later cleanup.
 
 ## Removal rule
 
-Remove a legacy component only after replacement or abandonment is approved, historical evidence needs are assessed, tests/documents no longer depend on it, and the owner approves deletion.
+Remove a legacy component only after replacement or abandonment is approved, historical evidence needs are assessed, deletion evidence is defined where needed, tests and documents no longer depend on it, and the owner approves the change.
