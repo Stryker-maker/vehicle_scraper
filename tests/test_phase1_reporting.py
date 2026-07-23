@@ -8,7 +8,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from canonical_evidence import build_canonical_evidence
-from identity_lifecycle import update_source_identity_lifecycle
+from identity_lifecycle import (
+    IDENTITY_LIFECYCLE_SCHEMA_VERSION,
+    update_source_identity_lifecycle,
+)
 from phase1_pipeline import (
     MANUAL_REVIEW_FIELDS,
     _raise_for_canonical_review_exclusions,
@@ -85,7 +88,7 @@ class ReportingTests(unittest.TestCase):
         status = {
             "schema_version": 8,
             "canonical_evidence_schema_version": 1,
-            "identity_lifecycle_schema_version": 1,
+            "identity_lifecycle_schema_version": IDENTITY_LIFECYCLE_SCHEMA_VERSION,
             "identity_lifecycle_status": "updated",
             "run_id": "run-1", "vehicle_key": "test_vehicle", "source": source,
             "execution_status": "success", "collection_status": "success",
@@ -137,6 +140,13 @@ class ReportingTests(unittest.TestCase):
         self.assertTrue(all(row["canonical_listing_id"] for row in rows))
         self.assertTrue(all(row["lifecycle_state"] == "active" for row in rows))
         self.assertTrue(all(row["observation_count"] == "1" for row in rows))
+        self.assertTrue(
+            all(
+                row["identity_lifecycle_schema_version"]
+                == str(IDENTITY_LIFECYCLE_SCHEMA_VERSION)
+                for row in rows
+            )
+        )
         kijiji = next(row for row in rows if row["source"] == "kijiji")
         self.assertEqual(kijiji["location"], "")
         self.assertEqual(kijiji["distance_km"], "")
@@ -152,7 +162,7 @@ class ReportingTests(unittest.TestCase):
             "schema_valid": True, "row_count": 0, "current_row_count": 0,
             "stale_row_count": 1, "row_cap_disabled": True, "config_isolated": True,
             "canonical_evidence_schema_version": 1,
-            "identity_lifecycle_schema_version": 1,
+            "identity_lifecycle_schema_version": IDENTITY_LIFECYCLE_SCHEMA_VERSION,
             "identity_lifecycle_status": "not_updated",
             "accepted_record_count": 0, "rejected_record_count": 0,
             "parse_failure_count": 0, "fetched_record_count": 0,
