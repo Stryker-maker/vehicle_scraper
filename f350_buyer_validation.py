@@ -7,7 +7,12 @@ from pathlib import Path
 from typing import Any, Sequence
 
 from canonical_evidence import read_jsonl
-from f350_buyer_intelligence import BUYER_SCHEMA_VERSION, CSV_FIELDS, artifact_paths
+from f350_buyer_intelligence import (
+    BUYER_SCHEMA_VERSION,
+    CSV_FIELDS,
+    artifact_paths,
+    load_source_bundles,
+)
 from vehicle_config import load_vehicle_config
 
 BUYER_VALIDATION_SCHEMA_VERSION = 1
@@ -42,6 +47,7 @@ def validate_buyer_artifacts(
     config_path: Path = Path("config_f350.json"),
     run_id: str | None = None,
     expected_sources: Sequence[str] | None = None,
+    validate_source_evidence: bool = True,
 ) -> dict[str, Any]:
     root = root.resolve()
     config_path = config_path if config_path.is_absolute() else root / config_path
@@ -58,6 +64,7 @@ def validate_buyer_artifacts(
             "buyer_validation_schema_version": BUYER_VALIDATION_SCHEMA_VERSION,
             "validation_status": "fail",
             "run_id": run_id,
+            "source_evidence_validation_status": "not_evaluated",
             "validation_errors": errors,
             "listing_count": 0,
             "question_record_count": 0,
@@ -88,21 +95,23 @@ def validate_buyer_artifacts(
 
     listings = read_jsonl(paths["investigation_jsonl"])
     questions = read_jsonl(paths["seller_questions"])
-    question_by_id: dict[str, dict[str, Any]] = {}
+    question_by_key: dict[tuple[str, str], dict[str, Any]] = {}
     for index, record in enumerate(questions):
+        source = str(record.get("source") or "")
         canonical_id = str(record.get("canonical_listing_id") or "")
+        key = (source, canonical_id)
         if record.get("buyer_intelligence_schema_version") != BUYER_SCHEMA_VERSION:
             errors.append(f"question_schema_mismatch:{index}")
         if record.get("run_id") != active_run:
             errors.append(f"question_run_id_mismatch:{index}")
         if record.get("vehicle_key") != "ford_f350":
             errors.append(f"question_vehicle_mismatch:{index}")
-        if record.get("source") not in sources:
+        if source not in sources:
             errors.append(f"question_source_mismatch:{index}")
-        if not canonical_id or canonical_id in question_by_id:
+        if not canonical_id or key in question_by_key:
             errors.append(f"question_canonical_id_invalid_or_duplicate:{index}")
         else:
-            question_by_id[canonical_id] = record
+            question_by_key[key] = record
         values = record.get("questions")
         if not isinstance(values, list):
             errors.append(f"question_list_missing:{index}")
@@ -120,22 +129,24 @@ def validate_buyer_artifacts(
             for path in _forbidden_key_paths(record)
         )
 
-    listing_ids: set[str] = set()
+    listing_keys: set[tuple[str, str]] = set()
     for index, record in enumerate(listings):
+        source = str(record.get("source") or "")
         canonical_id = str(record.get("canonical_listing_id") or "")
+        key = (source, canonical_id)
         if record.get("buyer_intelligence_schema_version") != BUYER_SCHEMA_VERSION:
             errors.append(f"listing_schema_mismatch:{index}")
         if record.get("run_id") != active_run:
             errors.append(f"listing_run_id_mismatch:{index}")
         if record.get("vehicle_key") != "ford_f350":
             errors.append(f"listing_vehicle_mismatch:{index}")
-        if record.get("source") not in sources:
+        if source not in sources:
             errors.append(f"listing_source_mismatch:{index}")
-        if not canonical_id or canonical_id in listing_ids:
+        if not canonical_id or key in listing_keys:
             errors.append(f"listing_canonical_id_invalid_or_duplicate:{index}")
-        listing_ids.add(canonical_id)
-        if canonical_id not in question_by_id:
-            errors.append(f"listing_question_record_missing:{canonical_id}")
+        listing_keys.add(key)
+        if key not in question_by_key:
+            errors.append(f"listing_question_record_missing:{source}:{canonical_id}")
         if record.get("decision_contract") != (
             "explainable_classification_not_rank_not_score_"
             "manual_override_preserves_source_evidence"
@@ -158,7 +169,11 @@ def validate_buyer_artifacts(
             "configured_query_accepted_listing_claims_not_complete_market"
         ):
             errors.append(f"listing_market_scope_mismatch:{canonical_id}")
-        regression = market.get("mileage_adjusted_asking_price_projection", {}) if isinstance(market, dict) else {}
+        regression = (
+            market.get("mileage_adjusted_asking_price_projection", {})
+            if isinstance(market, dict)
+            else {}
+        )
         if regression.get("meaning") != (
             "asking_price_context_not_appraisal_or_future_value"
         ):
@@ -168,7 +183,7 @@ def validate_buyer_artifacts(
             for path in _forbidden_key_paths(record)
         )
 
-    if set(question_by_id) != listing_ids:
+    if set(question_by_key) != listing_keys:
         errors.append("listing_question_id_set_mismatch")
     if int(summary.get("listing_claim_count", -1)) != len(listings):
         errors.append("summary_listing_count_mismatch")
@@ -178,6 +193,43 @@ def validate_buyer_artifacts(
     }
     if summary.get("source_listing_claim_counts") != expected_source_counts:
         errors.append("summary_source_count_mismatch")
+
+    source_evidence_status = "skipped_by_test_contract"
+    if validate_source_evidence:
+        source_evidence_status = "pass"
+        evidence_keys: set[tuple[str, str]] = set()
+        try:
+            for source in sources:
+                for bundle in load_source_bundles(
+                    root=root,
+                    config=config,
+                    source=source,
+                    run_id=active_run,
+                ):
+                    record = bundle["record"]
+                    evidence_keys.add(
+                        (
+                            source,
+                            str(record.get("canonical_listing_id") or ""),
+                        )
+                    )
+        except (OSError, ValueError, json.JSONDecodeError) as exc:
+            source_evidence_status = "fail"
+            errors.append(
+                "source_evidence_validation_exception:"
+                f"{type(exc).__name__}:{exc}"
+            )
+        else:
+            if evidence_keys != listing_keys:
+                source_evidence_status = "fail"
+                missing = sorted(evidence_keys - listing_keys)
+                unexpected = sorted(listing_keys - evidence_keys)
+                if missing:
+                    errors.append(f"buyer_listings_missing_source_evidence:{missing}")
+                if unexpected:
+                    errors.append(
+                        f"buyer_listings_not_in_current_source_evidence:{unexpected}"
+                    )
 
     with paths["investigation_csv"].open(
         "r", encoding="utf-8", newline=""
@@ -191,19 +243,20 @@ def validate_buyer_artifacts(
         errors.append("csv_contains_rank_or_score_column")
     if len(csv_rows) != len(listings):
         errors.append("csv_listing_count_mismatch")
-    csv_ids: set[str] = set()
+    csv_keys: set[tuple[str, str]] = set()
     for index, row in enumerate(csv_rows):
+        source = str(row.get("source") or "")
         canonical_id = str(row.get("canonical_listing_id") or "")
-        csv_ids.add(canonical_id)
+        csv_keys.add((source, canonical_id))
         if row.get("buyer_intelligence_schema_version") != str(BUYER_SCHEMA_VERSION):
             errors.append(f"csv_schema_mismatch:{index}")
         if row.get("run_id") != active_run:
             errors.append(f"csv_run_id_mismatch:{index}")
         if row.get("vehicle_key") != "ford_f350":
             errors.append(f"csv_vehicle_mismatch:{index}")
-        if row.get("source") not in sources:
+        if source not in sources:
             errors.append(f"csv_source_mismatch:{index}")
-    if csv_ids != listing_ids:
+    if csv_keys != listing_keys:
         errors.append("csv_listing_id_set_mismatch")
 
     markdown = paths["market_summary_markdown"].read_text(encoding="utf-8")
@@ -224,6 +277,7 @@ def validate_buyer_artifacts(
         "run_id": active_run,
         "vehicle_key": "ford_f350",
         "sources": sources,
+        "source_evidence_validation_status": source_evidence_status,
         "listing_count": len(listings),
         "question_record_count": len(questions),
         "csv_row_count": len(csv_rows),
