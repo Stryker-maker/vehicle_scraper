@@ -2,7 +2,7 @@
 
 ## Status
 
-Implemented on `ai/audit-10-purpose-outputs`; exact-head deterministic validation, narrow live validation, owner review, and merge remain pending.
+Implemented on `ai/audit-10-purpose-outputs`. Deterministic validation and required live validation are complete; final exact-head CI, owner review, and merge remain pending.
 
 ## Purpose
 
@@ -137,6 +137,30 @@ When family-friend preferences are incomplete, accepted listings remain `candida
 
 Seller questions remain separate from friend-preference questions. Seller questions address identity, accident/title documents, service records, seating, family-use features, availability, and independent inspection. Asking a question does not verify an answer.
 
+## Kijiji structured fuel correction
+
+During Audit 10 live validation, Honda Odyssey Kijiji collection repeatedly failed before purpose-output processing. Controlled GitHub-runner diagnostics proved that requests were successful and Kijiji returned complete JSON-LD listing pages. The exact production collector fetched `123` listing objects across seven successful pages with complete pagination and zero parse failures, but rejected all `123` records.
+
+The exact defect was that `kijiji_adapter.py` inspected title, description, and configuration text for fuel while ignoring Kijiji's structured JSON-LD field:
+
+```text
+vehicleEngine.fuelType
+```
+
+Kijiji reported values such as `gas` and `diesel` in that structured field. The ignored evidence caused false `fuel_unknown` rejections. For the failing Odyssey run, removing only that false rejection would have admitted 33 otherwise eligible records.
+
+The approved correction:
+
+- consumes structured `vehicleEngine` fuel and engine fields before text fallback
+- maps gas/gasoline/petrol/unleaded, diesel, hybrid, and electric conservatively
+- extracts engine displacement from structured or textual evidence when explicitly present
+- preserves unknown fuel/engine as unknown and continues to fail closed
+- records sanitized response shape, hashes, script/data markers, listing-link counts, and visible block-page markers in request evidence
+- excludes script-only challenge-library words from visible block detection
+- prepares and uploads single-pair evidence even when source collection fails
+
+The correction does not bypass source health, relax vehicle criteria, infer fuel or engine, introduce browser automation, alter Kijiji hubs, or publish generated data.
+
 ## Validation boundary
 
 `purpose_output_validation.py` schema version `1` validates:
@@ -167,6 +191,8 @@ A secondary-vehicle `single_pair` run:
 5. includes `purpose_output/` in the seven-day smoke artifact
 6. skips full reporting, anomalies, retention, and publication
 
+The single-pair evidence preparation and upload steps run under `always()` so source status and available adapter evidence remain inspectable after a source failure.
+
 The F-350 narrow path continues to use F-350 buyer intelligence and does not create a secondary-purpose output.
 
 ### Full run
@@ -179,6 +205,25 @@ After all source runs and the consolidated health gate pass, a full run builds a
 - Kia Carnival candidate review
 
 These outputs are built before anomaly enforcement, retention, staging, and publication. Full diagnostics include all four purpose-output directories.
+
+## Live validation evidence
+
+Audit 10 purpose-output validation passed through the governed workflow for:
+
+- RAM 3500 AutoTrader — run `30026076864`
+- Honda Odyssey AutoTrader — run `30032250386`
+
+The Kijiji correction passed two non-publishing, fail-fast-disabled matrices across all five active profiles. Final matrix run `30051771263` produced:
+
+| Vehicle | Fetched | Accepted | Rejected | Parse failures | Pages | Failed pages | Lifecycle | Downstream validation |
+|---|---:|---:|---:|---:|---:|---:|---|---|
+| Ford F-350 | 563 | 15 | 548 | 0 | 17 | 0 | updated | F-350 buyer validation passed |
+| RAM 3500 | 520 | 16 | 504 | 0 | 14 | 0 | updated | value-monitor validation passed |
+| Subaru Forester | 104 | 19 | 85 | 0 | 5 | 0 | updated | value-monitor validation passed |
+| Honda Odyssey | 123 | 26 | 97 | 0 | 7 | 0 | updated | family-candidate validation passed |
+| Kia Carnival | 21 | 1 | 20 | 0 | 6 | 0 | updated | family-candidate validation passed |
+
+Every profile reported successful collection, complete pagination, reconciled evidence, zero failed pages, identity current count equal to accepted count, sanitized response diagnostics on every requested page, and zero visible block markers. No matrix run published generated data.
 
 ## Acceptance gate
 
@@ -194,6 +239,8 @@ Audit 10 is acceptable only when deterministic and required narrow live validati
 - multi-run direction uses actual previous observations and exposes insufficient history
 - family seller questions are non-empty and trace to evidence gaps or manual verification needs
 - output contains no rank or score
+- every active Kijiji profile passes collection, reconciliation, lifecycle, and applicable buyer/purpose validation
+- failed single-pair source evidence remains downloadable
 - F-350 behavior and optional vehicle state remain unchanged
 
 ## Stop conditions
@@ -209,9 +256,11 @@ Stop and revise before merge if:
 - Forester receives RAM-specific subject assumptions
 - a purpose artifact can diverge from current canonical/raw/identity evidence
 - a secondary narrow run builds another vehicle's output
-- a pull request can execute marketplace collection
-- source queries, parsers, criteria, identity/lifecycle thresholds, retention limits, or optional-vehicle state change
+- a pull request executes the production collection workflow or publishes generated data
+- Kijiji structured fuel/engine evidence is ignored, guessed, or allowed to bypass criteria
+- a failed single-pair collection loses its available source-status or adapter evidence
+- vehicle criteria, registry enablement, canonical equations, identity/lifecycle thresholds, retention limits, or optional-vehicle state change
 
 ## Non-scope
 
-Audit 10 does not change source requests, parsing, filtering, pagination, locations, distance, vehicle criteria, registry enablement, canonical equations, identity/lifecycle thresholds, retention limits, F-350 buyer logic, independent appraisal, transaction-price collection, time-to-sale modelling, repair-cost prediction, sold-state verification, external history-report purchase, or F-150/Tundra reintroduction.
+Except for the approved Kijiji structured fuel/engine parsing correction and failure-diagnostic preservation described above, Audit 10 does not change source requests, filtering, pagination, locations, distance, vehicle criteria, registry enablement, canonical equations, identity/lifecycle thresholds, retention limits, F-350 buyer logic, independent appraisal, transaction-price collection, time-to-sale modelling, repair-cost prediction, sold-state verification, external history-report purchase, or F-150/Tundra reintroduction.
