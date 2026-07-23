@@ -159,6 +159,23 @@ jobs:
             --source "$SELECTED_SOURCE"
           cat data/ford_f350/buyer_intelligence/market_summary_latest.md >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Build and validate secondary-purpose output for narrow validation
+        if: env.COLLECTION_SCOPE == 'single_pair' && env.VEHICLE_KEY != 'ford_f350'
+        run: |
+          set -euo pipefail
+          config=$(cut -f1 "${{ steps.collection-plan.outputs.path }}")
+          python purpose_outputs.py build \
+            --config "$config" \
+            --run-id "$GITHUB_RUN_ID" \
+            --source "$SELECTED_SOURCE" \
+            --inputs purpose_inputs.json
+          python purpose_output_validation.py \
+            --config "$config" \
+            --run-id "$GITHUB_RUN_ID" \
+            --source "$SELECTED_SOURCE" \
+            --inputs purpose_inputs.json
+          find "data/$VEHICLE_KEY/purpose_output" -name '*_latest.md' -type f -print -exec cat {} \; >> "$GITHUB_STEP_SUMMARY"
+
       - name: Prepare single-pair validation artifact
         if: env.COLLECTION_SCOPE == 'single_pair'
         run: |
@@ -177,6 +194,10 @@ jobs:
           if [[ -d "data/$VEHICLE_KEY/buyer_intelligence" ]]; then
             mkdir -p "$artifact/buyer_intelligence"
             cp -R "data/$VEHICLE_KEY/buyer_intelligence/." "$artifact/buyer_intelligence/"
+          fi
+          if [[ -d "data/$VEHICLE_KEY/purpose_output" ]]; then
+            mkdir -p "$artifact/purpose_output"
+            cp -R "data/$VEHICLE_KEY/purpose_output/." "$artifact/purpose_output/"
           fi
           cp "${{ steps.collection-plan.outputs.path }}" "$artifact/source-plan.tsv"
 
@@ -226,6 +247,27 @@ jobs:
             --source kijiji
           cat data/ford_f350/buyer_intelligence/market_summary_latest.md >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Build and validate secondary-purpose outputs
+        if: env.COLLECTION_SCOPE == 'full'
+        run: |
+          set -euo pipefail
+          for config in config_ram3500.json config_forester.json config_odyssey.json config_carnival.json; do
+            python purpose_outputs.py build \
+              --config "$config" \
+              --run-id "$GITHUB_RUN_ID" \
+              --source autotrader \
+              --source kijiji \
+              --inputs purpose_inputs.json
+            python purpose_output_validation.py \
+              --config "$config" \
+              --run-id "$GITHUB_RUN_ID" \
+              --source autotrader \
+              --source kijiji \
+              --inputs purpose_inputs.json
+          done
+          find data/ram_3500/purpose_output data/subaru_forester/purpose_output data/honda_odyssey/purpose_output data/kia_carnival/purpose_output \
+            -name '*_latest.md' -type f -print -exec cat {} \; >> "$GITHUB_STEP_SUMMARY"
+
       - name: Enforce critical anomaly policy
         if: env.COLLECTION_SCOPE == 'full'
         run: |
@@ -259,6 +301,10 @@ jobs:
             data/run_status/
             data/retention/
             data/ford_f350/buyer_intelligence/
+            data/ram_3500/purpose_output/
+            data/subaru_forester/purpose_output/
+            data/honda_odyssey/purpose_output/
+            data/kia_carnival/purpose_output/
             ${{ steps.collection-plan.outputs.path }}
           if-no-files-found: warn
           retention-days: 14
