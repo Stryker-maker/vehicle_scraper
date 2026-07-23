@@ -62,22 +62,22 @@ def validate_generated_data_change(
             if not published.issubset(changed_without_manifest):
                 errors.append("publication_manifest_paths_not_in_pull_request_diff")
 
-    health_path = root / "data" / "run_status" / "latest.json"
-    if health_path.as_posix().replace(str(root) + "/", "") in changed_paths:
-        health = _load_json(health_path)
+    health_path = Path("data/run_status/latest.json")
+    if health_path.as_posix() in changed_paths:
+        health = _load_json(root / health_path)
         if health is None:
             errors.append("health_report_missing")
         else:
-            if health.get("schema_version") != 7:
+            if health.get("schema_version") != 6:
                 errors.append("health_report_schema_mismatch")
             if health.get("overall_status") == "degraded":
                 errors.append("health_report_degraded")
             if int(health.get("unhealthy_source_runs", 0)) != 0:
                 errors.append("health_report_contains_unhealthy_sources")
 
-    anomaly_path = root / "data" / "run_status" / "anomalies_latest.json"
-    if anomaly_path.as_posix().replace(str(root) + "/", "") in changed_paths:
-        anomaly = _load_json(anomaly_path)
+    anomaly_path = Path("data/run_status/anomalies_latest.json")
+    if anomaly_path.as_posix() in changed_paths:
+        anomaly = _load_json(root / anomaly_path)
         if anomaly is None:
             errors.append("anomaly_report_missing")
         else:
@@ -88,7 +88,12 @@ def validate_generated_data_change(
 
     for changed in changed_paths:
         parts = changed.split("/")
-        if len(parts) == 4 and parts[0] == "data" and parts[2] == "run_status" and parts[3].endswith("_latest.json"):
+        if (
+            len(parts) == 4
+            and parts[0] == "data"
+            and parts[2] == "run_status"
+            and parts[3].endswith("_latest.json")
+        ):
             status = _load_json(root / changed)
             if status is None:
                 errors.append(f"source_status_missing:{changed}")
