@@ -48,7 +48,20 @@ jobs:
               raise RuntimeError('Unable to instrument Audit 11A applicator')
           path.write_text(text.replace(old, new), encoding='utf-8')
           PY
-          python apply_audit11a.py
+          set +e
+          python apply_audit11a.py 2>&1 | tee "$RUNNER_TEMP/audit11a-applicator.log"
+          status=${PIPESTATUS[0]}
+          set -e
+          exit "$status"
+
+      - name: Upload applicator failure log
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: audit11a-applicator-failure-${{ github.run_id }}
+          path: ${{ runner.temp }}/audit11a-applicator.log
+          if-no-files-found: error
+          retention-days: 3
 
       - name: Validate implementation and workflow
         run: |
