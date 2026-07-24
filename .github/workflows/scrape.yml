@@ -14,7 +14,7 @@ on:
       vehicle_key:
         description: Active vehicle for single-pair validation
         type: choice
-        options: [ford_f350, ram_3500, subaru_forester, honda_odyssey, kia_carnival]
+        options: [ford_f350, ram_3500, subaru_forester, honda_odyssey, kia_carnival, ford_f150]
         default: ford_f350
         required: true
       source:
@@ -109,6 +109,7 @@ jobs:
           python workflow_control.py plan \
             --registry vehicle_registry.json \
             --scope "$COLLECTION_SCOPE" \
+            --cadence weekly \
             --vehicle-key "$VEHICLE_KEY" \
             --source "$SELECTED_SOURCE" \
             --output "$plan"
@@ -160,7 +161,7 @@ jobs:
           cat data/ford_f350/buyer_intelligence/market_summary_latest.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Build and validate secondary-purpose output for narrow validation
-        if: env.COLLECTION_SCOPE == 'single_pair' && env.VEHICLE_KEY != 'ford_f350'
+        if: env.COLLECTION_SCOPE == 'single_pair' && (env.VEHICLE_KEY == 'ram_3500' || env.VEHICLE_KEY == 'subaru_forester' || env.VEHICLE_KEY == 'honda_odyssey' || env.VEHICLE_KEY == 'kia_carnival')
         run: |
           set -euo pipefail
           config=$(cut -f1 "${{ steps.collection-plan.outputs.path }}")
@@ -175,6 +176,38 @@ jobs:
             --source "$SELECTED_SOURCE" \
             --inputs purpose_inputs.json
           find "data/$VEHICLE_KEY/purpose_output" -name '*_latest.md' -type f -print -exec cat {} \; >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Write optional-curiosity manual summary
+        if: env.COLLECTION_SCOPE == 'single_pair' && env.VEHICLE_KEY == 'ford_f150'
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          vehicle = os.environ["VEHICLE_KEY"]
+          source = os.environ["SELECTED_SOURCE"]
+          status_path = Path("data") / vehicle / "run_status" / f"{source}_latest.json"
+          status = json.loads(status_path.read_text(encoding="utf-8"))
+          output = Path(os.environ["RUNNER_TEMP"]) / "optional-curiosity-summary.md"
+          lines = [
+              "# Optional F-150 manual search",
+              "",
+              f"- Source: {source}",
+              f"- Fetched records: {status.get('fetched_record_count', 0)}",
+              f"- Accepted records: {status.get('accepted_record_count', 0)}",
+              f"- Rejected records: {status.get('rejected_record_count', 0)}",
+              f"- Parse failures: {status.get('parse_failure_count', 0)}",
+              f"- Pagination complete: {status.get('pagination_complete')}",
+              f"- Identity/lifecycle status: {status.get('identity_lifecycle_status')}",
+              "",
+              "No purchase need, rank, score, appraisal, or recommendation is implied. "
+              "The accepted CSV and evidence files are a manual optional-curiosity result only.",
+          ]
+          output.write_text("\n".join(lines) + "\n", encoding="utf-8")
+          print(output.read_text(encoding="utf-8"))
+          PY
+          cat "$RUNNER_TEMP/optional-curiosity-summary.md" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Prepare single-pair validation artifact
         if: always() && env.COLLECTION_SCOPE == 'single_pair'
@@ -204,6 +237,7 @@ jobs:
           copy_dir "data/$VEHICLE_KEY/identity_lifecycle/$SELECTED_SOURCE" "$artifact/identity_lifecycle"
           copy_dir "data/$VEHICLE_KEY/buyer_intelligence" "$artifact/buyer_intelligence"
           copy_dir "data/$VEHICLE_KEY/purpose_output" "$artifact/purpose_output"
+          copy_file "$RUNNER_TEMP/optional-curiosity-summary.md" "$artifact/optional_curiosity"
           cp "${{ steps.collection-plan.outputs.path }}" "$artifact/source-plan.tsv"
           find "$artifact" -type f -maxdepth 8 -print | sort
 
@@ -218,12 +252,12 @@ jobs:
 
       - name: Build evidence-backed manual-review files
         if: env.COLLECTION_SCOPE == 'full'
-        run: python phase1_pipeline.py build-manual-review --registry vehicle_registry.json
+        run: python phase1_pipeline.py build-manual-review --registry vehicle_registry.json --cadence weekly
 
       - name: Write consolidated reconciliation and run-health report
         if: env.COLLECTION_SCOPE == 'full'
         run: |
-          python phase1_pipeline.py report-health --registry vehicle_registry.json
+          python phase1_pipeline.py report-health --registry vehicle_registry.json --cadence weekly
           cat data/run_status/latest.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Build baseline-aware anomaly report
@@ -284,8 +318,8 @@ jobs:
       - name: Apply and verify bounded storage retention
         if: env.COLLECTION_SCOPE == 'full'
         run: |
-          python storage_retention.py apply --registry vehicle_registry.json
-          python storage_retention.py verify --registry vehicle_registry.json
+          python storage_retention.py apply --registry vehicle_registry.json --cadence weekly
+          python storage_retention.py verify --registry vehicle_registry.json --cadence weekly
           python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
           import json
           from pathlib import Path
