@@ -37,6 +37,16 @@ jobs:
 
       - name: Apply authority updates
         run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('apply_audit11a_docs.py')
+          text = path.read_text(encoding='utf-8')
+          old = 'Do not use `data/<vehicle>/merged/*.csv` as current recommendations.\n\'\'\','
+          new = 'Do not use `data/<vehicle>/merged/*.csv` as current recommendations. Historical merged CSVs are disabled legacy output and are deleted for active vehicles by governed retention with SHA-256 deletion evidence.\n\'\'\','
+          if text.count(old) != 2:
+              raise RuntimeError(f'Expected two README anchor fragments, found {text.count(old)}')
+          path.write_text(text.replace(old, new), encoding='utf-8')
+          PY
           set +e
           python apply_audit11a_docs.py 2>&1 | tee "$RUNNER_TEMP/audit11a-docs.log"
           status=${PIPESTATUS[0]}
