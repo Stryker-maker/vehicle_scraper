@@ -39,6 +39,8 @@ jobs:
           python -m pip check
 
       - name: Prove cadence and paused-scope boundaries
+        id: cadence
+        continue-on-error: true
         run: |
           set -euo pipefail
           python vehicle_registry.py validate --registry vehicle_registry.json
@@ -63,6 +65,8 @@ jobs:
           PY
 
       - name: Collect and validate F-150 AutoTrader
+        id: autotrader
+        continue-on-error: true
         env:
           ORS_API_KEY: ${{ secrets.ORS_API_KEY }}
         run: |
@@ -87,6 +91,8 @@ jobs:
           cp data/ford_f150/run_status/autotrader_latest.json "$RUNNER_TEMP/status/"
 
       - name: Collect and validate F-150 Kijiji
+        id: kijiji
+        continue-on-error: true
         env:
           ORS_API_KEY: ${{ secrets.ORS_API_KEY }}
         run: |
@@ -111,6 +117,11 @@ jobs:
           cp data/ford_f150/run_status/kijiji_latest.json "$RUNNER_TEMP/status/"
 
       - name: Write validation result
+        if: always()
+        env:
+          CADENCE_OUTCOME: ${{ steps.cadence.outcome }}
+          AUTOTRADER_OUTCOME: ${{ steps.autotrader.outcome }}
+          KIJIJI_OUTCOME: ${{ steps.kijiji.outcome }}
         run: |
           python - <<'PY'
           import json
@@ -118,13 +129,21 @@ jobs:
           from pathlib import Path
 
           root = Path('.')
-          status_root = Path(os.environ['RUNNER_TEMP']) / 'status'
+          temp = Path(os.environ['RUNNER_TEMP'])
+          status_root = temp / 'status'
           registry = json.loads((root / 'vehicle_registry.json').read_text(encoding='utf-8'))
           by_key = {entry['vehicle_key']: entry for entry in registry['vehicles']}
 
+          def read_lines(path: Path) -> list[str]:
+              return path.read_text(encoding='utf-8').splitlines() if path.exists() else []
+
           def summary(source: str) -> dict:
-              status = json.loads((status_root / f'{source}_latest.json').read_text(encoding='utf-8'))
+              path = status_root / f'{source}_latest.json'
+              if not path.exists():
+                  return {'status_evidence_present': False}
+              status = json.loads(path.read_text(encoding='utf-8'))
               return {
+                  'status_evidence_present': True,
                   'execution_status': status.get('execution_status'),
                   'collection_status': status.get('collection_status'),
                   'data_quality_status': status.get('data_quality_status'),
@@ -142,17 +161,24 @@ jobs:
                   'run_id': status.get('run_id'),
               }
 
+          outcomes = {
+              'cadence': os.environ.get('CADENCE_OUTCOME'),
+              'autotrader': os.environ.get('AUTOTRADER_OUTCOME'),
+              'kijiji': os.environ.get('KIJIJI_OUTCOME'),
+          }
+          passed = all(value == 'success' for value in outcomes.values())
           result = {
               'schema_version': 1,
               'audit': '11A',
-              'validation_status': 'success',
+              'validation_status': 'success' if passed else 'failure',
+              'step_outcomes': outcomes,
               'run_id': os.environ['GITHUB_RUN_ID'],
               'source_sha': os.environ['GITHUB_SHA'],
               'branch': os.environ['GITHUB_REF_NAME'],
               'event_name': os.environ['GITHUB_EVENT_NAME'],
               'publication_performed': False,
-              'weekly_source_run_count': len((Path(os.environ['RUNNER_TEMP']) / 'weekly-runs.tsv').read_text().splitlines()),
-              'manual_source_pairs': (Path(os.environ['RUNNER_TEMP']) / 'manual-runs.tsv').read_text().splitlines(),
+              'weekly_source_run_count': len(read_lines(temp / 'weekly-runs.tsv')),
+              'manual_source_pairs': read_lines(temp / 'manual-runs.tsv'),
               'ford_f150': {
                   'enabled': by_key['ford_f150']['enabled'],
                   'cadence': by_key['ford_f150']['cadence'],
@@ -183,10 +209,11 @@ jobs:
           if [[ -d data/ford_f150 ]]; then
             cp -R data/ford_f150/. "$artifact/"
           fi
-          cp "$RUNNER_TEMP/weekly-runs.tsv" "$artifact/weekly-runs.tsv"
-          cp "$RUNNER_TEMP/manual-runs.tsv" "$artifact/manual-runs.tsv"
-          cp "$RUNNER_TEMP/autotrader-plan.tsv" "$artifact/autotrader-plan.tsv"
-          cp "$RUNNER_TEMP/kijiji-plan.tsv" "$artifact/kijiji-plan.tsv"
+          for file in weekly-runs.tsv manual-runs.tsv autotrader-plan.tsv kijiji-plan.tsv; do
+            if [[ -f "$RUNNER_TEMP/$file" ]]; then
+              cp "$RUNNER_TEMP/$file" "$artifact/$file"
+            fi
+          done
           if [[ -f AUDIT_11A_F150_LIVE_VALIDATION_RESULT.json ]]; then
             cp AUDIT_11A_F150_LIVE_VALIDATION_RESULT.json "$artifact/"
           fi
@@ -201,8 +228,10 @@ jobs:
           retention-days: 7
 
       - name: Commit temporary validation result
+        if: always()
         run: |
           set -euo pipefail
+          test -f AUDIT_11A_F150_LIVE_VALIDATION_RESULT.json
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add AUDIT_11A_F150_LIVE_VALIDATION_RESULT.json
@@ -216,3 +245,14 @@ jobs:
           fi
           git commit -m "Record temporary Audit 11A F-150 live validation"
           git push origin "HEAD:$GITHUB_REF_NAME"
+
+      - name: Enforce validation success
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          result = json.loads(Path('AUDIT_11A_F150_LIVE_VALIDATION_RESULT.json').read_text())
+          if result['validation_status'] != 'success':
+              raise SystemExit('Audit 11A live validation failed; inspect committed result JSON')
+          PY
