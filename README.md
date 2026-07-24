@@ -2,7 +2,7 @@
 
 This repository collects used-vehicle listings from AutoTrader and Kijiji, preserves source/run evidence, tracks source-scoped listing lifecycle, bounds generated-data growth, and produces decision-safe unranked outputs for manual review, F-350 purchase investigation, owned-vehicle value monitoring, and family-vehicle candidate review.
 
-Its primary purpose is an informed early-2020s diesel Ford F-350 purchase. It also supports lightweight RAM 3500 and Subaru Forester value monitoring plus Honda Odyssey and Kia Carnival searches for a family friend.
+Its primary purpose is an informed early-2020s diesel Ford F-350 purchase. It also supports lightweight RAM 3500 and Subaru Forester value monitoring, Honda Odyssey and Kia Carnival searches for a family friend, and an explicitly manual-only Ford F-150 optional-curiosity search.
 
 ## Current status
 
@@ -30,22 +30,22 @@ See `docs/LIMITATIONS_REGISTER.md` for tracked limitations.
 
 `vehicle_registry.json` is the sole operational authority.
 
-### Active
+### Enabled
 
-| Vehicle | Purpose | Priority |
-|---|---|---:|
-| Ford F-350 | Primary purchase research | 1 |
-| RAM 3500 | Owned-vehicle value monitoring | 2 |
-| Subaru Forester | Owned-vehicle value monitoring | 2 |
-| Honda Odyssey | Family-friend purchase search | 3 |
-| Kia Carnival | Family-friend purchase search | 3 |
+| Vehicle | Purpose | Priority | Cadence |
+|---|---|---:|---|
+| Ford F-350 | Primary purchase research | 1 | Weekly |
+| RAM 3500 | Owned-vehicle value monitoring | 2 | Weekly |
+| Subaru Forester | Owned-vehicle value monitoring | 2 | Weekly |
+| Honda Odyssey | Family-friend purchase search | 3 | Weekly |
+| Kia Carnival | Family-friend purchase search | 3 | Weekly |
+| Ford F-150 | Optional curiosity | 4 | Manual only |
 
-### Paused until Audit 11
+### Paused
 
-- Ford F-150
-- Toyota Tundra
+- Toyota Tundra — pending separate Audit 11B owner decision
 
-Paused vehicles retain historical data and governed criteria but do not run or receive current evidence. Retention and publication validation do not modify their data.
+The weekly plan remains five vehicles and ten source runs. F-150 can run only through explicit non-publishing `single_pair` dispatch. Tundra retains historical data and governed criteria but cannot run or receive current evidence.
 
 ## Supported outputs
 
@@ -107,6 +107,8 @@ data/<vehicle>/purpose_output/family_candidate/requirements_summary_latest.md
 ```
 
 All supported review and purpose outputs are built from current accepted canonical records joined to current identity/lifecycle evidence. F-350 and Audit 10 outputs also join matching raw adapter payloads. No supported output contains `rank` or `score`.
+
+A manual F-150 single-pair run does not create buyer intelligence or a secondary-purpose output. Its seven-day artifact contains the selected source CSV, status, adapter/canonical/lifecycle evidence, and an `optional-curiosity-summary.md` that explicitly disclaims purchase need, rank, score, appraisal, and recommendation.
 
 Do not use `data/<vehicle>/merged/*.csv` as current recommendations. Historical merged CSVs are disabled legacy output and are deleted for active vehicles by governed retention with SHA-256 deletion evidence.
 
@@ -184,7 +186,7 @@ While friend preferences remain incomplete, accepted listings stay `candidate_pe
 
 `storage_retention.py` provides storage-retention schema version `1`.
 
-For each active vehicle, a governed full run retains eight timestamped source CSVs per source, four timestamped manual-review CSVs, and all current `*_latest` evidence. File deletions record path, reason, size, SHA-256, run ID, and time. Detailed ledgers retain the latest 100 records while cumulative counts, bytes, and chained digests continue.
+For each weekly-cadence vehicle, a governed full run retains eight timestamped source CSVs per source, four timestamped manual-review CSVs, and all current `*_latest` evidence. Manual-only F-150 runs do not invoke retention or publication. File deletions record path, reason, size, SHA-256, run ID, and time. Detailed ledgers retain the latest 100 records while cumulative counts, bytes, and chained digests continue.
 
 Repository-growth gates are 50 MiB per managed file and 500 MiB total active managed data.
 
@@ -198,11 +200,11 @@ The repository separates three workflows:
 
 Python is fixed to `3.11.13`. `requirements.lock` contains exact dependency pins, and GitHub-owned actions use exact commit SHAs.
 
-Scheduled full collection runs Mondays at 08:00 UTC. Manual inputs are `collection_scope`, active `vehicle_key`, `source`, `publish_generated_data`, `anomaly_policy`, and optional `operator_note`.
+Scheduled full collection runs Mondays at 08:00 UTC and use only registry entries with cadence `weekly`. Manual inputs are `collection_scope`, enabled `vehicle_key`, `source`, `publish_generated_data`, `anomaly_policy`, and optional `operator_note`. F-150 is selectable only as a manual `single_pair`; Tundra is not selectable.
 
 A full run snapshots prior health, writes baseline-aware anomalies, applies source health, builds F-350 buyer intelligence and all four secondary-purpose outputs, then applies anomaly/retention/publication gates. A remote branch change during collection blocks publication.
 
-A `single_pair` run validates one active governed source pair, builds only the selected vehicle's applicable F-350 or secondary-purpose output, uploads seven-day temporary evidence, and never publishes generated data.
+A `single_pair` run validates one enabled governed source pair, builds only the selected vehicle's applicable F-350 or secondary-purpose output, or writes the F-150 optional-curiosity summary, uploads seven-day temporary evidence, and never publishes generated data.
 
 ## Current execution flow
 
@@ -223,9 +225,10 @@ python -m pip install --requirement requirements.lock
 python -m pip check
 python vehicle_registry.py validate
 python vehicle_registry.py summary
-python vehicle_registry.py active-runs
+python vehicle_registry.py weekly-runs
+python vehicle_registry.py manual-runs
 python -m unittest discover -s tests -v
-python storage_retention.py verify --registry vehicle_registry.json
+python storage_retention.py verify --registry vehicle_registry.json --cadence weekly
 ```
 
 Example purpose-output build after a same-run source collection:
@@ -287,6 +290,7 @@ docs/                                repository authorities
 - `AUDIT_08_CI_WORKFLOW_HARDENING.md`
 - `AUDIT_09_F350_BUYER_INTELLIGENCE.md`
 - `AUDIT_10_SECONDARY_PURPOSE_OUTPUTS.md`
+- `AUDIT_11A_F150_MANUAL_REINTRODUCTION.md`
 
 ## Change authority
 

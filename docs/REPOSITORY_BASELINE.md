@@ -2,11 +2,11 @@
 
 ## Status
 
-**Baseline date:** July 23, 2026  
-**Baseline source:** `main` through Audit 09, updated by Audit 10 implementation and Kijiji corrective validation  
+**Baseline date:** July 24, 2026
+**Baseline source:** `main` through merged Audit 10, updated by Audit 11A implementation
 **Project state:** functional collection and purpose-specific analysis prototype under structured audit
 
-This document records current supported behaviour. Audit 10 implementation and live validation are complete on the branch; owner review and merge remain pending.
+This document records current supported behaviour. Audit 10 is merged. Audit 11A implementation is on a draft branch; live F-150 validation, owner review, and merge remain pending.
 
 ## Higher purpose
 
@@ -29,6 +29,7 @@ The repository can:
 - produce baseline-aware anomalies and run-tied publication manifests
 - build current-run F-350 buyer intelligence with visible evidence gaps and reasons
 - build profile-specific outputs for RAM 3500, Subaru Forester, Honda Odyssey, and Kia Carnival
+- expose F-150 as a manual-only optional-curiosity source-evidence search without weekly scheduling or publication
 
 ## Supported schema boundaries
 
@@ -92,7 +93,7 @@ No F-350 truck-specific assumptions apply to family vehicles.
 
 Collection has no pull-request trigger and cannot start before reusable CI succeeds.
 
-A narrow run builds only the selected vehicle's applicable F-350 or secondary-purpose output, uploads seven-day evidence, and never publishes generated data. Evidence preparation and upload run under `always()` so available status and adapter evidence survive an unhealthy source result.
+A narrow run builds only the selected vehicle's applicable F-350 or secondary-purpose output, or the F-150 optional-curiosity summary, uploads seven-day evidence, and never publishes generated data. Evidence preparation and upload run under `always()` so available status and adapter evidence survive an unhealthy source result.
 
 A full run builds all current purpose outputs only after source health passes. Publication remains behind anomaly, retention, staged-path, artifact, manifest, whitespace, and remote-ref gates.
 
@@ -113,17 +114,17 @@ The repository still cannot reliably establish:
 
 ## Governing vehicle scope
 
-| Vehicle | State | Purpose | Analysis profile |
-|---|---|---|---|
-| Ford F-350 | Enabled | Primary purchase research | `f350_purchase` |
-| RAM 3500 | Enabled | Owned-vehicle value monitoring | `owned_vehicle_value` |
-| Subaru Forester | Enabled | Owned-vehicle value monitoring | `owned_vehicle_value` |
-| Honda Odyssey | Enabled | Family-friend purchase search | `family_friend_purchase` |
-| Kia Carnival | Enabled | Family-friend purchase search | `family_friend_purchase` |
-| Ford F-150 | Paused | Optional curiosity | `optional_curiosity` |
-| Toyota Tundra | Paused | Optional curiosity | `optional_curiosity` |
+| Vehicle | State | Cadence | Purpose | Analysis profile |
+|---|---|---|---|---|
+| Ford F-350 | Enabled | Weekly | Primary purchase research | `f350_purchase` |
+| RAM 3500 | Enabled | Weekly | Owned-vehicle value monitoring | `owned_vehicle_value` |
+| Subaru Forester | Enabled | Weekly | Owned-vehicle value monitoring | `owned_vehicle_value` |
+| Honda Odyssey | Enabled | Weekly | Family-friend purchase search | `family_friend_purchase` |
+| Kia Carnival | Enabled | Weekly | Family-friend purchase search | `family_friend_purchase` |
+| Ford F-150 | Enabled | Manual only | Optional curiosity | `optional_curiosity` |
+| Toyota Tundra | Paused | Not runnable | Optional curiosity | `optional_curiosity` |
 
-F-150 and Tundra receive no current collection, evidence, lifecycle, review, purpose output, retention deletion, or publication update until Audit 11.
+The weekly plan remains five vehicles and ten source runs. F-150 may run only as an explicit non-publishing single pair and is excluded from weekly reporting, health, anomalies, retention, and publication. Tundra remains paused.
 
 ## Active component inventory
 
@@ -163,6 +164,8 @@ Current code/tests are intended to guarantee:
 14. lower asking bands are not represented as verified faster-sale ranges
 15. all classifications and comparability labels have visible reasons
 16. no supported output contains purchase `rank` or `score`
+17. registry cadence keeps manual F-150 source pairs out of every weekly/full subsystem
+18. paused Tundra cannot be selected for single-pair collection
 
 ## Explicit non-guarantees
 

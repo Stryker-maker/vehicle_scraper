@@ -18,12 +18,13 @@ This document preserves the owner-approved sequence for turning the repository i
 | 07 | Storage, Retention and Repository Hygiene | Complete and merged |
 | 08 | CI and Workflow Hardening | Complete and merged |
 | 09 | F-350 Buyer Intelligence | Complete and merged |
-| 10 | Secondary Purpose Outputs | Implemented; deterministic and narrow validation pending |
-| 11 | Optional Search Reintroduction | Approved final stage |
+| 10 | Secondary Purpose Outputs | Complete and merged |
+| 11A | Ford F-150 Manual Reintroduction | Implemented; live validation pending |
+| 11B | Toyota Tundra Reconsideration | Pending owner decision |
 
 ## Global completion criteria
 
-The audit is not complete until optional vehicles remain paused unless approved; registry/config authority is preserved; both adapters reconcile returned objects; parsing and exclusions are visible; Kijiji geography is listing-specific or unknown; source listing IDs remain distinct from VIN; identity/lifecycle semantics are explainable; generated-data and state growth are bounded; dependencies and workflows are reproducible; documentation matches code; F-350 evidence supports investigation; secondary purposes have profile-specific outputs; and three consecutive scheduled active-profile runs complete without manual repair.
+The audit is not complete until optional vehicles remain paused or explicitly cadence-governed by owner approval; registry/config authority is preserved; both adapters reconcile returned objects; parsing and exclusions are visible; Kijiji geography is listing-specific or unknown; source listing IDs remain distinct from VIN; identity/lifecycle semantics are explainable; generated-data and state growth are bounded; dependencies and workflows are reproducible; documentation matches code; F-350 evidence supports investigation; secondary purposes have profile-specific outputs; and three consecutive scheduled active-profile runs complete without manual repair.
 
 ---
 
@@ -121,7 +122,7 @@ Asking-price math remains non-appraisal context. Owner overrides preserve comput
 
 ## Audit 10 — Secondary Purpose Outputs
 
-**Status:** implemented on `ai/audit-10-purpose-outputs`; exact-head deterministic validation, narrow live validation, owner review, and merge remain pending.
+**Status:** complete and merged through PR #12, including Kijiji structured fuel/engine correction and all-profile live validation.
 
 ### Scope
 
@@ -152,9 +153,15 @@ No source-query/parser, vehicle-criteria, registry enablement, canonical-equatio
 
 ## Audit 11 — Optional Search Reintroduction
 
-**Status:** approved final stage.
+**Status:** Audit 11A implemented on `ai/audit-11a-f150-manual-reintroduction`; deterministic CI and two-source live validation remain pending. Audit 11B is not started.
 
-Reintroduce F-150 first under limited validation and owner approval, then Tundra separately. Either may remain manual/monthly.
+### Audit 11A — Ford F-150 manual reintroduction
+
+F-150 is enabled with cadence `manual` for explicit non-publishing single-pair collection only. Registry cadence is operational: scheduled/full collection, reporting, health, anomalies, retention, diagnostics, and publication remain limited to the five weekly vehicles and ten weekly source pairs. F-150 receives source/canonical/lifecycle evidence and an explicit optional-curiosity summary, but no F-350 buyer intelligence, Audit 10 purpose output, rank, score, appraisal, or recommendation.
+
+### Audit 11B — Toyota Tundra reconsideration
+
+Tundra remains paused and requires a separate package and owner decision after Audit 11A. It may remain paused permanently.
 
 ## Roadmap authority
 

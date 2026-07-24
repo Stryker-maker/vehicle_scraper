@@ -30,6 +30,7 @@ class DocumentationContractTests(unittest.TestCase):
             "AUDIT_08_CI_WORKFLOW_HARDENING.md",
             "AUDIT_09_F350_BUYER_INTELLIGENCE.md",
             "AUDIT_10_SECONDARY_PURPOSE_OUTPUTS.md",
+            "AUDIT_11A_F150_MANUAL_REINTRODUCTION.md",
         ]
         readme = self.read("README.md")
         for path in required:
@@ -95,8 +96,9 @@ class DocumentationContractTests(unittest.TestCase):
             self.assertRegex(roadmap, rf"## Audit {number:02d} — ")
         for row in (
             "| 09 | F-350 Buyer Intelligence | Complete and merged |",
-            "| 10 | Secondary Purpose Outputs | Implemented; deterministic and narrow validation pending |",
-            "| 11 | Optional Search Reintroduction | Approved final stage |",
+            "| 10 | Secondary Purpose Outputs | Complete and merged |",
+            "| 11A | Ford F-150 Manual Reintroduction | Implemented; live validation pending |",
+            "| 11B | Toyota Tundra Reconsideration | Pending owner decision |",
         ):
             self.assertIn(row, roadmap)
         register = self.read("docs/LIMITATIONS_REGISTER.md")
@@ -111,6 +113,8 @@ class DocumentationContractTests(unittest.TestCase):
             "LIM-052",
             "LIM-053",
             "LIM-054",
+            "LIM-055",
+            "LIM-056",
         ):
             self.assertIn(identifier, register)
 
@@ -145,6 +149,7 @@ class DocumentationContractTests(unittest.TestCase):
             "AUDIT_08_CI_WORKFLOW_HARDENING.md",
             "AUDIT_09_F350_BUYER_INTELLIGENCE.md",
             "AUDIT_10_SECONDARY_PURPOSE_OUTPUTS.md",
+            "AUDIT_11A_F150_MANUAL_REINTRODUCTION.md",
         ):
             self.assertIn("Stop and revise before merge", self.read(path))
         audit10 = self.read("AUDIT_10_SECONDARY_PURPOSE_OUTPUTS.md")

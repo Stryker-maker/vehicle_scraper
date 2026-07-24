@@ -33,10 +33,10 @@ This register preserves known weaknesses so they remain visible, prioritized, an
 | LIM-023 | Medium | Resolved | Generated data and implementation shared unvalidated diffs | Separate data validation and manifest | Audit 08 |
 | LIM-024 | Medium | Resolved | Collection and tests shared one workflow | Separated workflows | Audit 08 |
 | LIM-025 | High | Resolved | F-350 lacked transparent investigation/override output | Buyer schema v1, tests, live validation, owner merge | Audit 09 |
-| LIM-026 | Medium | Implemented, validation pending | Purpose-specific secondary outputs did not exist | Audit 10 purpose-input/output/validation schemas | Audit 10 |
-| LIM-027 | Medium | Deferred by owner | F-150 and Tundra are not polished | Both remain paused | Audit 11 |
+| LIM-026 | Medium | Resolved | Purpose-specific secondary outputs did not exist | Audit 10 purpose-input/output/validation schemas and merged live validation | Audit 10 |
+| LIM-027 | Medium | Implemented, validation pending | Optional F-150/Tundra state lacked a bounded reintroduction path | F-150 manual-only Audit 11A; Tundra remains paused for separate Audit 11B decision | Audit 11A/11B |
 | LIM-028 | Medium | Resolved | Active collectors retained mutation/ranking behavior | Direct schema-v2 adapters | Audit 05 |
-| LIM-029 | Low | Implemented, validation pending | Registry analysis profiles were not operationalized | F-350 and Audit 10 profile-specific outputs | Audit 10 |
+| LIM-029 | Low | Resolved | Registry analysis profiles were not operationalized | F-350 and Audit 10 profile-specific outputs, merged and validated | Audit 10 |
 | LIM-030 | Critical | Resolved | Request/response counts were not preserved | Adapter reconciliation | Audit 05 |
 | LIM-031 | Medium | Resolved | Retention policy was undefined | Storage-retention schema v1 | Audit 07 |
 | LIM-032 | High | Resolved | No duplicate/lifecycle model | Explainable candidates and lifecycle | Audit 06 |
@@ -55,14 +55,15 @@ This register preserves known weaknesses so they remain visible, prioritized, an
 | LIM-045 | High | Controlled, not fixed | F-350 asking-price math is not sale/appraisal evidence | Method/sample/limits visible | Current control |
 | LIM-046 | Medium | Resolved | F-350 owner input could erase computed/source evidence | Separate governed override contract | Audit 09 |
 | LIM-047 | Medium | Controlled, not fixed | Seller questions cannot obtain or verify answers | Questions remain prompts | Current control |
-| LIM-048 | High | Implemented, validation pending | RAM historical odometer context could be mistaken for current odometer | Separate historical field; current odometer remains required | Audit 10 |
-| LIM-049 | Medium | Implemented, validation pending | Forester lacks subject year/trim/powertrain/drivetrain/current odometer input | `subject_profile_incomplete` and owner-input gaps | Audit 10 |
-| LIM-050 | High | Implemented, validation pending | Odyssey/Carnival friend requirements are not yet supplied | `candidate_pending_requirements` and explicit friend questions | Audit 10 |
+| LIM-048 | High | Controlled, not fixed | RAM historical odometer context could be mistaken for current odometer | Separate historical field; current odometer remains required | Audit 10/current control |
+| LIM-049 | Medium | Controlled, not fixed | Forester lacks subject year/trim/powertrain/drivetrain/current odometer input | `subject_profile_incomplete` and owner-input gaps | Audit 10/current control |
+| LIM-050 | High | Controlled, not fixed | Odyssey/Carnival friend requirements are not yet supplied | `candidate_pending_requirements` and explicit friend questions | Audit 10/current control |
 | LIM-051 | High | Controlled, not fixed | Observed lower asking prices do not prove faster sale or sale probability | Explicit lower-band non-authority contract | Audit 10/current control |
 | LIM-052 | Medium | Controlled, not fixed | Listing asking-price changes do not prove market-value direction | Actual previous observations plus non-trend contract | Audit 10/current control |
 | LIM-053 | Medium | Controlled, not fixed | Family listing text cannot verify seating, features, history, condition, or availability | Unverified/unknown evidence and seller/inspection questions | Audit 10/current control |
-| LIM-054 | High | Implemented, validation pending | Secondary artifacts could diverge from current evidence | Fail-closed underlying-evidence validator and data-PR integration | Audit 10 |
-| LIM-055 | High | Implemented, validation pending | Kijiji structured `vehicleEngine.fuelType` was ignored, falsely rejecting valid gas and diesel listings as unknown fuel | Structured engine/fuel parsing, hostile tests, sanitized response signatures, failed-run evidence artifacts, and five-profile live validation | Audit 10 corrective work |
+| LIM-054 | High | Resolved | Secondary artifacts could diverge from current evidence | Merged fail-closed underlying-evidence validator and data-PR integration | Audit 10 |
+| LIM-055 | High | Resolved | Kijiji structured `vehicleEngine.fuelType` was ignored, falsely rejecting valid gas and diesel listings as unknown fuel | Structured engine/fuel parsing, hostile tests, sanitized response signatures, failed-run evidence artifacts, five-profile validation, and owner merge | Audit 10 corrective work |
+| LIM-056 | High | Implemented, validation pending | Enabling a manual optional vehicle could silently add it to weekly collection/reporting/retention/publication | Operational cadence plans, explicit weekly filters, F-150 profile isolation, and hostile tests | Audit 11A |
 
 ## Reconciliation boundaries
 

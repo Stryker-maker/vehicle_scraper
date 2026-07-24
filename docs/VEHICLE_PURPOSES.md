@@ -92,9 +92,11 @@ Truck-specific assumptions—engine/idle hours, cab, box, SRW/DRW, towing/worksi
 
 ### Ford F-150
 
+There is no current purchase or ownership need. Audit 11A enables F-150 only for explicit manual, non-publishing single-pair searches. It receives current source/canonical/lifecycle evidence and a temporary optional-curiosity summary, but no specialized buyer intelligence, secondary-purpose output, rank, score, appraisal, or recommendation. Manual enablement does not place F-150 in weekly collection, health, anomaly, retention, or publication scope.
+
 ### Toyota Tundra
 
-There is no current purchase or ownership need. They remain paused throughout the core audit, preserve historical data, receive no Audit 10 output, and are reconsidered only in Audit 11 one vehicle at a time. Reintroduction does not imply weekly cadence.
+Tundra remains paused with historical data preserved. Any reconsideration requires a separate Audit 11B package and owner approval; it may remain paused permanently.
 
 ## Engineering priority rule
 
