@@ -37,7 +37,18 @@ jobs:
           python -m pip check
 
       - name: Apply exact Audit 11A changes
-        run: python apply_audit11a.py
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('apply_audit11a.py')
+          text = path.read_text(encoding='utf-8')
+          old = 'raise RuntimeError(f"Expected exactly one match in {path}: found {count}")'
+          new = 'raise RuntimeError(f"Expected exactly one match in {path}: found {count}; anchor={old.splitlines()[0]!r}")'
+          if text.count(old) != 1:
+              raise RuntimeError('Unable to instrument Audit 11A applicator')
+          path.write_text(text.replace(old, new), encoding='utf-8')
+          PY
+          python apply_audit11a.py
 
       - name: Validate implementation and workflow
         run: |
