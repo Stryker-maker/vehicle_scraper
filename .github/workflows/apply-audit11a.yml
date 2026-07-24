@@ -3,9 +3,10 @@ name: Apply Audit 11A
 on:
   pull_request:
     paths:
-      - 'apply_audit11a.py'
+      - 'apply_audit11a_remaining.py'
       - '.github/workflows/apply-audit11a.yml'
       - 'vehicle_registry.json'
+      - 'vehicle_registry.py'
 
 permissions:
   contents: write
@@ -38,18 +39,8 @@ jobs:
 
       - name: Apply exact Audit 11A changes
         run: |
-          python - <<'PY'
-          from pathlib import Path
-          path = Path('apply_audit11a.py')
-          text = path.read_text(encoding='utf-8')
-          old = 'raise RuntimeError(f"Expected exactly one match in {path}: found {count}")'
-          new = 'raise RuntimeError(f"Expected exactly one match in {path}: found {count}; anchor={old.splitlines()[0]!r}")'
-          if text.count(old) != 1:
-              raise RuntimeError('Unable to instrument Audit 11A applicator')
-          path.write_text(text.replace(old, new), encoding='utf-8')
-          PY
           set +e
-          python apply_audit11a.py 2>&1 | tee "$RUNNER_TEMP/audit11a-applicator.log"
+          python apply_audit11a_remaining.py 2>&1 | tee "$RUNNER_TEMP/audit11a-applicator.log"
           status=${PIPESTATUS[0]}
           set -e
           exit "$status"
@@ -87,7 +78,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add \
-            vehicle_registry.py \
             workflow_control.py \
             phase1_pipeline.py \
             storage_retention.py \
@@ -99,5 +89,5 @@ jobs:
             echo "No Audit 11A code changes to commit."
             exit 0
           fi
-          git commit -m "Operationalize manual F-150 cadence"
+          git commit -m "Complete manual F-150 cadence integration"
           git push origin HEAD:ai/audit-11a-f150-manual-reintroduction
