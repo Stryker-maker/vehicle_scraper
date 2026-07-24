@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'apply_audit11a_docs.py'
+      - 'apply_audit11a_docs.trigger'
       - '.github/workflows/apply-audit11a-docs.yml'
 
 permissions:
@@ -55,9 +56,7 @@ jobs:
 def replace_first(path: Path, old: str, new: str) -> None:
     text = path.read_text(encoding="utf-8")
     if old not in text:
-        raise RuntimeError(
-            f"Expected at least one match in {path}; anchor={old.splitlines()[0]!r}"
-        )
+        raise RuntimeError(f"Missing anchor in {path}: {old.splitlines()[0]!r}")
     path.write_text(text.replace(old, new, 1), encoding="utf-8")
 
 
