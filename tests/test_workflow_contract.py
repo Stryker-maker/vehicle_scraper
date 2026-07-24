@@ -103,7 +103,30 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertNotIn("honda_odyssey/buyer_intelligence", self.collection)
         self.assertNotIn("kia_carnival/buyer_intelligence", self.collection)
 
-    def test_health_buyer_anomaly_retention_and_publish_gates_are_ordered(self):
+    def test_secondary_purpose_outputs_are_profile_gated_and_artifact_backed(self):
+        self.assertIn("purpose_outputs.py", self.ci)
+        self.assertIn("purpose_output_validation.py", self.ci)
+        for value in (
+            "Build and validate secondary-purpose output for narrow validation",
+            "if: env.COLLECTION_SCOPE == 'single_pair' && env.VEHICLE_KEY != 'ford_f350'",
+            "--inputs purpose_inputs.json",
+            "data/$VEHICLE_KEY/purpose_output",
+            "Build and validate secondary-purpose outputs",
+            "config_ram3500.json",
+            "config_forester.json",
+            "config_odyssey.json",
+            "config_carnival.json",
+            "data/ram_3500/purpose_output/",
+            "data/subaru_forester/purpose_output/",
+            "data/honda_odyssey/purpose_output/",
+            "data/kia_carnival/purpose_output/",
+        ):
+            self.assertIn(value, self.collection)
+        self.assertNotIn("data/ford_f350/purpose_output", self.collection)
+        self.assertNotIn("config_f150.json", self.collection)
+        self.assertNotIn("config_tundra.json", self.collection)
+
+    def test_health_purpose_anomaly_retention_and_publish_gates_are_ordered(self):
         for value in (
             "phase1_pipeline.py check-health",
             "workflow_anomalies.py build",
@@ -121,11 +144,13 @@ class WorkflowContractTests(unittest.TestCase):
         buyer = self.collection.index(
             "Build and validate transparent F-350 buyer intelligence"
         )
+        purpose = self.collection.index("Build and validate secondary-purpose outputs")
         anomaly = self.collection.index("Enforce critical anomaly policy")
         retention = self.collection.index("Apply and verify bounded storage retention")
         publish = self.collection.index("Commit and push governed generated data")
         self.assertLess(health, buyer)
-        self.assertLess(buyer, anomaly)
+        self.assertLess(buyer, purpose)
+        self.assertLess(purpose, anomaly)
         self.assertLess(anomaly, retention)
         self.assertLess(retention, publish)
 

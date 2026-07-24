@@ -1,14 +1,14 @@
 # Vehicle Market Information Collector
 
-This repository collects used-vehicle listings from AutoTrader and Kijiji, preserves source/run evidence, tracks source-scoped listing lifecycle, bounds generated-data growth, and produces decision-safe unranked outputs for manual review and F-350 purchase investigation.
+This repository collects used-vehicle listings from AutoTrader and Kijiji, preserves source/run evidence, tracks source-scoped listing lifecycle, bounds generated-data growth, and produces decision-safe unranked outputs for manual review, F-350 purchase investigation, owned-vehicle value monitoring, and family-vehicle candidate review.
 
-Its primary purpose is an informed early-2020s diesel Ford F-350 purchase. It also supports lightweight owned-vehicle value monitoring and a family-vehicle search for a family friend.
+Its primary purpose is an informed early-2020s diesel Ford F-350 purchase. It also supports lightweight RAM 3500 and Subaru Forester value monitoring plus Honda Odyssey and Kia Carnival searches for a family friend.
 
 ## Current status
 
-**Functional collection and F-350 investigation prototype under structured audit.**
+**Functional collection and purpose-specific analysis prototype under structured audit.**
 
-The repository validates governed scope, runs enabled sources independently, preserves adapter and canonical evidence, reconciles every fetched listing object, tracks explainable listing lifecycle, applies bounded retention, uses reproducible CI/collection workflows, and builds transparent F-350 investigation context. It is not an appraisal, automatic recommendation, independent vehicle-history service, or replacement for inspection.
+The repository validates governed scope, runs enabled sources independently, preserves adapter and canonical evidence, reconciles every fetched listing object, tracks explainable listing lifecycle, applies bounded retention, uses reproducible CI/collection workflows, and builds profile-specific investigation context. It is not an appraisal, automatic recommendation, independent vehicle-history service, transaction-price database, time-to-sale model, or replacement for inspection.
 
 Important boundaries:
 
@@ -19,7 +19,8 @@ Important boundaries:
 - Duplicate matches are explainable candidates only and never merge canonical records.
 - `missing` and `retired` are operational lifecycle inferences, not source claims that a vehicle sold.
 - Asking-price bands are observed listing context, not sale prices or appraisal.
-- Mileage-adjusted projections are descriptive asking-price context, not future value.
+- A lower observed asking band is not a verified faster-sale range or sale probability.
+- Missing owner or family-friend inputs stay missing; operational config is not silently promoted into personalized requirements.
 - Owner overrides never rewrite source or computed evidence.
 - Historical merged/ranked CSV files and legacy `price_history_*.json` are not supported outputs.
 
@@ -48,7 +49,7 @@ Paused vehicles retain historical data and governed criteria but do not run or r
 
 ## Supported outputs
 
-After a successful full run, use:
+After a successful full run, common evidence includes:
 
 ```text
 data/<vehicle>/manual_review/<vehicle>_manual_review_latest.csv
@@ -75,7 +76,7 @@ data/run_status/publication_latest.json
 data/retention/latest.json
 ```
 
-F-350-specific buyer investigation adds:
+F-350 buyer investigation adds:
 
 ```text
 data/ford_f350/buyer_intelligence/investigation_latest.jsonl
@@ -85,7 +86,27 @@ data/ford_f350/buyer_intelligence/market_summary_latest.json
 data/ford_f350/buyer_intelligence/market_summary_latest.md
 ```
 
-The general manual-review CSV is built from accepted canonical records joined one-to-one with current identity/lifecycle evidence. The F-350 investigation output additionally joins current raw adapter payloads to expose configuration, usage, history, price-band, projection, seller-question, and owner-override context. Neither output contains `rank` or `score`.
+Owned-vehicle value monitoring adds for RAM 3500 and Subaru Forester:
+
+```text
+data/<vehicle>/purpose_output/value_monitor/comparables_latest.jsonl
+data/<vehicle>/purpose_output/value_monitor/comparables_latest.csv
+data/<vehicle>/purpose_output/value_monitor/owner_input_gaps_latest.json
+data/<vehicle>/purpose_output/value_monitor/market_snapshot_latest.json
+data/<vehicle>/purpose_output/value_monitor/market_snapshot_latest.md
+```
+
+Family-vehicle candidate review adds for Honda Odyssey and Kia Carnival:
+
+```text
+data/<vehicle>/purpose_output/family_candidate/candidate_review_latest.jsonl
+data/<vehicle>/purpose_output/family_candidate/candidate_review_latest.csv
+data/<vehicle>/purpose_output/family_candidate/seller_questions_latest.jsonl
+data/<vehicle>/purpose_output/family_candidate/requirements_summary_latest.json
+data/<vehicle>/purpose_output/family_candidate/requirements_summary_latest.md
+```
+
+All supported review and purpose outputs are built from current accepted canonical records joined to current identity/lifecycle evidence. F-350 and Audit 10 outputs also join matching raw adapter payloads. No supported output contains `rank` or `score`.
 
 Do not use `data/<vehicle>/merged/*.csv` as current recommendations. Historical merged CSVs are disabled legacy output and are deleted for active vehicles by governed retention with SHA-256 deletion evidence.
 
@@ -121,20 +142,43 @@ Both source status files use schema version `8`; adapter schema remains `1`.
 
 ## F-350 buyer intelligence
 
-`f350_buyer_intelligence.py` provides buyer-intelligence schema version `1`. It builds only from current successful source status, accepted canonical evidence, matching raw adapter payloads, and matching identity/lifecycle evidence. Stale Audit 03 review CSVs and legacy rank/history fields are not inputs.
+`f350_buyer_intelligence.py` provides buyer-intelligence schema version `1`. It builds only from current successful source status, accepted canonical evidence, matching raw adapter payloads, and matching identity/lifecycle evidence. Stale review CSVs and legacy rank/history fields are not inputs.
 
-It can expose source-text claims for trim, STX/FX4/Tremor packages, cab, box, SRW/DRW, drivetrain, engine hours, idle hours, service-record availability, accident/title language, and prior-use language. Missing evidence remains unknown and becomes a visible investigation gap and seller question.
+It exposes explicitly unverified configuration, usage, service, accident/title, prior-use, asking-price, seller-question, and owner-override context. Missing evidence remains unknown. Asking-price quartiles and mileage-adjusted regression are descriptive context, not appraisal or future value.
 
-When supported, it calculates kilometres per engine hour and idle-hour percentage as usage context only. It also provides:
+## Secondary-purpose outputs
 
-- observed asking-price quartiles with cohort basis and comparable count
-- transparent mileage-adjusted asking-price regression with sample count, slope, intercept, and `r_squared`
-- a five-year mileage scenario using the owner's expected 5,000–8,000 km per year
-- explainable non-ranked classifications and reasons
-- seller questions driven by missing evidence or visible concerns
-- owner dispositions, notes, tags, and reasoned classification overrides
+`purpose_inputs.json` schema version `1` is governed non-generated input.
 
-The computed classification remains visible when an owner override is applied. `f350_owner_overrides.json` is governed input; it never rewrites collected or computed evidence. `trim_tiers.json` remains legacy descriptive configuration and is not buyer-intelligence or purchase authority.
+The RAM profile preserves historical owner-reported claims while requiring a current odometer. The Forester subject profile remains incomplete until the owner records year, trim, powertrain, drivetrain, and current odometer. Odyssey/Carnival family-friend preferences remain explicit input gaps until budget, year, mileage, seating, cargo, distance, history, seller, and availability requirements are supplied.
+
+`purpose_outputs.py` provides purpose-output schema version `1`.
+
+### Owned-vehicle value profile
+
+RAM 3500 and Subaru Forester outputs provide:
+
+- source/year/comparability counts
+- observed asking-price and mileage distributions
+- close, partial, broad, incomplete, or evidence-gap subject comparability with visible reasons
+- previous-observation asking-price change counts when real history exists
+- owner-input gaps
+- an observed Q1-to-median lower asking band
+
+The lower band is explicitly not a verified faster-sale range, transaction-price estimate, sale probability, or appraisal. Fewer than three listings with previous price observations produces `insufficient_multi_run_history`.
+
+### Family-friend purchase profile
+
+Odyssey and Carnival outputs provide:
+
+- requirement completeness and questions for the family friend
+- source-text seating, cargo, service, accident/title, and seller claims when present
+- candidate classifications with visible reasons
+- seller questions for identity, history, service, seating, family-use features, availability, and inspection
+
+While friend preferences remain incomplete, accepted listings stay `candidate_pending_requirements`. They are not personalized recommendations.
+
+`purpose_output_validation.py` checks all profile artifacts against current canonical/raw/identity evidence and rejects ID/count/reference drift or any `rank`/`score` field. Generated-data pull requests invoke this validator when purpose outputs change.
 
 ## Storage and retention
 
@@ -156,9 +200,9 @@ Python is fixed to `3.11.13`. `requirements.lock` contains exact dependency pins
 
 Scheduled full collection runs Mondays at 08:00 UTC. Manual inputs are `collection_scope`, active `vehicle_key`, `source`, `publish_generated_data`, `anomaly_policy`, and optional `operator_note`.
 
-A full run snapshots prior health, writes baseline-aware anomaly schema v1, applies source health, builds combined F-350 buyer intelligence, then applies anomaly/retention/publication gates. A remote branch change during collection blocks publication.
+A full run snapshots prior health, writes baseline-aware anomalies, applies source health, builds F-350 buyer intelligence and all four secondary-purpose outputs, then applies anomaly/retention/publication gates. A remote branch change during collection blocks publication.
 
-A `single_pair` run validates one active governed source pair, uploads seven-day temporary evidence, and never publishes generated data. F-350 single-pair runs also include source-specific buyer intelligence; other vehicles do not receive F-350 outputs.
+A `single_pair` run validates one active governed source pair, builds only the selected vehicle's applicable F-350 or secondary-purpose output, uploads seven-day temporary evidence, and never publishes generated data.
 
 ## Current execution flow
 
@@ -167,9 +211,9 @@ A `single_pair` run validates one active governed source pair, uploads seven-day
 3. Direct adapters preserve request, page, raw object, rejection, parse-failure, and canonical evidence.
 4. Identity/lifecycle updates only after healthy reconciled source execution and rolls back on failure.
 5. Full runs build manual review, consolidated health, and baseline-aware anomaly evidence.
-6. Source health passes before combined F-350 buyer intelligence is built.
+6. Source health passes before F-350 and secondary-purpose outputs are built.
 7. Critical-anomaly policy and retention gates run.
-8. Publication validates staged paths, writes/verifies the manifest, checks whitespace, confirms the remote ref is unchanged, and then pushes a governed data commit.
+8. Publication validates staged paths, validates buyer/purpose artifacts, writes/verifies the manifest, checks whitespace, confirms the remote ref is unchanged, and then pushes a governed data commit.
 
 ## Local validation
 
@@ -184,12 +228,11 @@ python -m unittest discover -s tests -v
 python storage_retention.py verify --registry vehicle_registry.json
 ```
 
-Run governed sources and then build current-run F-350 intelligence:
+Example purpose-output build after a same-run source collection:
 
 ```bash
-python autotrader_run.py --config config_f350.json --timeout-seconds 4500 --fail-on-unhealthy
-python kijiji_run.py --config config_f350.json --timeout-seconds 4500 --fail-on-unhealthy
-python f350_buyer_intelligence.py build --config config_f350.json --run-id <same-run-id> --overrides f350_owner_overrides.json
+python purpose_outputs.py build --config config_ram3500.json --run-id <same-run-id> --source autotrader --source kijiji --inputs purpose_inputs.json
+python purpose_output_validation.py --config config_ram3500.json --run-id <same-run-id> --source autotrader --source kijiji --inputs purpose_inputs.json
 ```
 
 Legacy command names remain aliases into the governed runtimes. Never run `merge.py` to create a recommendation set.
@@ -211,7 +254,10 @@ kijiji_*.py                          direct Kijiji adapter/runtime/evidence
 canonical_evidence.py                canonical stages and reconciliation
 identity_lifecycle.py                identity, lifecycle, compact history, duplicate candidates
 f350_buyer_intelligence.py           transparent F-350 investigation outputs
-f350_owner_overrides.json            governed owner annotations and overrides
+f350_owner_overrides.json            governed F-350 owner annotations and overrides
+purpose_inputs.json                  governed secondary-purpose owner/friend inputs
+purpose_outputs.py                   owned-value and family-candidate outputs
+purpose_output_validation.py         current-evidence purpose-output validation
 storage_retention.py                 archive bounds, deletion evidence, size and staged-path gates
 phase1_reporting.py                  accepted plus identity evidence manual review and health
 vehicle_registry.json/.py            operational scope and source plan
@@ -240,6 +286,7 @@ docs/                                repository authorities
 - `AUDIT_07_STORAGE_RETENTION.md`
 - `AUDIT_08_CI_WORKFLOW_HARDENING.md`
 - `AUDIT_09_F350_BUYER_INTELLIGENCE.md`
+- `AUDIT_10_SECONDARY_PURPOSE_OUTPUTS.md`
 
 ## Change authority
 

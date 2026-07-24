@@ -1,0 +1,171 @@
+{
+  "schema_version": 1,
+  "vehicles": {
+    "ram_3500": {
+      "analysis_profile": "owned_vehicle_value",
+      "subject_profile": {
+        "year": {
+          "value": 2013,
+          "evidence_status": "owner_reported_historical_unverified"
+        },
+        "trim": {
+          "value": "Laramie",
+          "evidence_status": "owner_reported_historical_unverified"
+        },
+        "fuel": {
+          "value": "Diesel",
+          "evidence_status": "owner_reported_historical_unverified"
+        },
+        "engine": {
+          "value": "6.7 Cummins diesel",
+          "evidence_status": "owner_reported_historical_unverified"
+        },
+        "drivetrain": {
+          "value": "4wd",
+          "evidence_status": "owner_reported_historical_unverified"
+        },
+        "current_odometer_km": {
+          "value": null,
+          "evidence_status": "owner_input_required"
+        },
+        "odometer_context": {
+          "value": "Just over 400,000 km when this vehicle purpose was recorded.",
+          "evidence_status": "owner_reported_historical_unverified"
+        }
+      },
+      "sale_goal": "support_sale_to_help_fund_f350_purchase"
+    },
+    "subaru_forester": {
+      "analysis_profile": "owned_vehicle_value",
+      "subject_profile": {
+        "year": {
+          "value": null,
+          "evidence_status": "owner_input_required"
+        },
+        "trim": {
+          "value": null,
+          "evidence_status": "owner_input_required"
+        },
+        "fuel": {
+          "value": null,
+          "evidence_status": "owner_input_required"
+        },
+        "engine": {
+          "value": null,
+          "evidence_status": "owner_input_required"
+        },
+        "drivetrain": {
+          "value": null,
+          "evidence_status": "owner_input_required"
+        },
+        "current_odometer_km": {
+          "value": null,
+          "evidence_status": "owner_input_required"
+        },
+        "odometer_context": {
+          "value": null,
+          "evidence_status": "owner_input_required"
+        }
+      },
+      "sale_goal": "approximate_current_market_value_monitoring"
+    },
+    "honda_odyssey": {
+      "analysis_profile": "family_friend_purchase",
+      "preferences": {
+        "budget_max_cad": {
+          "value": null,
+          "evidence_status": "friend_input_required"
+        },
+        "min_year": {
+          "value": null,
+          "evidence_status": "friend_input_required"
+        },
+        "max_year": {
+          "value": null,
+          "evidence_status": "friend_input_required"
+        },
+        "max_mileage_km": {
+          "value": null,
+          "evidence_status": "friend_input_required"
+        },
+        "minimum_seating": {
+          "value": null,
+          "evidence_status": "friend_input_required"
+        },
+        "cargo_requirements": {
+          "value": [],
+          "evidence_status": "friend_input_required"
+        },
+        "max_distance_km": {
+          "value": null,
+          "evidence_status": "friend_input_required"
+        },
+        "accident_title_requirement": {
+          "value": null,
+          "evidence_status": "friend_input_required"
+        },
+        "service_history_requirement": {
+          "value": null,
+          "evidence_status": "friend_input_required"
+        },
+        "acceptable_seller_types": {
+          "value": [],
+          "evidence_status": "friend_input_required"
+        },
+        "availability_constraints": {
+          "value": [],
+          "evidence_status": "friend_input_required"
+        }
+      }
+    },
+    "kia_carnival": {
+      "analysis_profile": "family_friend_purchase",
+      "preferences": {
+        "budget_max_cad": {
+          "value": null,
+          "evidence_status": "friend_input_required"
+        },
+        "min_year": {
+          "value": null,
+          "evidence_status": "friend_input_required"
+        },
+        "max_year": {
+          "value": null,
+          "evidence_status": "friend_input_required"
+        },
+        "max_mileage_km": {
+          "value": null,
+          "evidence_status": "friend_input_required"
+        },
+        "minimum_seating": {
+          "value": null,
+          "evidence_status": "friend_input_required"
+        },
+        "cargo_requirements": {
+          "value": [],
+          "evidence_status": "friend_input_required"
+        },
+        "max_distance_km": {
+          "value": null,
+          "evidence_status": "friend_input_required"
+        },
+        "accident_title_requirement": {
+          "value": null,
+          "evidence_status": "friend_input_required"
+        },
+        "service_history_requirement": {
+          "value": null,
+          "evidence_status": "friend_input_required"
+        },
+        "acceptable_seller_types": {
+          "value": [],
+          "evidence_status": "friend_input_required"
+        },
+        "availability_constraints": {
+          "value": [],
+          "evidence_status": "friend_input_required"
+        }
+      }
+    }
+  }
+}

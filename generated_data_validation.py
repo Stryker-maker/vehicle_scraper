@@ -7,11 +7,13 @@ from typing import Any
 
 from f350_buyer_validation import validate_buyer_artifacts
 from generated_data_publish import MANIFEST_PATH, PUBLICATION_SCHEMA_VERSION
+from purpose_output_validation import validate_purpose_output
 from storage_retention import validate_generated_data_paths, verify_retention
 from vehicle_registry import DEFAULT_REGISTRY_PATH, registry_entries
 
 GENERATED_DATA_VALIDATION_SCHEMA_VERSION = 1
 BUYER_INTELLIGENCE_PREFIX = "data/ford_f350/buyer_intelligence/"
+PURPOSE_OUTPUT_SEGMENT = "/purpose_output/"
 
 
 def _load_json(path: Path) -> dict[str, Any] | None:
@@ -41,6 +43,7 @@ def validate_generated_data_change(
     entries = registry_entries(root=root, registry_path=registry_path)
     active = [str(entry["vehicle_key"]) for entry in entries if entry["enabled"]]
     paused = [str(entry["vehicle_key"]) for entry in entries if not entry["enabled"]]
+    entry_by_key = {str(entry["vehicle_key"]): entry for entry in entries}
     changed_paths = _read_paths(paths_file)
     errors = validate_generated_data_paths(
         changed_paths=changed_paths,
@@ -120,6 +123,45 @@ def validate_generated_data_change(
                     for value in buyer_validation.get("validation_errors", [])
                 )
 
+    purpose_vehicle_keys = sorted(
+        {
+            parts[1]
+            for path in changed_paths
+            if PURPOSE_OUTPUT_SEGMENT in path
+            for parts in [path.split("/")]
+            if len(parts) >= 4 and parts[0] == "data"
+        }
+    )
+    purpose_validations: dict[str, dict[str, Any]] = {}
+    for vehicle_key in purpose_vehicle_keys:
+        entry = entry_by_key.get(vehicle_key)
+        if not entry or not entry.get("enabled"):
+            errors.append(f"purpose_output_vehicle_not_active:{vehicle_key}")
+            continue
+        if entry.get("analysis_profile") not in {
+            "owned_vehicle_value",
+            "family_friend_purchase",
+        }:
+            errors.append(f"purpose_output_profile_not_supported:{vehicle_key}")
+            continue
+        try:
+            validation = validate_purpose_output(
+                root=root,
+                config_path=Path(str(entry["config_path"])),
+            )
+        except (OSError, ValueError, json.JSONDecodeError) as exc:
+            errors.append(
+                f"purpose_output_validation_exception:{vehicle_key}:"
+                f"{type(exc).__name__}:{exc}"
+            )
+            continue
+        purpose_validations[vehicle_key] = validation
+        if validation.get("validation_status") != "pass":
+            errors.extend(
+                f"purpose_output:{vehicle_key}:{value}"
+                for value in validation.get("validation_errors", [])
+            )
+
     retention = verify_retention(root=root, registry_path=registry_path)
     if retention.get("verification_status") != "pass":
         errors.extend(
@@ -137,6 +179,18 @@ def validate_generated_data_change(
             None if buyer_validation is None else buyer_validation.get("validation_status")
         ),
         "buyer_intelligence_validation": buyer_validation,
+        "purpose_output_validation_status": (
+            None
+            if not purpose_vehicle_keys
+            else "pass"
+            if len(purpose_validations) == len(purpose_vehicle_keys)
+            and all(
+                value.get("validation_status") == "pass"
+                for value in purpose_validations.values()
+            )
+            else "fail"
+        ),
+        "purpose_output_validations": purpose_validations,
     }
 
 

@@ -10,7 +10,7 @@ This document prevents old files, fields, workflows, and behaviours from being m
 - **Historical output** — older evidence; not current authority
 - **Compatibility alias** — old entry point redirected into a supported path
 - **Active supported adapter** — current governed source execution
-- **Active shared control** — current evidence, workflow, retention, anomaly, publication, or buyer-investigation control
+- **Active shared control** — current evidence, workflow, analysis, retention, or publication control
 
 ## Disabled legacy
 
@@ -18,85 +18,83 @@ This document prevents old files, fields, workflows, and behaviours from being m
 
 Status: **LEGACY / DISABLED**.
 
-No workflow calls it. It treated source listing IDs like possible VINs, applied broad duplicate tolerances, filled fields without current evidence authority, and ranked output. Audit 06 replaced identity/dedup semantics; Audit 07 removes active-vehicle historical merged CSVs through governed SHA-256 deletion evidence. Audit 09 does not reuse its ranking, weighting, or merge logic.
+No workflow calls it. It conflated listing IDs with possible VINs, applied broad duplicate tolerances, filled fields without current evidence authority, and ranked output. No F-350 or secondary-purpose output reuses its merge, ranking, weighting, or recommendation logic.
 
 ### Historical merged CSVs
 
-`data/<vehicle>/merged/*.csv` files are not current recommendations, graph inputs, buyer-intelligence inputs, or availability evidence. Active-vehicle files are deleted during governed retention. Paused F-150/Tundra files remain untouched until later owner-approved scope.
+`data/<vehicle>/merged/*.csv` files are not current recommendations, value-monitor inputs, family-candidate inputs, graph authority, or availability evidence.
 
 ### Legacy source price history
 
-`price_history_autotrader.json` and `price_history_kijiji.json` are not read, migrated, or rewritten by supported runtimes or buyer intelligence. Active-vehicle copies are deleted with path, reason, size, SHA-256, run, and time evidence. Identity/lifecycle schema v2 is the supported history authority.
+`price_history_autotrader.json` and `price_history_kijiji.json` are not read by supported runtimes or purpose outputs. Identity/lifecycle schema v2 is the supported observation authority.
 
-### Historical Audit 03 review CSVs
+### Historical review and analysis files
 
-Older manual-review CSVs may preserve valid historical evidence from their own runs, but they are not current F-350 buyer-intelligence inputs. Buyer intelligence requires current source status schema v8, canonical evidence v1, raw adapter evidence v1, and identity evidence v2 from the same run.
+Older manual-review, buyer, or purpose-output files may describe their own historical runs but are not current analysis inputs. Current purpose output requires matching source status, canonical, raw adapter, identity, and governed input evidence from one run.
 
 ### Former Kijiji patcher
 
-`phase1_kijiji_runner.py` has been removed. Its text replacement and `exec` strategy is not part of the repository or workflow.
+`phase1_kijiji_runner.py` has been removed. Runtime text replacement and `exec` are unsupported.
 
 ### Acknowledgement-only generated-data workflow
 
-The former pull-request branch that merely acknowledged bot-generated data is removed. `data/**` pull requests now run `.github/workflows/generated-data.yml` and receive actual path, retention, status, health, anomaly, and publication-manifest validation.
+The former acknowledgement-only path is removed. `data/**` pull requests receive actual integrity validation, including F-350 and secondary-purpose artifact validation when those paths change.
 
-### Moving dependency and action references
+### Moving dependencies and actions
 
-Direct unpinned installation commands such as `pip install requests beautifulsoup4 geopy`, moving Python versions, and action references such as `actions/checkout@v4` are not supported workflow patterns. Supported workflows use Python `3.11.13`, `requirements.lock`, and exact action commit SHAs.
+Unpinned package installs, moving Python versions, and moving action tags are unsupported. Workflows use Python `3.11.13`, `requirements.lock`, and exact action SHAs.
 
 ## Compatibility aliases
 
-### `scraper.py`
+- `scraper.py` redirects to `autotrader_run.py`.
+- `kijiji_scraper.py` redirects to `kijiji_run.py`.
 
-The former AutoTrader command is an alias into `autotrader_run.py`.
+These aliases receive the same governed runtime controls.
 
-### `kijiji_scraper.py`
+## Active supported adapters
 
-The former Kijiji command is an alias into `kijiji_run.py`.
-
-Legacy command names therefore receive the same timeout, source-status, adapter/canonical evidence, identity/lifecycle, config-isolation, and rollback controls as the supported runtimes.
-
-## Active supported source adapters
-
-### AutoTrader
-
-`autotrader_adapter.py`, `autotrader_distance.py`, `autotrader_history.py`, `autotrader_canonical.py`, and `autotrader_run.py` read schema-v2 config directly, preserve request/page and response-object evidence, paginate, retry, record duplicates/rejections/parse failures, emit no rank or score, and do not mutate config.
-
-### Kijiji
-
-`kijiji_locations.py`, `kijiji_adapter.py`, `kijiji_history.py`, `kijiji_canonical.py`, and `kijiji_run.py` read schema-v2 config directly, validate explicit Cars & Trucks hubs, preserve JSON-LD objects and query/page provenance, record duplicates/rejections/parse failures, emit no rank or score, and never substitute query origin for listing geography.
+Direct AutoTrader and Kijiji modules read schema-v2 config, preserve request/page/object evidence, record duplicates/rejections/parse failures, emit no rank/score, and do not mutate approved config. Kijiji never substitutes query origin for listing geography.
 
 ## Active shared controls
 
-- `canonical_evidence.py` — raw, normalized, accepted, rejected, parse-failure, and reconciliation evidence
-- `identity_lifecycle.py` schema v2 — source-ID/VIN separation, fingerprints, duplicate candidates, lifecycle, compact history, and bounded retired-state evidence
-- `phase1_reporting.py` — accepted canonical evidence joined with current identity/lifecycle evidence
-- `f350_buyer_intelligence.py` schema v1 — current-run F-350 raw/canonical/identity joins, unverified evidence extraction, market context, seller questions, and explainable non-ranked classifications
-- `f350_owner_overrides.json` schema v1 — owner disposition, notes, tags, and reasoned classification overrides that remain separate from source/computed evidence
-- `storage_retention.py` schema v1 — archive limits, deletion evidence, managed-size and staged-path gates
-- `requirements.lock` / `dependency_lock.py` — exact Python environment
-- `.github/workflows/ci.yml` — reusable deterministic code validation
-- `.github/workflows/generated-data.yml` — generated-data pull-request validation
-- `.github/workflows/scrape.yml` — schedule/manual collection and F-350 buyer-intelligence orchestration
-- `workflow_control.py` — registry-governed plan and smoke validation
-- `workflow_anomalies.py` schema v1 — baseline-aware anomaly evidence and policy
-- `generated_data_publish.py` schema v1 — run/path publication manifest and staged verification
-- `generated_data_validation.py` schema v1 — generated-data pull-request integrity checks
+- `canonical_evidence.py` — canonical stages and reconciliation
+- `identity_lifecycle.py` v2 — identity, lifecycle, compact history, duplicate candidates
+- `phase1_reporting.py` — current general review and health
+- `f350_buyer_intelligence.py` / validator — F-350 investigation
+- `f350_owner_overrides.json` v1 — F-350 owner review input
+- `purpose_inputs.json` v1 — secondary owner/friend interpretation input
+- `purpose_outputs.py` / validator v1 — owned-value and family-candidate outputs
+- `storage_retention.py` v1 — archive, deletion, size, and staged-path controls
+- exact CI, generated-data validation, collection, anomaly, manifest, and publication controls
+
+## Non-authoritative historical context
+
+### RAM historical odometer statement
+
+“Just over 400,000 km” is preserved only as `owner_reported_historical_unverified` context. It is not current odometer, current valuation input, or a replacement for an owner update.
+
+### Missing Forester profile
+
+Absence of Forester subject details is not permission to infer them from listings, config ranges, or another vehicle. Output remains `subject_profile_incomplete` until owner input exists.
+
+### Missing family-friend requirements
+
+Operational Odyssey/Carnival config criteria are broad collection boundaries, not personalized friend preferences. Until explicit friend input exists, listings remain `candidate_pending_requirements` rather than recommendations.
+
+### Historical “faster sale” language
+
+No current repository evidence contains transaction prices, sale dates, or sale probability. An observed lower asking band must not be called a verified faster-sale range.
 
 ## Remaining compatibility fields and descriptive configuration
 
-`max_results` and `ranking_weights` are prohibited in approved configs and unused by active adapters. Source `rank` and `score` are absent from supported adapters, general review, and buyer intelligence. `weeks_tracked`, `price_last_week`, and `price_change_week` remain blank source-CSV compatibility columns; supported history uses actual observations. Raw unknown sentinels may remain in raw evidence while canonical normalization preserves null-safe values.
+`max_results` and `ranking_weights` are prohibited in approved configs. Source `rank` and `score` are absent from supported outputs. Legacy week columns remain blank compatibility fields; supported history uses actual observations.
 
-### `trim_tiers.json`
-
-Status: **active legacy descriptive configuration**.
-
-Source CSV writers may still populate compatibility `trim_tier` values from this file. Its historical tiers mix true trim names with packages such as Tremor and FX4, so they are not a valid purchase hierarchy. Audit 09 does not use `trim_tier` or `trim_tiers.json` for configuration evidence, price cohorts, classifications, questions, or owner overrides. Buyer intelligence extracts trim and package claims separately from current source text.
+`trim_tiers.json` remains active legacy descriptive configuration. Its tiers mix trims and packages and are not purchase, comparability, or candidate authority. F-350 and secondary-purpose outputs do not use it for classifications.
 
 ## Paused vehicle data
 
-F-150 and Tundra are paused, not legacy. Their historical data is not modified by retention, generated-data validation, collection, buyer intelligence, or publication until Audit 11 or another explicit owner-approved package.
+F-150 and Tundra are paused, not legacy. Their historical data is not modified by collection, analysis, retention deletion, generated-data validation, or publication until Audit 11 or explicit owner approval.
 
 ## Removal rule
 
-Remove a legacy component only after replacement or abandonment is approved, historical evidence needs are assessed, deletion evidence is defined where needed, tests and documents no longer depend on it, and the owner approves the change.
+Remove legacy material only after replacement/abandonment approval, historical-evidence review, deletion controls where needed, test/document updates, and owner approval.

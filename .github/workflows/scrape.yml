@@ -159,29 +159,56 @@ jobs:
             --source "$SELECTED_SOURCE"
           cat data/ford_f350/buyer_intelligence/market_summary_latest.md >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Build and validate secondary-purpose output for narrow validation
+        if: env.COLLECTION_SCOPE == 'single_pair' && env.VEHICLE_KEY != 'ford_f350'
+        run: |
+          set -euo pipefail
+          config=$(cut -f1 "${{ steps.collection-plan.outputs.path }}")
+          python purpose_outputs.py build \
+            --config "$config" \
+            --run-id "$GITHUB_RUN_ID" \
+            --source "$SELECTED_SOURCE" \
+            --inputs purpose_inputs.json
+          python purpose_output_validation.py \
+            --config "$config" \
+            --run-id "$GITHUB_RUN_ID" \
+            --source "$SELECTED_SOURCE" \
+            --inputs purpose_inputs.json
+          find "data/$VEHICLE_KEY/purpose_output" -name '*_latest.md' -type f -print -exec cat {} \; >> "$GITHUB_STEP_SUMMARY"
+
       - name: Prepare single-pair validation artifact
-        if: env.COLLECTION_SCOPE == 'single_pair'
+        if: always() && env.COLLECTION_SCOPE == 'single_pair'
         run: |
           set -euo pipefail
           artifact="$RUNNER_TEMP/smoke-artifact"
-          mkdir -p "$artifact/run_status" "$artifact/latest" "$artifact/evidence"
-          cp "data/$VEHICLE_KEY/run_status/${SELECTED_SOURCE}_latest.json" "$artifact/run_status/"
-          cp "data/$VEHICLE_KEY/latest/${VEHICLE_KEY}_${SELECTED_SOURCE}_latest.csv" "$artifact/latest/"
-          cp -R "data/$VEHICLE_KEY/evidence/$SELECTED_SOURCE/." "$artifact/evidence/"
-          if [[ -d "data/$VEHICLE_KEY/adapter_evidence/$SELECTED_SOURCE" ]]; then
-            mkdir -p "$artifact/adapter_evidence"
-            cp -R "data/$VEHICLE_KEY/adapter_evidence/$SELECTED_SOURCE/." "$artifact/adapter_evidence/"
-          fi
-          mkdir -p "$artifact/identity_lifecycle"
-          cp -R "data/$VEHICLE_KEY/identity_lifecycle/$SELECTED_SOURCE/." "$artifact/identity_lifecycle/"
-          if [[ -d "data/$VEHICLE_KEY/buyer_intelligence" ]]; then
-            mkdir -p "$artifact/buyer_intelligence"
-            cp -R "data/$VEHICLE_KEY/buyer_intelligence/." "$artifact/buyer_intelligence/"
-          fi
+          rm -rf "$artifact"
+          mkdir -p "$artifact"
+          copy_file() {
+            local source="$1" destination="$2"
+            if [[ -f "$source" ]]; then
+              mkdir -p "$destination"
+              cp "$source" "$destination/"
+            fi
+          }
+          copy_dir() {
+            local source="$1" destination="$2"
+            if [[ -d "$source" ]]; then
+              mkdir -p "$destination"
+              cp -R "$source/." "$destination/"
+            fi
+          }
+          copy_file "data/$VEHICLE_KEY/run_status/${SELECTED_SOURCE}_latest.json" "$artifact/run_status"
+          copy_file "data/$VEHICLE_KEY/latest/${VEHICLE_KEY}_${SELECTED_SOURCE}_latest.csv" "$artifact/latest"
+          copy_dir "data/$VEHICLE_KEY/evidence/$SELECTED_SOURCE" "$artifact/evidence"
+          copy_dir "data/$VEHICLE_KEY/adapter_evidence/$SELECTED_SOURCE" "$artifact/adapter_evidence"
+          copy_dir "data/$VEHICLE_KEY/identity_lifecycle/$SELECTED_SOURCE" "$artifact/identity_lifecycle"
+          copy_dir "data/$VEHICLE_KEY/buyer_intelligence" "$artifact/buyer_intelligence"
+          copy_dir "data/$VEHICLE_KEY/purpose_output" "$artifact/purpose_output"
           cp "${{ steps.collection-plan.outputs.path }}" "$artifact/source-plan.tsv"
+          find "$artifact" -type f -maxdepth 8 -print | sort
 
       - name: Upload single-pair validation artifact
-        if: env.COLLECTION_SCOPE == 'single_pair'
+        if: always() && env.COLLECTION_SCOPE == 'single_pair'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: source-smoke-${{ env.VEHICLE_KEY }}-${{ env.SELECTED_SOURCE }}-${{ github.run_id }}
@@ -226,6 +253,27 @@ jobs:
             --source kijiji
           cat data/ford_f350/buyer_intelligence/market_summary_latest.md >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Build and validate secondary-purpose outputs
+        if: env.COLLECTION_SCOPE == 'full'
+        run: |
+          set -euo pipefail
+          for config in config_ram3500.json config_forester.json config_odyssey.json config_carnival.json; do
+            python purpose_outputs.py build \
+              --config "$config" \
+              --run-id "$GITHUB_RUN_ID" \
+              --source autotrader \
+              --source kijiji \
+              --inputs purpose_inputs.json
+            python purpose_output_validation.py \
+              --config "$config" \
+              --run-id "$GITHUB_RUN_ID" \
+              --source autotrader \
+              --source kijiji \
+              --inputs purpose_inputs.json
+          done
+          find data/ram_3500/purpose_output data/subaru_forester/purpose_output data/honda_odyssey/purpose_output data/kia_carnival/purpose_output \
+            -name '*_latest.md' -type f -print -exec cat {} \; >> "$GITHUB_STEP_SUMMARY"
+
       - name: Enforce critical anomaly policy
         if: env.COLLECTION_SCOPE == 'full'
         run: |
@@ -259,6 +307,10 @@ jobs:
             data/run_status/
             data/retention/
             data/ford_f350/buyer_intelligence/
+            data/ram_3500/purpose_output/
+            data/subaru_forester/purpose_output/
+            data/honda_odyssey/purpose_output/
+            data/kia_carnival/purpose_output/
             ${{ steps.collection-plan.outputs.path }}
           if-no-files-found: warn
           retention-days: 14

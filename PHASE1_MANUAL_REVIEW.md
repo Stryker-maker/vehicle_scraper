@@ -1,58 +1,50 @@
-# Phase 1: Canonical, Identity, Retention, Workflow and Buyer-Investigation Evidence
+# Phase 1: Evidence, Investigation, Value Monitoring and Candidate Review
 
 **Status:** active interim operating guidance during the repository audit.
 
-Read with the repository baseline, architecture, data dictionary, limitations register, roadmap, and Audit 03–09 authority documents.
+Read with the repository baseline, architecture, data dictionary, limitations register, roadmap, and Audit 03–10 authority documents.
 
-## Current controls
+## Core controls
 
-- Registry/config schema v2 controls operational scope and criteria.
-- Both sources run through direct adapters with bounded execution.
-- Canonical evidence schema v1 preserves raw, normalized, accepted, rejected, and parse-failure stages.
-- Identity/lifecycle schema v2 updates only after a successful reconciled source run.
-- Source status schema v8 requires identity current count to equal accepted count.
-- Failed or unhealthy source runs cannot advance lifecycle state.
-- Source listing IDs remain `source_identifier_claim_not_vin`; VIN is explicit unverified source evidence only.
-- Duplicate matches are candidates only; canonical records are never merged.
-- Price history keeps truthful aggregate values, the newest thirteen raw observations, and digest-backed compaction evidence.
-- Retired state and generated-data growth are bounded.
-- General manual review and F-350 buyer intelligence contain no purchase `rank` or `score`.
-- Kijiji query origin is provenance only; listing geography is listing-specific or unknown.
-- Python `3.11.13`, exact `requirements.lock` pins, and exact GitHub Action SHAs govern workflows.
-- Code CI, generated-data PR validation, and collection are separate workflows.
-- F-350 buyer intelligence requires current source status, canonical, raw adapter, and identity evidence from the same run.
-- Missing F-350 configuration/history/usage evidence stays unknown and becomes an investigation gap rather than an inferred fact.
-- Owner overrides preserve computed classifications and source evidence.
+- Registry/config schema v2 controls operational collection scope and criteria.
+- Canonical schema v1 reconciles every returned object.
+- Identity/lifecycle schema v2 updates only after healthy source execution.
+- Source listing IDs are not VINs; duplicate candidates never merge records.
+- General, F-350, and secondary-purpose outputs contain no purchase `rank` or `score`.
+- Missing owner/friend inputs and missing listing evidence remain unknown.
+- Python `3.11.13`, exact dependencies/actions, separated workflows, retention, anomalies, and publication manifests remain required.
 
-## Current evidence files
+## Current evidence paths
 
-Source, canonical, identity, review, retention, health, anomaly, and publication evidence includes:
+Common evidence:
 
 ```text
 data/<vehicle>/adapter_evidence/<source>/...
 data/<vehicle>/evidence/<source>/...
 data/<vehicle>/identity_lifecycle/<source>/...
-data/<vehicle>/identity_lifecycle/duplicate_candidates_latest.jsonl
 data/<vehicle>/manual_review/<vehicle>_manual_review_latest.csv
-data/<vehicle>/retention/latest.json
-data/<vehicle>/retention/deletion_ledger.json
 data/<vehicle>/run_status/<source>_latest.json
+data/<vehicle>/retention/...
+data/run_status/...
 data/retention/latest.json
-data/run_status/latest.json
-data/run_status/latest.md
-data/run_status/anomalies_latest.json
-data/run_status/anomalies_latest.md
-data/run_status/publication_latest.json
 ```
 
-F-350 buyer-investigation evidence adds:
+F-350:
 
 ```text
-data/ford_f350/buyer_intelligence/investigation_latest.jsonl
-data/ford_f350/buyer_intelligence/investigation_latest.csv
-data/ford_f350/buyer_intelligence/seller_questions_latest.jsonl
-data/ford_f350/buyer_intelligence/market_summary_latest.json
-data/ford_f350/buyer_intelligence/market_summary_latest.md
+data/ford_f350/buyer_intelligence/...
+```
+
+Owned-value profiles:
+
+```text
+data/<ram_3500|subaru_forester>/purpose_output/value_monitor/...
+```
+
+Family-candidate profiles:
+
+```text
+data/<honda_odyssey|kia_carnival>/purpose_output/family_candidate/...
 ```
 
 The canonical equation remains:
@@ -61,106 +53,102 @@ The canonical equation remains:
 fetched_records = accepted_records + rejected_records + parse_failures
 ```
 
-AutoTrader scope is `autotrader_adapter_response_listing_objects`. Kijiji scope is `kijiji_adapter_json_ld_listing_objects`.
+## Identity/lifecycle interpretation
 
-## Identity and lifecycle interpretation
+- `active`: observed in the current successful source run
+- `missing`: absent from a successful source run
+- `reappeared`: observed after missing/retired
+- `retired`: three successful misses plus fourteen days
 
-- `active` means observed in the current successful source run.
-- `missing` means not observed in a successful source run.
-- `reappeared` means observed after missing or retired state.
-- `retired` requires three successful-run misses and fourteen elapsed days.
-- These are operational inferences, not sold/removed claims.
-- Observation counts include compacted evidence; compacted raw observations are not reconstructable.
-- `duplicate_candidate_review_required` means human comparison, not merge authority.
+These are operational inferences, not sold claims. Price-change fields represent listing asking-price observations, not transaction prices.
 
-## F-350 buyer-intelligence interpretation
+## F-350 investigation guidance
 
-Buyer intelligence is an investigation aid, not a verified dossier, appraisal, or automatic recommendation.
+Treat F-350 source-text claims, `km_per_engine_hour`, `idle_hour_percent`, asking-price quartiles, regression, classifications, questions, and owner overrides according to Audit 09. They are investigation context, not verified configuration/history, condition, appraisal, or recommendation.
 
-### Source-text claims
+Before advancing a truck, confirm live availability, VIN, exact configuration, engine/idle hours, records/history, prior use, modifications, cold start, diagnostic scan, and independent inspection.
 
-Review evidence status and matched source text for:
+## RAM 3500 value-monitor guidance
 
-- trim and package claims
-- cab and box claims
-- SRW/DRW and drivetrain claims
-- total engine and idle hours
-- service-record availability
-- accident/title language
-- prior-use language
+Open:
 
-`source_text_reported_unverified` means the source text supported the claim; it does not mean the claim was independently confirmed. `unknown` means the repository found no supported value and did not infer one.
-
-`trim_tiers.json` and compatibility `trim_tier` values are not purchase authority. Audit 09 extracts trim and package claims separately.
-
-### Usage context
-
-`km_per_engine_hour` and `idle_hour_percent` are calculated only when the required source claims exist. They provide usage context, not condition proof. Confirm instrument-cluster values and inspect for inconsistent or impossible claims.
-
-### Asking-price context
+```text
+data/ram_3500/purpose_output/value_monitor/market_snapshot_latest.md
+data/ram_3500/purpose_output/value_monitor/comparables_latest.csv
+```
 
 Review:
 
-- `price_band_basis`
-- `price_band_comparable_count`
-- `price_band_q1_cad`
-- `price_band_median_cad`
-- `price_band_q3_cad`
-- `price_position`
-- `price_difference_from_median_cad`
+- `subject_comparability` and visible reasons
+- asking-price/mileage distributions and cohort basis
+- current `subject_profile_missing_fields`
+- real `change_from_previous_observation_cad` evidence
+- multi-run direction status
 
-These summarize current accepted asking-price claims from configured queries. They are not sale prices or appraised value.
+The known 2013/Laramie/6.7 Cummins/4WD profile and historic “just over 400,000 km” statement are owner-reported historical context. Record the current odometer before treating output as current subject context.
 
-When available, the mileage-adjusted projection also exposes sample count, slope per 10,000 km, intercept, and `r_squared`. Treat it as descriptive sample context only. A weak or small sample must not be used as value authority.
+`competitive_asking_context` is a Q1-to-median observed asking band. It is not a verified faster-sale range, transaction value, sale probability, or appraisal.
 
-### Owner-use scenario
+## Subaru Forester value-monitor guidance
 
-`projected_mileage_5y_min_km` and `projected_mileage_5y_max_km` add 25,000–40,000 km to the current mileage claim. They use the owner's expected 5,000–8,000 km annual use and do not predict resale value.
+Until the owner records current year, trim, fuel/engine, drivetrain, odometer, and relevant context, use Forester output only as broad configured-query market context.
 
-### Classifications
+`subject_profile_incomplete` is expected while those fields are absent. Do not select a listing as a close comparable by guessing the owner's vehicle details.
 
-Review both:
+## Odyssey/Carnival candidate guidance
 
-- `computed_classification` and `computed_classification_reasons`
-- owner classification override, reason, and `effective_classification`
+Open:
 
-Computed labels are explainable review categories, not ranks. An owner override changes review disposition only; it does not change the source evidence, market calculations, or computed result.
+```text
+data/<vehicle>/purpose_output/family_candidate/requirements_summary_latest.md
+data/<vehicle>/purpose_output/family_candidate/candidate_review_latest.csv
+data/<vehicle>/purpose_output/family_candidate/seller_questions_latest.jsonl
+```
 
-### Seller questions
+First resolve `questions_for_friend` for:
 
-Use `seller_questions_latest.jsonl` as a conversation and document-request checklist. Questions identify missing evidence or visible concerns; they do not prove that a defect exists. Record answers and supporting documents through an approved owner-note workflow rather than rewriting source evidence.
+- budget
+- year range
+- maximum mileage
+- seating and cargo requirements
+- travel radius
+- history/service requirements
+- acceptable seller types
+- timing, deposit, inspection, and availability constraints
 
-## Retention interpretation
+While those inputs are missing, `candidate_pending_requirements` means only that the listing passed broad collection criteria. It is not a shortlist or recommendation.
 
-Full-run retention keeps eight timestamped source CSVs/source and four timestamped manual-review CSVs for active vehicles while preserving current `*_latest` evidence, including buyer-intelligence outputs. File deletion evidence records path, category, reason, size, SHA-256, run ID, and time. Paused F-150/Tundra data remains outside collection, retention deletion, buyer intelligence, and publication scope.
+After preferences are recorded:
 
-A passing retention report proves configured storage limits and deletion accounting passed; it does not verify listing truth.
+- `candidate_outside_stated_preferences` exposes visible mismatches
+- `candidate_with_evidence_gaps` requires seller/document confirmation
+- `candidate_for_manual_review` still requires live-listing confirmation, history review, and independent inspection
+
+Never apply F-350 truck assumptions to minivans.
+
+## Seller-question interpretation
+
+Seller questions identify missing evidence or verification needs. They do not prove a defect, obtain an answer, or verify a claim. Keep seller responses/documents separate from collected source evidence.
 
 ## Workflow behaviour
 
 ### Deterministic CI
 
-`.github/workflows/ci.yml` runs for non-data pull-request changes, manual CI, and collection preflight. It validates the exact dependency lock, installs the locked environment, compiles sources including `f350_buyer_intelligence.py`, validates registry/config state, and runs structured/hostile tests. It never collects marketplace data.
+`.github/workflows/ci.yml` validates exact dependencies, compiles all source and analysis modules, validates registry/config state, and runs hostile tests. It never collects marketplace data.
 
 ### Generated-data pull requests
 
-`.github/workflows/generated-data.yml` runs when a pull request changes `data/**`. It validates governed paths, retention, changed source statuses, health/anomaly evidence, and publication-manifest membership. Data-only changes do not receive acknowledgement-only success.
+`.github/workflows/generated-data.yml` validates governed paths, retention, statuses, health/anomalies, manifests, and any changed F-350 or secondary-purpose artifacts against current underlying evidence.
 
 ### Collection
 
-`.github/workflows/scrape.yml` runs only on the Monday 08:00 UTC schedule or manual dispatch. It cannot begin until reusable CI passes.
+A `single_pair` run executes one active vehicle/source, builds only that vehicle's applicable analysis output, uploads seven-day evidence, and never publishes generated data.
 
-A `single_pair` run validates one active governed vehicle/source pair, uploads seven-day evidence, and never publishes data. When the selected vehicle is F-350, source-specific buyer intelligence is included. Other vehicles do not receive F-350 buyer output.
-
-A full run builds health and baseline-aware anomaly evidence, fails on unhealthy source evidence, builds combined AutoTrader/Kijiji F-350 buyer intelligence, applies anomaly/retention gates, and publishes only when explicitly authorized. Scheduled runs enforce critical anomalies. Manual `report_only` preserves anomaly evidence while allowing an explicitly selected diagnostic publication policy.
-
-Before publishing, the workflow validates staged paths, writes and verifies `publication_latest.json`, runs whitespace checks, and confirms the remote ref has not changed since collection began.
+A full run builds general review and health, then F-350 and all four secondary-purpose outputs after health passes. Anomaly, retention, staging, manifest, whitespace, and remote-ref gates remain before publication.
 
 ## What Phase 1 does not prove
 
-Phase 1 does not prove complete marketplace coverage, independent truth of source or extracted configuration/history claims, verified VIN, physical-vehicle identity, sold status, verified Kijiji geography, routable Kijiji distance, current availability, mechanical condition, actual sale price, appraised/fair/future value, seller answers, repair cost, purchase suitability, or raw reconstruction of compacted/deleted evidence.
-
-A clean anomaly report means only the configured diagnostics did not identify a critical/warning condition. A publication manifest proves staged-path accounting, not marketplace truth. A complete F-350 evidence profile means fields were present, not independently verified.
+Phase 1 does not prove complete marketplace coverage, independently verified identity/configuration/history, sold state, availability, mechanical condition, transaction price, appraisal, future value, sale speed/probability, seller answers, personalized secondary analysis without required inputs, or raw reconstruction of deleted/compacted evidence.
 
 ## Active scope
 
@@ -172,22 +160,4 @@ A clean anomaly report means only the configured diagnostics did not identify a 
 
 Ford F-150 and Toyota Tundra remain paused.
 
-## General manual-review guidance
-
-Confirm the live listing, actual location, price, mileage, VIN, identity, history, seller, condition, and availability. Review VIN evidence, lifecycle state/reason, elapsed time, missing/reappearance counters, duplicate-candidate evidence, quality warnings, source claims, location/distance evidence, canonical/raw references, and source completion time.
-
-## F-350 investigation guidance
-
-Before advancing a truck beyond investigation:
-
-1. Open the live listing and confirm it still exists.
-2. Confirm VIN from independent images/documents.
-3. Confirm exact trim, packages, cab, box, SRW/DRW, drivetrain, and major modifications.
-4. Obtain current total engine and idle hours from a cluster image.
-5. Obtain maintenance/repair records and a current history report.
-6. Clarify prior fleet, commercial, rental, oilfield, towing, plowing, worksite, and idle use.
-7. Compare asking price only within the visible cohort and sample limits.
-8. Arrange a true cold start, diagnostic scan, and independent pre-purchase inspection.
-9. Record owner disposition, notes, tags, and any override reason without altering source evidence.
-
-Phase 1 remains interim until Audit 09 validation/merge, purpose-specific outputs, optional-vehicle decisions, and three consecutive unattended scheduled runs are complete.
+Phase 1 remains interim until Audit 10 validation/merge, Audit 11 decisions, and three consecutive unattended scheduled runs are complete.
