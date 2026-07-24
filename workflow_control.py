@@ -7,7 +7,9 @@ from typing import Any, Iterable
 
 from phase1_common import source_status_path, status_is_current_success
 from vehicle_config import SUPPORTED_SOURCES, load_vehicle_config
-from vehicle_registry import DEFAULT_REGISTRY_PATH, active_runs, registry_entries
+from vehicle_registry import (
+    ALLOWED_CADENCES, DEFAULT_REGISTRY_PATH, registry_entries, runs_for_cadence,
+)
 
 WORKFLOW_CONTROL_SCHEMA_VERSION = 1
 COLLECTION_SCOPES = ("full", "single_pair")
@@ -22,12 +24,17 @@ def build_collection_plan(
     scope: str,
     vehicle_key: str | None = None,
     source: str | None = None,
+    cadence: str = "weekly",
 ) -> list[tuple[Path, str]]:
     root = root.resolve()
     if scope not in COLLECTION_SCOPES:
         raise ValueError(f"Unsupported collection scope: {scope}")
     if scope == "full":
-        plan = active_runs(root=root, registry_path=registry_path)
+        if cadence not in ALLOWED_CADENCES:
+            raise ValueError(f"Unsupported collection cadence: {cadence}")
+        plan = runs_for_cadence(
+            root=root, cadence=cadence, registry_path=registry_path
+        )
     else:
         if not vehicle_key:
             raise ValueError("single_pair requires vehicle_key")
@@ -151,6 +158,7 @@ def parser() -> argparse.ArgumentParser:
     plan = sub.add_parser("plan")
     plan.add_argument("--registry", default=str(DEFAULT_REGISTRY_PATH))
     plan.add_argument("--scope", choices=COLLECTION_SCOPES, required=True)
+    plan.add_argument("--cadence", choices=sorted(ALLOWED_CADENCES), default="weekly")
     plan.add_argument("--vehicle-key")
     plan.add_argument("--source", choices=SUPPORTED_SOURCES)
     plan.add_argument("--output", required=True)
@@ -170,6 +178,7 @@ def main(argv: list[str] | None = None) -> int:
             scope=args.scope,
             vehicle_key=args.vehicle_key,
             source=args.source,
+            cadence=args.cadence,
         )
         output = Path(args.output)
         write_plan(output, plan)

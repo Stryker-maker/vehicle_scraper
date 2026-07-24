@@ -5,7 +5,9 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from vehicle_registry import active_config_paths, active_runs, registry_entries
+from vehicle_registry import (
+    active_config_paths, active_runs, registry_entries, runs_for_cadence,
+)
 
 
 def governed_config(vehicle_key: str) -> dict:
@@ -47,6 +49,7 @@ def registry_entry(
     *,
     enabled: bool = True,
     enabled_sources: list[str] | None = None,
+    cadence: str = "weekly",
 ) -> dict:
     entry = {
         "vehicle_key": vehicle_key,
@@ -54,7 +57,7 @@ def registry_entry(
         "enabled": enabled,
         "purpose": "primary_purchase",
         "priority": 1,
-        "cadence": "weekly",
+        "cadence": cadence,
         "enabled_sources": enabled_sources or ["autotrader", "kijiji"],
         "analysis_profile": "f350_purchase",
     }
@@ -78,9 +81,10 @@ class VehicleRegistryTests(unittest.TestCase):
                 "subaru_forester",
                 "honda_odyssey",
                 "kia_carnival",
+                "ford_f150",
             ],
         )
-        self.assertEqual(paused, ["ford_f150", "toyota_tundra"])
+        self.assertEqual(paused, ["toyota_tundra"])
         self.assertEqual(
             [str(path) for path in active_config_paths(root=root)],
             [
@@ -89,22 +93,32 @@ class VehicleRegistryTests(unittest.TestCase):
                 "config_forester.json",
                 "config_odyssey.json",
                 "config_carnival.json",
+                "config_f150.json",
             ],
         )
-        runs = [(str(path), source) for path, source in active_runs(root=root)]
-        self.assertEqual(len(runs), 10)
+        all_runs = [(str(path), source) for path, source in active_runs(root=root)]
+        self.assertEqual(len(all_runs), 12)
+        weekly_runs = [
+            (str(path), source)
+            for path, source in runs_for_cadence(root=root, cadence="weekly")
+        ]
+        manual_runs = [
+            (str(path), source)
+            for path, source in runs_for_cadence(root=root, cadence="manual")
+        ]
+        self.assertEqual(len(weekly_runs), 10)
+        self.assertFalse(any("f150" in path or "tundra" in path for path, _ in weekly_runs))
         self.assertEqual(
-            runs[:2],
+            manual_runs,
             [
-                ("config_f350.json", "autotrader"),
-                ("config_f350.json", "kijiji"),
+                ("config_f150.json", "autotrader"),
+                ("config_f150.json", "kijiji"),
             ],
         )
-        self.assertFalse(
-            any("f150" in path or "tundra" in path for path, _ in runs)
-        )
+        cadence_by_key = {entry["vehicle_key"]: entry["cadence"] for entry in entries}
+        self.assertEqual(cadence_by_key["ford_f150"], "manual")
+        self.assertEqual(cadence_by_key["toyota_tundra"], "weekly")
         for entry in entries:
-            self.assertEqual(entry["cadence"], "weekly")
             self.assertEqual(entry["enabled_sources"], ["autotrader", "kijiji"])
 
     def test_registry_rejects_duplicate_vehicle_keys(self):

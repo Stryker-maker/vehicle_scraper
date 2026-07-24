@@ -20,7 +20,9 @@ from phase1_runtime import (
     dedupe_history_observations_for_date, remove_history_observations_for_date,
     run_source,
 )
-from vehicle_registry import DEFAULT_REGISTRY_PATH, active_source_plan
+from vehicle_registry import (
+    ALLOWED_CADENCES, DEFAULT_REGISTRY_PATH, source_plan_for_cadence,
+)
 
 __all__ = [
     "EVIDENCE_SCHEMA_VERSION", "IDENTITY_LIFECYCLE_SCHEMA_VERSION",
@@ -42,11 +44,18 @@ def add_reporting_scope_arguments(action: argparse.ArgumentParser) -> None:
     scope = action.add_mutually_exclusive_group(required=True)
     scope.add_argument("--registry")
     scope.add_argument("--configs", nargs="+")
+    action.add_argument(
+        "--cadence", choices=sorted(ALLOWED_CADENCES), default="weekly"
+    )
 
 
 def reporting_source_plan(args: argparse.Namespace, *, root: Path):
     if args.registry:
-        return active_source_plan(root=root, registry_path=Path(args.registry))
+        return source_plan_for_cadence(
+            root=root,
+            cadence=args.cadence,
+            registry_path=Path(args.registry),
+        )
     return [(path, SOURCES) for path in config_paths(args.configs)]
 
 

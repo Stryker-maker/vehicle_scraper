@@ -9,7 +9,9 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from phase1_common import write_json
-from vehicle_registry import DEFAULT_REGISTRY_PATH, registry_entries
+from vehicle_registry import (
+    ALLOWED_CADENCES, DEFAULT_REGISTRY_PATH, cadence_entries, registry_entries,
+)
 
 STORAGE_RETENTION_SCHEMA_VERSION = 1
 SOURCE_ARCHIVES_TO_KEEP = 8
@@ -250,12 +252,17 @@ def apply_retention(
     registry_path: Path = DEFAULT_REGISTRY_PATH,
     run_id: str = "local",
     deleted_at_utc: str | None = None,
+    cadence: str | None = None,
 ) -> dict[str, Any]:
     root = root.resolve()
     registry_path = (
         registry_path if registry_path.is_absolute() else root / registry_path
     )
-    entries = registry_entries(root=root, registry_path=registry_path)
+    entries = (
+        cadence_entries(root=root, cadence=cadence, registry_path=registry_path)
+        if cadence is not None
+        else registry_entries(root=root, registry_path=registry_path)
+    )
     active_keys = [str(entry["vehicle_key"]) for entry in entries if entry["enabled"]]
     deleted_at_utc = deleted_at_utc or utc_now()
     vehicle_reports: list[dict[str, Any]] = []
@@ -339,13 +346,20 @@ def apply_retention(
 
 
 def verify_retention(
-    *, root: Path, registry_path: Path = DEFAULT_REGISTRY_PATH
+    *,
+    root: Path,
+    registry_path: Path = DEFAULT_REGISTRY_PATH,
+    cadence: str | None = None,
 ) -> dict[str, Any]:
     root = root.resolve()
     registry_path = (
         registry_path if registry_path.is_absolute() else root / registry_path
     )
-    entries = registry_entries(root=root, registry_path=registry_path)
+    entries = (
+        cadence_entries(root=root, cadence=cadence, registry_path=registry_path)
+        if cadence is not None
+        else registry_entries(root=root, registry_path=registry_path)
+    )
     active_keys = [str(entry["vehicle_key"]) for entry in entries if entry["enabled"]]
     errors = [
         error
@@ -442,6 +456,8 @@ def parser() -> argparse.ArgumentParser:
     for name in ("apply", "verify", "validate-staged"):
         action = sub.add_parser(name)
         action.add_argument("--registry", default=str(DEFAULT_REGISTRY_PATH))
+        if name != "validate-staged":
+            action.add_argument("--cadence", choices=sorted(ALLOWED_CADENCES))
     return result
 
 
@@ -455,11 +471,14 @@ def main(argv: list[str] | None = None) -> int:
             root=root,
             registry_path=registry,
             run_id=run_id,
+            cadence=args.cadence,
         )
         print(json.dumps(report, indent=2, sort_keys=True))
         return 0 if report["verification_status"] == "pass" else 1
     if args.action == "verify":
-        report = verify_retention(root=root, registry_path=registry)
+        report = verify_retention(
+            root=root, registry_path=registry, cadence=args.cadence
+        )
         print(json.dumps(report, indent=2, sort_keys=True))
         return 0 if report["verification_status"] == "pass" else 1
     if args.action == "validate-staged":

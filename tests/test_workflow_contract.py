@@ -56,7 +56,7 @@ class WorkflowContractTests(unittest.TestCase):
             "collection_scope:",
             "options: [full, single_pair]",
             "vehicle_key:",
-            "options: [ford_f350, ram_3500, subaru_forester, honda_odyssey, kia_carnival]",
+            "options: [ford_f350, ram_3500, subaru_forester, honda_odyssey, kia_carnival, ford_f150]",
             "source:",
             "options: [autotrader, kijiji]",
             "publish_generated_data:",
@@ -81,6 +81,7 @@ class WorkflowContractTests(unittest.TestCase):
             self.assertIn(value, self.collection)
         self.assertIn("if: env.COLLECTION_SCOPE == 'single_pair'", self.collection)
         self.assertIn("if: env.COLLECTION_SCOPE == 'full'", self.collection)
+        self.assertGreaterEqual(self.collection.count("--cadence weekly"), 3)
 
     def test_f350_buyer_intelligence_is_ci_compiled_validated_and_scope_gated(self):
         self.assertIn("f350_buyer_intelligence.py", self.ci)
@@ -108,7 +109,7 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("purpose_output_validation.py", self.ci)
         for value in (
             "Build and validate secondary-purpose output for narrow validation",
-            "if: env.COLLECTION_SCOPE == 'single_pair' && env.VEHICLE_KEY != 'ford_f350'",
+            "env.VEHICLE_KEY == 'ram_3500' ||",
             "--inputs purpose_inputs.json",
             "data/$VEHICLE_KEY/purpose_output",
             "Build and validate secondary-purpose outputs",
@@ -123,7 +124,23 @@ class WorkflowContractTests(unittest.TestCase):
         ):
             self.assertIn(value, self.collection)
         self.assertNotIn("data/ford_f350/purpose_output", self.collection)
+        self.assertNotIn("data/ford_f150/purpose_output", self.collection)
         self.assertNotIn("config_f150.json", self.collection)
+        self.assertNotIn("config_tundra.json", self.collection)
+
+    def test_f150_is_manual_nonpublishing_and_profile_isolated(self):
+        for value in (
+            "ford_f150",
+            "Write optional-curiosity manual summary",
+            "optional-curiosity-summary.md",
+            "No purchase need, rank, score, appraisal, or recommendation is implied.",
+            "env.VEHICLE_KEY == 'ford_f150'",
+        ):
+            self.assertIn(value, self.collection)
+        self.assertIn(
+            "env.COLLECTION_SCOPE == 'full' && env.PUBLISH_GENERATED_DATA == 'true'",
+            self.collection,
+        )
         self.assertNotIn("config_tundra.json", self.collection)
 
     def test_health_purpose_anomaly_retention_and_publish_gates_are_ordered(self):
@@ -133,6 +150,7 @@ class WorkflowContractTests(unittest.TestCase):
             "workflow_anomalies.py check",
             "storage_retention.py apply",
             "storage_retention.py verify",
+            "--cadence weekly",
             "storage_retention.py validate-staged",
             "generated_data_publish.py prepare",
             "generated_data_publish.py verify-staged",

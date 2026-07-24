@@ -44,6 +44,20 @@ class WorkflowControlTests(unittest.TestCase):
             registry_path=Path("vehicle_registry.json"),
         )
         self.assertEqual(len(full), 10)
+        self.assertFalse(any("f150" in str(path) for path, _ in full))
+        manual = build_collection_plan(
+            root=root,
+            scope="full",
+            cadence="manual",
+            registry_path=Path("vehicle_registry.json"),
+        )
+        self.assertEqual(
+            manual,
+            [
+                (Path("config_f150.json"), "autotrader"),
+                (Path("config_f150.json"), "kijiji"),
+            ],
+        )
         single = build_collection_plan(
             root=root,
             scope="single_pair",
@@ -52,12 +66,20 @@ class WorkflowControlTests(unittest.TestCase):
             source="kijiji",
         )
         self.assertEqual(single, [(Path("config_f350.json"), "kijiji")])
+        f150 = build_collection_plan(
+            root=root,
+            scope="single_pair",
+            registry_path=Path("vehicle_registry.json"),
+            vehicle_key="ford_f150",
+            source="autotrader",
+        )
+        self.assertEqual(f150, [(Path("config_f150.json"), "autotrader")])
         with self.assertRaisesRegex(ValueError, "paused"):
             build_collection_plan(
                 root=root,
                 scope="single_pair",
                 registry_path=Path("vehicle_registry.json"),
-                vehicle_key="ford_f150",
+                vehicle_key="toyota_tundra",
                 source="autotrader",
             )
 
