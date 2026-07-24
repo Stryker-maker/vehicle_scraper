@@ -1,1 +1,1 @@
-Audit 11A authority applicator trigger. Temporary file; remove after the authority commit.
+Audit 11A authority applicator trigger, revision 2. Temporary file; remove after the authority commit.
