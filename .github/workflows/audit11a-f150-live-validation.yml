@@ -5,12 +5,16 @@ on:
     branches: [ai/audit-11a-f150-manual-reintroduction]
     paths:
       - '.github/workflows/audit11a-f150-live-validation.yml'
+  pull_request:
+    paths:
+      - '.github/workflows/audit11a-f150-live-validation.yml'
 
 permissions:
   contents: write
 
 jobs:
   validate:
+    if: github.event_name == 'push'
     name: Validate both F-150 sources
     runs-on: ubuntu-24.04
     timeout-minutes: 90
@@ -134,7 +138,7 @@ jobs:
                   'successful_page_count': status.get('successful_page_count'),
                   'failed_page_count': status.get('failed_page_count'),
                   'identity_lifecycle_status': status.get('identity_lifecycle_status'),
-                  'identity_current_count': status.get('identity_current_count'),
+                  'identity_observed_current_count': status.get('identity_observed_current_count'),
                   'run_id': status.get('run_id'),
               }
 
