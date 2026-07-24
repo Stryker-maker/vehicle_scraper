@@ -41,17 +41,37 @@ jobs:
           from pathlib import Path
           path = Path('apply_audit11a_docs.py')
           text = path.read_text(encoding='utf-8')
+
           old_readme = 'Do not use `data/<vehicle>/merged/*.csv` as current recommendations.\n\'\'\','
           new_readme = 'Do not use `data/<vehicle>/merged/*.csv` as current recommendations. Historical merged CSVs are disabled legacy output and are deleted for active vehicles by governed retention with SHA-256 deletion evidence.\n\'\'\','
           if text.count(old_readme) != 2:
               raise RuntimeError(f'Expected two README anchor fragments, found {text.count(old_readme)}')
           text = text.replace(old_readme, new_readme)
+
+          helper_anchor = '    path.write_text(text.replace(old, new), encoding="utf-8")\n\n\nreadme = ROOT / "README.md"'
+          helper_replacement = '''    path.write_text(text.replace(old, new), encoding="utf-8")
+
+
+def replace_first(path: Path, old: str, new: str) -> None:
+    text = path.read_text(encoding="utf-8")
+    if old not in text:
+        raise RuntimeError(
+            f"Expected at least one match in {path}; anchor={old.splitlines()[0]!r}"
+        )
+    path.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+
+readme = ROOT / "README.md"'''
+          if text.count(helper_anchor) != 1:
+              raise RuntimeError(f'Expected one helper anchor, found {text.count(helper_anchor)}')
+          text = text.replace(helper_anchor, helper_replacement)
+
           old_test = '''replace_once(
               test,
               '            "AUDIT_10_SECONDARY_PURPOSE_OUTPUTS.md",\\n',
               '            "AUDIT_10_SECONDARY_PURPOSE_OUTPUTS.md",\\n            "AUDIT_11A_F150_MANUAL_REINTRODUCTION.md",\\n',
           )'''.replace('              ', '    ')
-          new_test = '''replace_once(
+          new_test = '''replace_first(
               test,
               '            "AUDIT_09_F350_BUYER_INTELLIGENCE.md",\\n            "AUDIT_10_SECONDARY_PURPOSE_OUTPUTS.md",\\n',
               '            "AUDIT_09_F350_BUYER_INTELLIGENCE.md",\\n            "AUDIT_10_SECONDARY_PURPOSE_OUTPUTS.md",\\n            "AUDIT_11A_F150_MANUAL_REINTRODUCTION.md",\\n',
