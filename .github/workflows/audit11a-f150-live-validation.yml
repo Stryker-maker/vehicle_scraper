@@ -1,0 +1,135 @@
+name: Audit 11A F-150 Live Validation
+
+on:
+  push:
+    branches: [ai/audit-11a-f150-manual-reintroduction]
+    paths:
+      - '.github/workflows/audit11a-f150-live-validation.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: F-150 ${{ matrix.source }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      matrix:
+        source: [autotrader, kijiji]
+    steps:
+      - name: Checkout Audit 11A branch
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.11.13
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.11.13'
+          cache: pip
+          cache-dependency-path: requirements.lock
+
+      - name: Install exact locked dependencies
+        run: |
+          python dependency_lock.py --lock requirements.lock
+          python -m pip install --disable-pip-version-check pip==25.1.1
+          python -m pip install --disable-pip-version-check --requirement requirements.lock
+          python -m pip check
+
+      - name: Build exact manual F-150 plan
+        run: |
+          python vehicle_registry.py validate --registry vehicle_registry.json
+          python vehicle_registry.py weekly-runs --registry vehicle_registry.json
+          python vehicle_registry.py manual-runs --registry vehicle_registry.json
+          python workflow_control.py plan \
+            --registry vehicle_registry.json \
+            --scope single_pair \
+            --cadence weekly \
+            --vehicle-key ford_f150 \
+            --source '${{ matrix.source }}' \
+            --output "$RUNNER_TEMP/source-plan.tsv"
+          test "$(wc -l < "$RUNNER_TEMP/source-plan.tsv")" -eq 1
+          grep -Fx $'config_f150.json\t${{ matrix.source }}' "$RUNNER_TEMP/source-plan.tsv"
+
+      - name: Collect F-150 source evidence
+        env:
+          ORS_API_KEY: ${{ secrets.ORS_API_KEY }}
+        run: |
+          case '${{ matrix.source }}' in
+            autotrader)
+              python autotrader_run.py \
+                --config config_f150.json \
+                --timeout-seconds 4200 \
+                --fail-on-unhealthy
+              ;;
+            kijiji)
+              python kijiji_run.py \
+                --config config_f150.json \
+                --timeout-seconds 4200 \
+                --fail-on-unhealthy
+              ;;
+            *)
+              exit 1
+              ;;
+          esac
+
+      - name: Validate source, reconciliation, and lifecycle
+        run: |
+          python workflow_control.py validate-single-pair \
+            --plan "$RUNNER_TEMP/source-plan.tsv" \
+            --run-id "$GITHUB_RUN_ID"
+
+      - name: Write optional-curiosity evidence summary
+        run: |
+          SOURCE='${{ matrix.source }}' python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          source = os.environ['SOURCE']
+          status_path = Path('data/ford_f150/run_status') / f'{source}_latest.json'
+          status = json.loads(status_path.read_text(encoding='utf-8'))
+          output = Path(os.environ['RUNNER_TEMP']) / 'optional-curiosity-summary.md'
+          lines = [
+              '# Optional F-150 manual search',
+              '',
+              f'- Source: {source}',
+              f'- Fetched records: {status.get("fetched_record_count", 0)}',
+              f'- Accepted records: {status.get("accepted_record_count", 0)}',
+              f'- Rejected records: {status.get("rejected_record_count", 0)}',
+              f'- Parse failures: {status.get("parse_failure_count", 0)}',
+              f'- Pagination complete: {status.get("pagination_complete")}',
+              f'- Identity/lifecycle status: {status.get("identity_lifecycle_status")}',
+              '',
+              'No purchase need, rank, score, appraisal, or recommendation is implied. '
+              'The accepted CSV and evidence files are a manual optional-curiosity result only.',
+          ]
+          output.write_text('\n'.join(lines) + '\n', encoding='utf-8')
+          print(output.read_text(encoding='utf-8'))
+          PY
+
+      - name: Prepare F-150 validation evidence
+        if: always()
+        run: |
+          artifact="$RUNNER_TEMP/f150-${{ matrix.source }}"
+          mkdir -p "$artifact"
+          if [[ -d data/ford_f150 ]]; then
+            cp -R data/ford_f150/. "$artifact/"
+          fi
+          if [[ -f "$RUNNER_TEMP/source-plan.tsv" ]]; then
+            cp "$RUNNER_TEMP/source-plan.tsv" "$artifact/source-plan.tsv"
+          fi
+          if [[ -f "$RUNNER_TEMP/optional-curiosity-summary.md" ]]; then
+            cp "$RUNNER_TEMP/optional-curiosity-summary.md" "$artifact/"
+          fi
+
+      - name: Upload F-150 validation evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: audit11a-f150-${{ matrix.source }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/f150-${{ matrix.source }}
+          if-no-files-found: error
+          retention-days: 7
