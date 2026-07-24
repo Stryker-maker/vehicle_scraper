@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-SCRIPT = Path(__file__).resolve().parent / "apply_audit11a_docs.py"
+ROOT = Path(__file__).resolve().parent
+SCRIPT = ROOT / "apply_audit11a_docs.py"
 text = SCRIPT.read_text(encoding="utf-8")
 
 readme_fragment = (
@@ -58,3 +59,15 @@ text = text.replace(authority_call, fixed_authority_call)
 
 namespace = {"__file__": str(SCRIPT), "__name__": "__main__"}
 exec(compile(text, str(SCRIPT), "exec"), namespace)
+
+for relative in (
+    "README.md",
+    "docs/AUDIT_ROADMAP.md",
+    "docs/VEHICLE_PURPOSES.md",
+    "docs/REPOSITORY_BASELINE.md",
+    "docs/LIMITATIONS_REGISTER.md",
+    "tests/test_documentation_contract.py",
+):
+    path = ROOT / relative
+    lines = path.read_text(encoding="utf-8").splitlines()
+    path.write_text("\n".join(line.rstrip() for line in lines) + "\n", encoding="utf-8")
