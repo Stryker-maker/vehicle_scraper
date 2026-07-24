@@ -3,7 +3,7 @@ name: Apply Audit 11A Docs
 on:
   pull_request:
     paths:
-      - 'apply_audit11a_docs.py'
+      - 'run_audit11a_docs.py'
       - 'apply_audit11a_docs.trigger'
       - '.github/workflows/apply-audit11a-docs.yml'
 
@@ -37,62 +37,7 @@ jobs:
           python -m pip check
 
       - name: Apply authority updates
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          path = Path('apply_audit11a_docs.py')
-          text = path.read_text(encoding='utf-8')
-
-          old_readme = 'Do not use `data/<vehicle>/merged/*.csv` as current recommendations.\n\'\'\','
-          new_readme = 'Do not use `data/<vehicle>/merged/*.csv` as current recommendations. Historical merged CSVs are disabled legacy output and are deleted for active vehicles by governed retention with SHA-256 deletion evidence.\n\'\'\','
-          if text.count(old_readme) != 2:
-              raise RuntimeError(f'Expected two README anchor fragments, found {text.count(old_readme)}')
-          text = text.replace(old_readme, new_readme)
-
-          helper_anchor = '    path.write_text(text.replace(old, new), encoding="utf-8")\n\n\nreadme = ROOT / "README.md"'
-          helper_replacement = '''    path.write_text(text.replace(old, new), encoding="utf-8")
-
-
-def replace_first(path: Path, old: str, new: str) -> None:
-    text = path.read_text(encoding="utf-8")
-    if old not in text:
-        raise RuntimeError(f"Missing anchor in {path}: {old.splitlines()[0]!r}")
-    path.write_text(text.replace(old, new, 1), encoding="utf-8")
-
-
-readme = ROOT / "README.md"'''
-          if text.count(helper_anchor) != 1:
-              raise RuntimeError(f'Expected one helper anchor, found {text.count(helper_anchor)}')
-          text = text.replace(helper_anchor, helper_replacement)
-
-          old_test = '''replace_once(
-              test,
-              '            "AUDIT_10_SECONDARY_PURPOSE_OUTPUTS.md",\\n',
-              '            "AUDIT_10_SECONDARY_PURPOSE_OUTPUTS.md",\\n            "AUDIT_11A_F150_MANUAL_REINTRODUCTION.md",\\n',
-          )'''.replace('              ', '    ')
-          new_test = '''replace_first(
-              test,
-              '            "AUDIT_09_F350_BUYER_INTELLIGENCE.md",\\n            "AUDIT_10_SECONDARY_PURPOSE_OUTPUTS.md",\\n',
-              '            "AUDIT_09_F350_BUYER_INTELLIGENCE.md",\\n            "AUDIT_10_SECONDARY_PURPOSE_OUTPUTS.md",\\n            "AUDIT_11A_F150_MANUAL_REINTRODUCTION.md",\\n',
-          )'''.replace('              ', '    ')
-          if text.count(old_test) != 1:
-              raise RuntimeError(f'Expected one authority-list call, found {text.count(old_test)}')
-          path.write_text(text.replace(old_test, new_test), encoding='utf-8')
-          PY
-          set +e
-          python apply_audit11a_docs.py 2>&1 | tee "$RUNNER_TEMP/audit11a-docs.log"
-          status=${PIPESTATUS[0]}
-          set -e
-          exit "$status"
-
-      - name: Upload authority failure log
-        if: failure()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: audit11a-docs-failure-${{ github.run_id }}
-          path: ${{ runner.temp }}/audit11a-docs.log
-          if-no-files-found: error
-          retention-days: 3
+        run: python run_audit11a_docs.py
 
       - name: Validate complete repository
         run: |
