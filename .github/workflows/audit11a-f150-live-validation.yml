@@ -7,17 +7,13 @@ on:
       - '.github/workflows/audit11a-f150-live-validation.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   validate:
-    name: F-150 ${{ matrix.source }}
+    name: Validate both F-150 sources
     runs-on: ubuntu-24.04
-    timeout-minutes: 75
-    strategy:
-      fail-fast: false
-      matrix:
-        source: [autotrader, kijiji]
+    timeout-minutes: 90
     steps:
       - name: Checkout Audit 11A branch
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -38,98 +34,181 @@ jobs:
           python -m pip install --disable-pip-version-check --requirement requirements.lock
           python -m pip check
 
-      - name: Build exact manual F-150 plan
+      - name: Prove cadence and paused-scope boundaries
         run: |
+          set -euo pipefail
           python vehicle_registry.py validate --registry vehicle_registry.json
-          python vehicle_registry.py weekly-runs --registry vehicle_registry.json
-          python vehicle_registry.py manual-runs --registry vehicle_registry.json
+          python vehicle_registry.py weekly-runs --registry vehicle_registry.json > "$RUNNER_TEMP/weekly-runs.tsv"
+          python vehicle_registry.py manual-runs --registry vehicle_registry.json > "$RUNNER_TEMP/manual-runs.tsv"
+          test "$(wc -l < "$RUNNER_TEMP/weekly-runs.tsv")" -eq 10
+          test "$(wc -l < "$RUNNER_TEMP/manual-runs.tsv")" -eq 2
+          grep -Fx $'config_f150.json\tautotrader' "$RUNNER_TEMP/manual-runs.tsv"
+          grep -Fx $'config_f150.json\tkijiji' "$RUNNER_TEMP/manual-runs.tsv"
+          if grep -Eq 'f150|tundra' "$RUNNER_TEMP/weekly-runs.tsv"; then
+            echo "Optional vehicle leaked into weekly plan" >&2
+            exit 1
+          fi
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          registry = json.loads(Path('vehicle_registry.json').read_text(encoding='utf-8'))
+          by_key = {entry['vehicle_key']: entry for entry in registry['vehicles']}
+          assert by_key['ford_f150']['enabled'] is True
+          assert by_key['ford_f150']['cadence'] == 'manual'
+          assert by_key['toyota_tundra']['enabled'] is False
+          PY
+
+      - name: Collect and validate F-150 AutoTrader
+        env:
+          ORS_API_KEY: ${{ secrets.ORS_API_KEY }}
+        run: |
+          set -euo pipefail
+          plan="$RUNNER_TEMP/autotrader-plan.tsv"
           python workflow_control.py plan \
             --registry vehicle_registry.json \
             --scope single_pair \
             --cadence weekly \
             --vehicle-key ford_f150 \
-            --source '${{ matrix.source }}' \
-            --output "$RUNNER_TEMP/source-plan.tsv"
-          test "$(wc -l < "$RUNNER_TEMP/source-plan.tsv")" -eq 1
-          grep -Fx $'config_f150.json\t${{ matrix.source }}' "$RUNNER_TEMP/source-plan.tsv"
+            --source autotrader \
+            --output "$plan"
+          grep -Fx $'config_f150.json\tautotrader' "$plan"
+          python autotrader_run.py \
+            --config config_f150.json \
+            --timeout-seconds 4200 \
+            --fail-on-unhealthy
+          python workflow_control.py validate-single-pair \
+            --plan "$plan" \
+            --run-id "$GITHUB_RUN_ID"
+          mkdir -p "$RUNNER_TEMP/status"
+          cp data/ford_f150/run_status/autotrader_latest.json "$RUNNER_TEMP/status/"
 
-      - name: Collect F-150 source evidence
+      - name: Collect and validate F-150 Kijiji
         env:
           ORS_API_KEY: ${{ secrets.ORS_API_KEY }}
         run: |
-          case '${{ matrix.source }}' in
-            autotrader)
-              python autotrader_run.py \
-                --config config_f150.json \
-                --timeout-seconds 4200 \
-                --fail-on-unhealthy
-              ;;
-            kijiji)
-              python kijiji_run.py \
-                --config config_f150.json \
-                --timeout-seconds 4200 \
-                --fail-on-unhealthy
-              ;;
-            *)
-              exit 1
-              ;;
-          esac
-
-      - name: Validate source, reconciliation, and lifecycle
-        run: |
+          set -euo pipefail
+          plan="$RUNNER_TEMP/kijiji-plan.tsv"
+          python workflow_control.py plan \
+            --registry vehicle_registry.json \
+            --scope single_pair \
+            --cadence weekly \
+            --vehicle-key ford_f150 \
+            --source kijiji \
+            --output "$plan"
+          grep -Fx $'config_f150.json\tkijiji' "$plan"
+          python kijiji_run.py \
+            --config config_f150.json \
+            --timeout-seconds 4200 \
+            --fail-on-unhealthy
           python workflow_control.py validate-single-pair \
-            --plan "$RUNNER_TEMP/source-plan.tsv" \
+            --plan "$plan" \
             --run-id "$GITHUB_RUN_ID"
+          mkdir -p "$RUNNER_TEMP/status"
+          cp data/ford_f150/run_status/kijiji_latest.json "$RUNNER_TEMP/status/"
 
-      - name: Write optional-curiosity evidence summary
+      - name: Write validation result
         run: |
-          SOURCE='${{ matrix.source }}' python - <<'PY'
+          python - <<'PY'
           import json
           import os
           from pathlib import Path
 
-          source = os.environ['SOURCE']
-          status_path = Path('data/ford_f150/run_status') / f'{source}_latest.json'
-          status = json.loads(status_path.read_text(encoding='utf-8'))
-          output = Path(os.environ['RUNNER_TEMP']) / 'optional-curiosity-summary.md'
-          lines = [
-              '# Optional F-150 manual search',
-              '',
-              f'- Source: {source}',
-              f'- Fetched records: {status.get("fetched_record_count", 0)}',
-              f'- Accepted records: {status.get("accepted_record_count", 0)}',
-              f'- Rejected records: {status.get("rejected_record_count", 0)}',
-              f'- Parse failures: {status.get("parse_failure_count", 0)}',
-              f'- Pagination complete: {status.get("pagination_complete")}',
-              f'- Identity/lifecycle status: {status.get("identity_lifecycle_status")}',
-              '',
-              'No purchase need, rank, score, appraisal, or recommendation is implied. '
-              'The accepted CSV and evidence files are a manual optional-curiosity result only.',
-          ]
-          output.write_text('\n'.join(lines) + '\n', encoding='utf-8')
-          print(output.read_text(encoding='utf-8'))
+          root = Path('.')
+          status_root = Path(os.environ['RUNNER_TEMP']) / 'status'
+          registry = json.loads((root / 'vehicle_registry.json').read_text(encoding='utf-8'))
+          by_key = {entry['vehicle_key']: entry for entry in registry['vehicles']}
+
+          def summary(source: str) -> dict:
+              status = json.loads((status_root / f'{source}_latest.json').read_text(encoding='utf-8'))
+              return {
+                  'execution_status': status.get('execution_status'),
+                  'collection_status': status.get('collection_status'),
+                  'data_quality_status': status.get('data_quality_status'),
+                  'fetched_record_count': status.get('fetched_record_count'),
+                  'accepted_record_count': status.get('accepted_record_count'),
+                  'rejected_record_count': status.get('rejected_record_count'),
+                  'parse_failure_count': status.get('parse_failure_count'),
+                  'output_row_count': status.get('output_row_count'),
+                  'pagination_complete': status.get('pagination_complete'),
+                  'request_attempt_count': status.get('request_attempt_count'),
+                  'successful_page_count': status.get('successful_page_count'),
+                  'failed_page_count': status.get('failed_page_count'),
+                  'identity_lifecycle_status': status.get('identity_lifecycle_status'),
+                  'identity_current_count': status.get('identity_current_count'),
+                  'run_id': status.get('run_id'),
+              }
+
+          result = {
+              'schema_version': 1,
+              'audit': '11A',
+              'validation_status': 'success',
+              'run_id': os.environ['GITHUB_RUN_ID'],
+              'source_sha': os.environ['GITHUB_SHA'],
+              'branch': os.environ['GITHUB_REF_NAME'],
+              'event_name': os.environ['GITHUB_EVENT_NAME'],
+              'publication_performed': False,
+              'weekly_source_run_count': len((Path(os.environ['RUNNER_TEMP']) / 'weekly-runs.tsv').read_text().splitlines()),
+              'manual_source_pairs': (Path(os.environ['RUNNER_TEMP']) / 'manual-runs.tsv').read_text().splitlines(),
+              'ford_f150': {
+                  'enabled': by_key['ford_f150']['enabled'],
+                  'cadence': by_key['ford_f150']['cadence'],
+                  'analysis_profile': by_key['ford_f150']['analysis_profile'],
+              },
+              'toyota_tundra': {
+                  'enabled': by_key['toyota_tundra']['enabled'],
+                  'pause_reason': by_key['toyota_tundra'].get('pause_reason'),
+              },
+              'sources': {
+                  'autotrader': summary('autotrader'),
+                  'kijiji': summary('kijiji'),
+              },
+              'interpretation': 'manual_optional_curiosity_not_rank_not_score_not_appraisal_not_recommendation',
+          }
+          Path('AUDIT_11A_F150_LIVE_VALIDATION_RESULT.json').write_text(
+              json.dumps(result, indent=2, sort_keys=True) + '\n',
+              encoding='utf-8',
+          )
+          print(json.dumps(result, indent=2, sort_keys=True))
           PY
 
-      - name: Prepare F-150 validation evidence
+      - name: Prepare validation artifact
         if: always()
         run: |
-          artifact="$RUNNER_TEMP/f150-${{ matrix.source }}"
+          artifact="$RUNNER_TEMP/audit11a-f150-live"
           mkdir -p "$artifact"
           if [[ -d data/ford_f150 ]]; then
             cp -R data/ford_f150/. "$artifact/"
           fi
-          if [[ -f "$RUNNER_TEMP/source-plan.tsv" ]]; then
-            cp "$RUNNER_TEMP/source-plan.tsv" "$artifact/source-plan.tsv"
-          fi
-          if [[ -f "$RUNNER_TEMP/optional-curiosity-summary.md" ]]; then
-            cp "$RUNNER_TEMP/optional-curiosity-summary.md" "$artifact/"
+          cp "$RUNNER_TEMP/weekly-runs.tsv" "$artifact/weekly-runs.tsv"
+          cp "$RUNNER_TEMP/manual-runs.tsv" "$artifact/manual-runs.tsv"
+          cp "$RUNNER_TEMP/autotrader-plan.tsv" "$artifact/autotrader-plan.tsv"
+          cp "$RUNNER_TEMP/kijiji-plan.tsv" "$artifact/kijiji-plan.tsv"
+          if [[ -f AUDIT_11A_F150_LIVE_VALIDATION_RESULT.json ]]; then
+            cp AUDIT_11A_F150_LIVE_VALIDATION_RESULT.json "$artifact/"
           fi
 
-      - name: Upload F-150 validation evidence
+      - name: Upload validation artifact
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: audit11a-f150-${{ matrix.source }}-${{ github.run_id }}
-          path: ${{ runner.temp }}/f150-${{ matrix.source }}
+          name: audit11a-f150-live-${{ github.run_id }}
+          path: ${{ runner.temp }}/audit11a-f150-live
           if-no-files-found: error
           retention-days: 7
+
+      - name: Commit temporary validation result
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add AUDIT_11A_F150_LIVE_VALIDATION_RESULT.json
+          test "$(git diff --cached --name-only)" = "AUDIT_11A_F150_LIVE_VALIDATION_RESULT.json"
+          git diff --cached --check
+          git fetch origin "$GITHUB_REF_NAME"
+          remote_sha=$(git rev-parse "origin/$GITHUB_REF_NAME")
+          if [[ "$remote_sha" != "$GITHUB_SHA" ]]; then
+            echo "Remote branch changed during validation: expected $GITHUB_SHA, found $remote_sha" >&2
+            exit 1
+          fi
+          git commit -m "Record temporary Audit 11A F-150 live validation"
+          git push origin "HEAD:$GITHUB_REF_NAME"
