@@ -41,9 +41,22 @@ jobs:
 
       - name: Validate complete repository
         run: |
-          python -m unittest discover -s tests -p 'test*.py'
+          set +e
+          python -m unittest discover -s tests -p 'test*.py' 2>&1 | tee "$RUNNER_TEMP/audit11a-tests.log"
+          status=${PIPESTATUS[0]}
+          set -e
           git diff --check
           git diff --stat
+          exit "$status"
+
+      - name: Upload failed authority test log
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: audit11a-authority-tests-${{ github.run_id }}
+          path: ${{ runner.temp }}/audit11a-tests.log
+          if-no-files-found: error
+          retention-days: 3
 
       - name: Commit authorities to Audit 11A branch
         run: |
