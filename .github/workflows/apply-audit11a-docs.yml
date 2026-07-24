@@ -41,11 +41,24 @@ jobs:
           from pathlib import Path
           path = Path('apply_audit11a_docs.py')
           text = path.read_text(encoding='utf-8')
-          old = 'Do not use `data/<vehicle>/merged/*.csv` as current recommendations.\n\'\'\','
-          new = 'Do not use `data/<vehicle>/merged/*.csv` as current recommendations. Historical merged CSVs are disabled legacy output and are deleted for active vehicles by governed retention with SHA-256 deletion evidence.\n\'\'\','
-          if text.count(old) != 2:
-              raise RuntimeError(f'Expected two README anchor fragments, found {text.count(old)}')
-          path.write_text(text.replace(old, new), encoding='utf-8')
+          old_readme = 'Do not use `data/<vehicle>/merged/*.csv` as current recommendations.\n\'\'\','
+          new_readme = 'Do not use `data/<vehicle>/merged/*.csv` as current recommendations. Historical merged CSVs are disabled legacy output and are deleted for active vehicles by governed retention with SHA-256 deletion evidence.\n\'\'\','
+          if text.count(old_readme) != 2:
+              raise RuntimeError(f'Expected two README anchor fragments, found {text.count(old_readme)}')
+          text = text.replace(old_readme, new_readme)
+          old_test = '''replace_once(
+              test,
+              '            "AUDIT_10_SECONDARY_PURPOSE_OUTPUTS.md",\\n',
+              '            "AUDIT_10_SECONDARY_PURPOSE_OUTPUTS.md",\\n            "AUDIT_11A_F150_MANUAL_REINTRODUCTION.md",\\n',
+          )'''.replace('              ', '    ')
+          new_test = '''replace_once(
+              test,
+              '            "AUDIT_09_F350_BUYER_INTELLIGENCE.md",\\n            "AUDIT_10_SECONDARY_PURPOSE_OUTPUTS.md",\\n',
+              '            "AUDIT_09_F350_BUYER_INTELLIGENCE.md",\\n            "AUDIT_10_SECONDARY_PURPOSE_OUTPUTS.md",\\n            "AUDIT_11A_F150_MANUAL_REINTRODUCTION.md",\\n',
+          )'''.replace('              ', '    ')
+          if text.count(old_test) != 1:
+              raise RuntimeError(f'Expected one authority-list call, found {text.count(old_test)}')
+          path.write_text(text.replace(old_test, new_test), encoding='utf-8')
           PY
           set +e
           python apply_audit11a_docs.py 2>&1 | tee "$RUNNER_TEMP/audit11a-docs.log"
