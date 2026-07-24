@@ -162,41 +162,109 @@ def validate_registry(*, root: Path, registry: dict[str, Any]) -> list[dict[str,
     return validated
 
 
-def registry_entries(*, root: Path, registry_path: Path = DEFAULT_REGISTRY_PATH) -> list[dict[str, Any]]:
+def registry_entries(
+    *, root: Path, registry_path: Path = DEFAULT_REGISTRY_PATH
+) -> list[dict[str, Any]]:
     path = registry_path if registry_path.is_absolute() else root / registry_path
     registry = load_registry(path)
     return validate_registry(root=root, registry=registry)
 
 
-def active_entries(*, root: Path, registry_path: Path = DEFAULT_REGISTRY_PATH) -> list[dict[str, Any]]:
-    return [entry for entry in registry_entries(root=root, registry_path=registry_path) if entry["enabled"]]
-
-
-def active_config_paths(*, root: Path, registry_path: Path = DEFAULT_REGISTRY_PATH) -> list[Path]:
-    return [Path(entry["config_path"]) for entry in active_entries(root=root, registry_path=registry_path)]
-
-
-def active_source_plan(
-    *, root: Path, registry_path: Path = DEFAULT_REGISTRY_PATH,
-) -> list[tuple[Path, tuple[str, ...]]]:
+def enabled_entries(
+    *, root: Path, registry_path: Path = DEFAULT_REGISTRY_PATH
+) -> list[dict[str, Any]]:
     return [
-        (Path(entry["config_path"]), tuple(entry["enabled_sources"]))
-        for entry in active_entries(root=root, registry_path=registry_path)
+        entry
+        for entry in registry_entries(root=root, registry_path=registry_path)
+        if entry["enabled"]
     ]
 
 
-def active_runs(*, root: Path, registry_path: Path = DEFAULT_REGISTRY_PATH) -> list[tuple[Path, str]]:
+def active_entries(
+    *, root: Path, registry_path: Path = DEFAULT_REGISTRY_PATH
+) -> list[dict[str, Any]]:
+    return enabled_entries(root=root, registry_path=registry_path)
+
+
+def cadence_entries(
+    *, root: Path, cadence: str, registry_path: Path = DEFAULT_REGISTRY_PATH
+) -> list[dict[str, Any]]:
+    if cadence not in ALLOWED_CADENCES:
+        raise ValueError(f"Unsupported registry cadence: {cadence}")
+    return [
+        entry
+        for entry in enabled_entries(root=root, registry_path=registry_path)
+        if entry["cadence"] == cadence
+    ]
+
+
+def active_config_paths(
+    *, root: Path, registry_path: Path = DEFAULT_REGISTRY_PATH
+) -> list[Path]:
+    return [
+        Path(entry["config_path"])
+        for entry in enabled_entries(root=root, registry_path=registry_path)
+    ]
+
+
+def active_source_plan(
+    *, root: Path, registry_path: Path = DEFAULT_REGISTRY_PATH
+) -> list[tuple[Path, tuple[str, ...]]]:
+    return [
+        (Path(entry["config_path"]), tuple(entry["enabled_sources"]))
+        for entry in enabled_entries(root=root, registry_path=registry_path)
+    ]
+
+
+def source_plan_for_cadence(
+    *, root: Path, cadence: str, registry_path: Path = DEFAULT_REGISTRY_PATH
+) -> list[tuple[Path, tuple[str, ...]]]:
+    return [
+        (Path(entry["config_path"]), tuple(entry["enabled_sources"]))
+        for entry in cadence_entries(
+            root=root, cadence=cadence, registry_path=registry_path
+        )
+    ]
+
+
+def active_runs(
+    *, root: Path, registry_path: Path = DEFAULT_REGISTRY_PATH
+) -> list[tuple[Path, str]]:
     return [
         (config_path, source)
-        for config_path, sources in active_source_plan(root=root, registry_path=registry_path)
+        for config_path, sources in active_source_plan(
+            root=root, registry_path=registry_path
+        )
+        for source in sources
+    ]
+
+
+def runs_for_cadence(
+    *, root: Path, cadence: str, registry_path: Path = DEFAULT_REGISTRY_PATH
+) -> list[tuple[Path, str]]:
+    return [
+        (config_path, source)
+        for config_path, sources in source_plan_for_cadence(
+            root=root, cadence=cadence, registry_path=registry_path
+        )
         for source in sources
     ]
 
 
 def parser() -> argparse.ArgumentParser:
-    result = argparse.ArgumentParser(description="Validate governed vehicle scope and source plans.")
+    result = argparse.ArgumentParser(
+        description="Validate governed vehicle scope and source plans."
+    )
     result.add_argument(
-        "action", choices=("validate", "active-configs", "active-runs", "summary")
+        "action",
+        choices=(
+            "validate",
+            "active-configs",
+            "active-runs",
+            "weekly-runs",
+            "manual-runs",
+            "summary",
+        ),
     )
     result.add_argument("--registry", default=str(DEFAULT_REGISTRY_PATH))
     return result
@@ -207,18 +275,28 @@ def main(argv: Sequence[str] | None = None) -> int:
     root = Path.cwd()
     registry_path = Path(args.registry)
     entries = registry_entries(root=root, registry_path=registry_path)
-    active = [entry for entry in entries if entry["enabled"]]
+    enabled = [entry for entry in entries if entry["enabled"]]
 
     if args.action == "active-configs":
-        for entry in active:
+        for entry in enabled:
             print(entry["config_path"])
     elif args.action == "active-runs":
-        for config_path, source in active_runs(root=root, registry_path=registry_path):
+        for config_path, source in active_runs(
+            root=root, registry_path=registry_path
+        ):
+            print(f"{config_path}\t{source}")
+    elif args.action in {"weekly-runs", "manual-runs"}:
+        cadence = args.action.removesuffix("-runs")
+        for config_path, source in runs_for_cadence(
+            root=root, cadence=cadence, registry_path=registry_path
+        ):
             print(f"{config_path}\t{source}")
     elif args.action == "summary":
         for entry in entries:
-            state = "ACTIVE" if entry["enabled"] else "PAUSED"
-            reason = f" — {entry.get('pause_reason')}" if entry.get("pause_reason") else ""
+            state = "ENABLED" if entry["enabled"] else "PAUSED"
+            reason = (
+                f" — {entry.get('pause_reason')}" if entry.get("pause_reason") else ""
+            )
             sources = ",".join(entry["enabled_sources"])
             print(
                 f"{state}: {entry['vehicle_key']} | purpose={entry['purpose']} | "
@@ -226,10 +304,20 @@ def main(argv: Sequence[str] | None = None) -> int:
                 f"sources={sources}{reason}"
             )
     else:
-        run_count = sum(len(entry["enabled_sources"]) for entry in active)
+        weekly_count = len(
+            runs_for_cadence(
+                root=root, cadence="weekly", registry_path=registry_path
+            )
+        )
+        manual_count = len(
+            runs_for_cadence(
+                root=root, cadence="manual", registry_path=registry_path
+            )
+        )
         print(
-            f"Vehicle registry valid: {len(active)} active, "
-            f"{len(entries) - len(active)} paused, {run_count} enabled source runs."
+            f"Vehicle registry valid: {len(enabled)} enabled, "
+            f"{len(entries) - len(enabled)} paused, {weekly_count} weekly source runs, "
+            f"{manual_count} manual source runs."
         )
     return 0
 
