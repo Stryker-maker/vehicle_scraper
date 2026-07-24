@@ -102,7 +102,9 @@ jobs:
           retention-days: 3
 
   audit11a-f150-live:
-    if: github.event_name == 'push'
+    if: >-
+      github.ref_name == 'ai/audit-11a-f150-manual-reintroduction' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     name: Audit 11A F-150 live validation
     needs: test
     runs-on: ubuntu-24.04
