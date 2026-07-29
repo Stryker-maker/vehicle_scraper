@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 from typing import Sequence
@@ -20,7 +21,7 @@ from phase1_runtime import (
     dedupe_history_observations_for_date, remove_history_observations_for_date,
     run_source,
 )
-from vehicle_registry import DEFAULT_REGISTRY_PATH, active_source_plan
+from vehicle_registry import DEFAULT_REGISTRY_PATH, active_source_plan, registry_entries
 
 __all__ = [
     "EVIDENCE_SCHEMA_VERSION", "IDENTITY_LIFECYCLE_SCHEMA_VERSION",
@@ -46,7 +47,20 @@ def add_reporting_scope_arguments(action: argparse.ArgumentParser) -> None:
 
 def reporting_source_plan(args: argparse.Namespace, *, root: Path):
     if args.registry:
-        return active_source_plan(root=root, registry_path=Path(args.registry))
+        event_name = os.environ.get("GITHUB_EVENT_NAME", "local")
+        entries = registry_entries(root=root, registry_path=Path(args.registry))
+        if event_name == "schedule":
+            return [
+                (Path(entry["config_path"]), tuple(entry["enabled_sources"]))
+                for entry in entries
+                if entry["enabled"] and entry["cadence"] == "weekly"
+            ]
+        else:
+            return [
+                (Path(entry["config_path"]), tuple(entry["enabled_sources"]))
+                for entry in entries
+                if entry["enabled"]
+            ]
     return [(path, SOURCES) for path in config_paths(args.configs)]
 
 
