@@ -38,12 +38,30 @@ class DependencyLockTests(unittest.TestCase):
 class WorkflowControlTests(unittest.TestCase):
     def test_full_and_single_pair_plans_are_registry_governed(self):
         root = Path(__file__).resolve().parents[1]
-        full = build_collection_plan(
+        import os
+        
+        # Test scheduled runs only collect weekly vehicles
+        os.environ["GITHUB_EVENT_NAME"] = "schedule"
+        full_schedule = build_collection_plan(
             root=root,
             scope="full",
             registry_path=Path("vehicle_registry.json"),
         )
-        self.assertEqual(len(full), 10)
+        self.assertEqual(len(full_schedule), 10)
+        self.assertFalse(any("f150" in str(p) for p, _ in full_schedule))
+        
+        # Test manual runs collect all active vehicles
+        os.environ["GITHUB_EVENT_NAME"] = "workflow_dispatch"
+        full_manual = build_collection_plan(
+            root=root,
+            scope="full",
+            registry_path=Path("vehicle_registry.json"),
+        )
+        self.assertEqual(len(full_manual), 12)
+        self.assertTrue(any("f150" in str(p) for p, _ in full_manual))
+        
+        del os.environ["GITHUB_EVENT_NAME"]
+        
         single = build_collection_plan(
             root=root,
             scope="single_pair",
@@ -57,7 +75,7 @@ class WorkflowControlTests(unittest.TestCase):
                 root=root,
                 scope="single_pair",
                 registry_path=Path("vehicle_registry.json"),
-                vehicle_key="ford_f150",
+                vehicle_key="toyota_tundra",
                 source="autotrader",
             )
 
