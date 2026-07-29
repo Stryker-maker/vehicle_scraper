@@ -56,7 +56,7 @@ class WorkflowContractTests(unittest.TestCase):
             "collection_scope:",
             "options: [full, single_pair]",
             "vehicle_key:",
-            "options: [ford_f350, ram_3500, subaru_forester, honda_odyssey, kia_carnival]",
+            "options: [ford_f350, ram_3500, subaru_forester, honda_odyssey, kia_carnival, ford_f150]",
             "source:",
             "options: [autotrader, kijiji]",
             "publish_generated_data:",
