@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -26,8 +27,25 @@ def build_collection_plan(
     root = root.resolve()
     if scope not in COLLECTION_SCOPES:
         raise ValueError(f"Unsupported collection scope: {scope}")
+        
+    event_name = os.environ.get("GITHUB_EVENT_NAME", "local")
+    
     if scope == "full":
-        plan = active_runs(root=root, registry_path=registry_path)
+        entries = registry_entries(root=root, registry_path=registry_path)
+        if event_name == "schedule":
+            plan = [
+                (Path(entry["config_path"]), str(source_name))
+                for entry in entries
+                if entry["enabled"] and entry["cadence"] == "weekly"
+                for source_name in entry["enabled_sources"]
+            ]
+        else:
+            plan = [
+                (Path(entry["config_path"]), str(source_name))
+                for entry in entries
+                if entry["enabled"]
+                for source_name in entry["enabled_sources"]
+            ]
     else:
         if not vehicle_key:
             raise ValueError("single_pair requires vehicle_key")
@@ -48,9 +66,10 @@ def build_collection_plan(
                 f"Source {source} is not enabled for governed vehicle {vehicle_key}"
             )
         plan = [(Path(entry["config_path"]), str(source))]
+        
     if not plan:
         raise ValueError("Collection plan must not be empty")
-    return [(Path(config_path), str(source_name)) for config_path, source_name in plan]
+    return plan
 
 
 def write_plan(path: Path, plan: Iterable[tuple[Path, str]]) -> None:
