@@ -15,7 +15,7 @@ ALLOWED_PURPOSES = {
     "family_friend_purchase_search",
     "optional_curiosity",
 }
-ALLOWED_CADENCES = {"weekly", "manual"}
+ALLOWED_CADENCES = {"weekly", "manual", "disabled"}
 PURPOSE_ANALYSIS_PROFILES = {
     "primary_purchase": "f350_purchase",
     "owned_vehicle_value_monitoring": "owned_vehicle_value",

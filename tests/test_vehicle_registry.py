@@ -78,9 +78,10 @@ class VehicleRegistryTests(unittest.TestCase):
                 "subaru_forester",
                 "honda_odyssey",
                 "kia_carnival",
+                "ford_f150",
             ],
         )
-        self.assertEqual(paused, ["ford_f150", "toyota_tundra"])
+        self.assertEqual(paused, ["toyota_tundra"])
         self.assertEqual(
             [str(path) for path in active_config_paths(root=root)],
             [
@@ -89,10 +90,11 @@ class VehicleRegistryTests(unittest.TestCase):
                 "config_forester.json",
                 "config_odyssey.json",
                 "config_carnival.json",
+                "config_f150.json",
             ],
         )
         runs = [(str(path), source) for path, source in active_runs(root=root)]
-        self.assertEqual(len(runs), 10)
+        self.assertEqual(len(runs), 12)
         self.assertEqual(
             runs[:2],
             [
@@ -101,11 +103,8 @@ class VehicleRegistryTests(unittest.TestCase):
             ],
         )
         self.assertFalse(
-            any("f150" in path or "tundra" in path for path, _ in runs)
+            any("tundra" in path for path, _ in runs)
         )
-        for entry in entries:
-            self.assertEqual(entry["cadence"], "weekly")
-            self.assertEqual(entry["enabled_sources"], ["autotrader", "kijiji"])
 
     def test_registry_rejects_duplicate_vehicle_keys(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -14,7 +14,7 @@ on:
       vehicle_key:
         description: Active vehicle for single-pair validation
         type: choice
-        options: [ford_f350, ram_3500, subaru_forester, honda_odyssey, kia_carnival]
+        options: [ford_f350, ram_3500, subaru_forester, honda_odyssey, kia_carnival, ford_f150]
         default: ford_f350
         required: true
       source:

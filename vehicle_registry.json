@@ -70,16 +70,15 @@
     {
       "vehicle_key": "ford_f150",
       "config_path": "config_f150.json",
-      "enabled": false,
+      "enabled": true,
       "purpose": "optional_curiosity",
       "priority": 4,
-      "cadence": "weekly",
+      "cadence": "manual",
       "enabled_sources": [
         "autotrader",
         "kijiji"
       ],
-      "analysis_profile": "optional_curiosity",
-      "pause_reason": "Paused during the repository audit to reduce runtime and generated-data volume."
+      "analysis_profile": "optional_curiosity"
     },
     {
       "vehicle_key": "toyota_tundra",
@@ -87,7 +86,7 @@
       "enabled": false,
       "purpose": "optional_curiosity",
       "priority": 4,
-      "cadence": "weekly",
+      "cadence": "disabled",
       "enabled_sources": [
         "autotrader",
         "kijiji"
