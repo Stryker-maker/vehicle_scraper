@@ -108,7 +108,7 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("purpose_output_validation.py", self.ci)
         for value in (
             "Build and validate secondary-purpose output for narrow validation",
-            "if: env.COLLECTION_SCOPE == 'single_pair' && env.VEHICLE_KEY != 'ford_f350'",
+            "if: env.COLLECTION_SCOPE == 'single_pair' && env.VEHICLE_KEY != 'ford_f350' && env.VEHICLE_KEY != 'ford_f150' && env.VEHICLE_KEY != 'toyota_tundra'",
             "--inputs purpose_inputs.json",
             "data/$VEHICLE_KEY/purpose_output",
             "Build and validate secondary-purpose outputs",
