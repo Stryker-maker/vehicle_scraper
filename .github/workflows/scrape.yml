@@ -160,7 +160,7 @@ jobs:
           cat data/ford_f350/buyer_intelligence/market_summary_latest.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Build and validate secondary-purpose output for narrow validation
-        if: env.COLLECTION_SCOPE == 'single_pair' && env.VEHICLE_KEY != 'ford_f350'
+        if: env.COLLECTION_SCOPE == 'single_pair' && env.VEHICLE_KEY != 'ford_f350' && env.VEHICLE_KEY != 'ford_f150' && env.VEHICLE_KEY != 'toyota_tundra'
         run: |
           set -euo pipefail
           config=$(cut -f1 "${{ steps.collection-plan.outputs.path }}")
