@@ -13,7 +13,7 @@ from urllib.parse import urlencode
 
 from autotrader_distance import DistanceResult, build_distance_resolver
 from autotrader_history import apply_price_history, load_trim_tiers, write_csv_outputs
-from phase1_common import utc_now, write_json
+from phase1_common import utc_now, write_json, chrome_desktop_headers
 from vehicle_config import load_vehicle_config
 
 ADAPTER_SCHEMA_VERSION = 1
@@ -215,38 +215,6 @@ def parse_listing(
     address = ", ".join(part for part in (street, city, province, postal) if part)
     distance = distance_resolver({"dealer_address": address, "location": location})
 
-    criteria, rejections = config["criteria"], []
-    if not listing_id: rejections.append("missing_source_listing_id")
-    if not listing_url: rejections.append("missing_listing_url")
-    if not criteria["min_year"] <= year <= criteria["max_year"]: rejections.append("year_out_of_range")
-    if not 0 < price <= criteria["max_price_cad"]: rejections.append("price_out_of_range")
-    required_fuel = str(criteria.get("fuel") or "").strip()
-    if required_fuel and required_fuel.lower() not in fuel.lower(): rejections.append("fuel_unknown" if not fuel else "fuel_mismatch")
-    required_engine = str(criteria.get("engine") or "").strip()
-    if required_engine and required_engine.lower() not in engine.lower(): rejections.append("engine_unknown" if not engine else "engine_mismatch")
-    if distance.distance_km is None: rejections.append("distance_unavailable")
-    elif distance.distance_km > config["origin"]["max_distance_km"]: rejections.append("distance_out_of_range")
-
-    seller = item.get("seller") if isinstance(item.get("seller"), dict) else {}
-    super_deal = item.get("superDeal") if isinstance(item.get("superDeal"), dict) else {}
-    old_price = str(super_deal.get("oldPriceFormatted") or "").strip()
-    row = {
-        "year": year, "make": vehicle.get("make") or config["make"],
-        "model": vehicle.get("model") or config["model"], "trim": trim,
-        "trim_tier": trim_tier(trim, tiers), "price": price,
-        "price_history": f"Reduced from {old_price}" if old_price else "No change noted",
-        "trend": "", "weeks_tracked": 0, "price_first_seen": price,
-        "price_last_week": price, "price_change_week": 0, "price_change_total": 0,
-        "mileage": "" if mileage is None else mileage, "engine": engine, "fuel": fuel,
-        "accident_flag": accident_claim(item), "days_on_market": "",
-        "dealer": seller.get("companyName") or "Unknown", "seller_type": "Dealer",
-        "dealer_address": address, "location": location,
-        "distance_km": "" if distance.distance_km is None else distance.distance_km,
-        "distance_method": distance.method, "distance_evidence_status": distance.evidence_status,
-        "listing_id": listing_id, "url_region_hint": "", "url_region_status": "unavailable",
-        "url": listing_url, "source": "AutoTrader", **provenance,
-    }
-    return row, sorted(set(rejections)), []
 
 
 def default_session() -> SessionLike:
@@ -266,7 +234,7 @@ def collect_autotrader(
     config, active_run = load_vehicle_config(config_path), run_id or os.environ.get("GITHUB_RUN_ID", "local")
     session, distance_resolver = session or default_session(), distance_resolver or build_distance_resolver(config)
     tiers, source_config = load_trim_tiers(root, str(config["vehicle_key"])), config["sources"]["autotrader"]
-    headers = {"User-Agent": "Mozilla/5.0 Chrome/120 VehicleScraper/1.0"}
+    headers = chrome_desktop_headers()
     requests_evidence: list[dict[str, Any]] = []
     records: list[dict[str, Any]] = []
     first_identity: dict[str, int] = {}
