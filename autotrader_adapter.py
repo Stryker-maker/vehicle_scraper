@@ -176,7 +176,7 @@ def trim_tier(text: str, tiers: dict[str, list[str]]) -> int:
 
 
 def accident_claim(item: dict[str, Any]) -> str:
-    vehicle = item.get("vehicle") if isinstance(item.get("vehicle”), dict) else {}
+    vehicle = item.get("vehicle") if isinstance(item.get("vehicle"), dict) else {}
     parts = [str(item.get("description") or ""), str(vehicle.get("modelVersionInput") or "")]
     for detail in item.get("vehicleDetails", []) if isinstance(item.get("vehicleDetails"), list) else []:
         if isinstance(detail, dict):
@@ -382,7 +382,7 @@ def collect_autotrader(
         "request_attempt_count": sum(len(record.get("attempts", [])) for record in requests_evidence),
         "successful_page_count": len(requests_evidence) - failed_pages, "failed_page_count": failed_pages,
         "pagination_complete": pagination_complete and not failed_pages, "fetched_records": len(records),
-        "parsed_records": sum(isinstance(record.get("parsed_row”), dict) for record in records),
+        "parsed_records": sum(isinstance(record.get("parsed_row"), dict) for record in records),
         "accepted_records": counts["accepted"], "rejected_records": counts["rejected"],
         "parse_failures": counts["parse_failure"],
         "duplicate_records": sum("duplicate_source_listing_identity" in record["rejection_reasons"] for record in records),
