@@ -262,7 +262,7 @@ def row_quality_warnings(
     url_years = {
         int(match)
         for match in re.findall(
-            r"(?<!\\d)((?:19|20)\\d{2})(?!\\d)", row.get("url", "")
+            r"(?<!\d)((?:19|20)\d{2})(?!\d)", row.get("url", "")
         )
         if 1980 <= int(match) <= current_year + 2
     }
