@@ -195,58 +195,63 @@ def parse_listing(
     item: dict[str, Any], *, config: dict[str, Any], tiers: dict[str, list[str]],
     distance_resolver: Callable[[dict[str, Any]], DistanceResult], provenance: dict[str, Any],
 ) -> tuple[dict[str, Any] | None, list[str], list[str]]:
-    vehicle = item.get("vehicle")
-    if not isinstance(vehicle, dict):
-        return None, [], ["missing_vehicle_object"]
-    listing_id, listing_url = str(item.get("id") or "").strip(), str(item.get("url") or "").strip()
-    price_obj = item.get("price") if isinstance(item.get("price"), dict) else {}
-    price, year = clean_int(price_obj.get("priceFormatted")), clean_int(vehicle.get("modelYear"))
-    parse_failures = [name for name, value in (("invalid_price", price), ("invalid_year", year)) if value is None]
-    if parse_failures:
-        return None, [], parse_failures
+    try:
+        vehicle = item.get("vehicle")
+        if not isinstance(vehicle, dict):
+            return None, [], ["missing_vehicle_object"]
+        listing_id, listing_url = str(item.get("id") or "").strip(), str(item.get("url") or "").strip()
+        price_obj = item.get("price") if isinstance(item.get("price"), dict) else {}
+        price, year = clean_int(price_obj.get("priceFormatted")), clean_int(vehicle.get("modelYear"))
+        parse_failures = [name for name, value in (("invalid_price", price), ("invalid_year", year)) if value is None]
+        if parse_failures:
+            return None, [], parse_failures
 
-    mileage = clean_int(vehicle.get("mileageInKm"))
-    engine, fuel = engine_text(vehicle.get("engineDisplacementInCCM")), str(vehicle.get("fuel") or "").strip()
-    trim = str(vehicle.get("modelVersionInput") or "").strip()
-    location_obj = item.get("location") if isinstance(item.get("location"), dict) else {}
-    city, province = str(location_obj.get("city") or "").strip(), str(location_obj.get("provinceCode") or "").strip()
-    street, postal = str(location_obj.get("street") or "").strip(), str(location_obj.get("zip") or "").strip()
-    location = ", ".join(part for part in (city, province) if part)
-    address = ", ".join(part for part in (street, city, province, postal) if part)
-    distance = distance_resolver({"dealer_address": address, "location": location})
+        mileage = clean_int(vehicle.get("mileageInKm"))
+        engine, fuel = engine_text(vehicle.get("engineDisplacementInCCM")), str(vehicle.get("fuel") or "").strip()
+        trim = str(vehicle.get("modelVersionInput") or "").strip()
+        location_obj = item.get("location") if isinstance(item.get("location"), dict) else {}
+        city, province = str(location_obj.get("city") or "").strip(), str(location_obj.get("provinceCode") or "").strip()
+        street, postal = str(location_obj.get("street") or "").strip(), str(location_obj.get("zip") or "").strip()
+        location = ", ".join(part for part in (city, province) if part)
+        address = ", ".join(part for part in (street, city, province, postal) if part)
+        distance = distance_resolver({"dealer_address": address, "location": location})
 
-    criteria, rejections = config["criteria"], []
-    if not listing_id: rejections.append("missing_source_listing_id")
-    if not listing_url: rejections.append("missing_listing_url")
-    if not criteria["min_year"] <= year <= criteria["max_year"]: rejections.append("year_out_of_range")
-    if not 0 < price <= criteria["max_price_cad"]: rejections.append("price_out_of_range")
-    required_fuel = str(criteria.get("fuel") or "").strip()
-    if required_fuel and required_fuel.lower() not in fuel.lower(): rejections.append("fuel_unknown" if not fuel else "fuel_mismatch")
-    required_engine = str(criteria.get("engine") or "").strip()
-    if required_engine and required_engine.lower() not in engine.lower(): rejections.append("engine_unknown" if not engine else "engine_mismatch")
-    if distance.distance_km is None: rejections.append("distance_unavailable")
-    elif distance.distance_km > config["origin"]["max_distance_km"]: rejections.append("distance_out_of_range")
+        criteria, rejections = config["criteria"], []
+        if not listing_id: rejections.append("missing_source_listing_id")
+        if not listing_url: rejections.append("missing_listing_url")
+        if not criteria["min_year"] <= year <= criteria["max_year"]: rejections.append("year_out_of_range")
+        if not 0 < price <= criteria["max_price_cad"]: rejections.append("price_out_of_range")
+        required_fuel = str(criteria.get("fuel") or "").strip()
+        if required_fuel and required_fuel.lower() not in fuel.lower(): rejections.append("fuel_unknown" if not fuel else "fuel_mismatch")
+        required_engine = str(criteria.get("engine") or "").strip()
+        if required_engine and required_engine.lower() not in engine.lower(): rejections.append("engine_unknown" if not engine else "engine_mismatch")
+        if distance.distance_km is None:
+            rejections.append("distance_unavailable")
+        elif distance.distance_km > config["origin"]["max_distance_km"]:
+            rejections.append("distance_out_of_range")
 
-    seller = item.get("seller") if isinstance(item.get("seller"), dict) else {}
-    super_deal = item.get("superDeal") if isinstance(item.get("superDeal"), dict) else {}
-    old_price = str(super_deal.get("oldPriceFormatted") or "").strip()
-    row = {
-        "year": year, "make": vehicle.get("make") or config["make"],
-        "model": vehicle.get("model") or config["model"], "trim": trim,
-        "trim_tier": trim_tier(trim, tiers), "price": price,
-        "price_history": f"Reduced from {old_price}" if old_price else "No change noted",
-        "trend": "", "weeks_tracked": 0, "price_first_seen": price,
-        "price_last_week": price, "price_change_week": 0, "price_change_total": 0,
-        "mileage": "" if mileage is None else mileage, "engine": engine, "fuel": fuel,
-        "accident_flag": accident_claim(item), "days_on_market": "",
-        "dealer": seller.get("companyName") or "Unknown", "seller_type": "Dealer",
-        "dealer_address": address, "location": location,
-        "distance_km": "" if distance.distance_km is None else distance.distance_km,
-        "distance_method": distance.method, "distance_evidence_status": distance.evidence_status,
-        "listing_id": listing_id, "url_region_hint": "", "url_region_status": "unavailable",
-        "url": listing_url, "source": "AutoTrader", **provenance,
-    }
-    return row, sorted(set(rejections)), []
+        seller = item.get("seller") if isinstance(item.get("seller"), dict) else {}
+        super_deal = item.get("superDeal") if isinstance(item.get("superDeal"), dict) else {}
+        old_price = str(super_deal.get("oldPriceFormatted") or "").strip()
+        row = {
+            "year": year, "make": vehicle.get("make") or config["make"],
+            "model": vehicle.get("model") or config["model"], "trim": trim,
+            "trim_tier": trim_tier(trim, tiers), "price": price,
+            "price_history": f"Reduced from {old_price}" if old_price else "No change noted",
+            "trend": "", "weeks_tracked": 0, "price_first_seen": price,
+            "price_last_week": price, "price_change_week": 0, "price_change_total": 0,
+            "mileage": "" if mileage is None else mileage, "engine": engine, "fuel": fuel,
+            "accident_flag": accident_claim(item), "days_on_market": "",
+            "dealer": seller.get("companyName") or "Unknown", "seller_type": "Dealer",
+            "dealer_address": address, "location": location,
+            "distance_km": "" if distance.distance_km is None else distance.distance_km,
+            "distance_method": distance.method, "distance_evidence_status": distance.evidence_status,
+            "listing_id": listing_id, "url_region_hint": "", "url_region_status": "unavailable",
+            "url": listing_url, "source": "AutoTrader", **provenance,
+        }
+        return row, sorted(set(rejections)), []
+    except Exception as exc:
+        return None, [], [f"unexpected_parse_failure:{type(exc).__name__}"]
 
 
 def default_session() -> SessionLike:

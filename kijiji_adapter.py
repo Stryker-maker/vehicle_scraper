@@ -15,7 +15,7 @@ from bs4 import BeautifulSoup
 from kijiji_history import apply_price_history, load_trim_tiers, write_csv_outputs
 from kijiji_locations import LOCATION_REGISTRY_VERSION, validate_query_locations
 from kijiji_response_diagnostics import summarize_kijiji_html
-from phase1_common import utc_now, write_json
+from phase1_common import utc_now, write_json, chrome_desktop_headers
 from vehicle_config import load_vehicle_config
 
 ADAPTER_SCHEMA_VERSION = 1
@@ -456,13 +456,7 @@ def collect_kijiji(
     tiers = load_trim_tiers(root, str(config["vehicle_key"]))
     source_config = config["sources"]["kijiji"]
     query_plan = validate_query_locations(source_config["search_locations"])
-    headers = {
-        "User-Agent": (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "Chrome/120 VehicleScraper/1.0"
-        ),
-        "Accept-Language": "en-CA,en;q=0.9",
-    }
+    headers = chrome_desktop_headers()
     requests_evidence: list[dict[str, Any]] = []
     records: list[dict[str, Any]] = []
     first_identity: dict[str, int] = {}
