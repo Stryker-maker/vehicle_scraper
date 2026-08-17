@@ -66,7 +66,11 @@ def registry_entry(
         "purpose": "primary_purchase",
         "priority": 1,
         "cadence": "weekly",
-        "enabled_sources": enabled_sources or ["autotrader", "kijiji"],
+        "enabled_sources": (
+            enabled_sources
+            if enabled_sources is not None
+            else ["autotrader", "kijiji"]
+        ),
         "analysis_profile": "f350_purchase",
     }
     if not enabled:
@@ -1098,7 +1102,7 @@ class CLITests(unittest.TestCase):
             self.assertEqual(result, 0)
 
     def test_main_invalid_registry_returns_nonzero(self):
-        with tempfile.TemporaryDirectory() as directory:
+    def test_main_invalid_registry_raises_error(self):
             root = Path(directory)
             registry = {"schema_version": 2, "profile": "test", "vehicles": []}
             (root / "vehicle_registry.json").write_text(json.dumps(registry))
