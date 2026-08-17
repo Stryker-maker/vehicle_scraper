@@ -1,5 +1,12 @@
 # Vehicle Market Information Collector
 
+---
+
+> **cto.new Workflow Test Notice**  
+> This repository is being used for a controlled test of the cto.new coding-agent workflow. This notice serves as a harmless documentation-only marker to verify the workflow's ability to analyze repository structure, identify testing infrastructure, and create appropriate pull requests without modifying application behavior.
+
+---
+
 This repository collects used-vehicle listings from AutoTrader and Kijiji, preserves source/run evidence, tracks source-scoped listing lifecycle, bounds generated-data growth, and produces decision-safe unranked outputs for manual review, F-350 purchase investigation, owned-vehicle value monitoring, and family-vehicle candidate review.
 
 Its primary purpose is an informed early-2020s diesel Ford F-350 purchase. It also supports lightweight RAM 3500 and Subaru Forester value monitoring plus Honda Odyssey and Kia Carnival searches for a family friend.
