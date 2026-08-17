@@ -1101,8 +1101,8 @@ class CLITests(unittest.TestCase):
                 result = main(["validate", "--registry", "custom.json"])
             self.assertEqual(result, 0)
 
-    def test_main_invalid_registry_returns_nonzero(self):
     def test_main_invalid_registry_raises_error(self):
+        with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             registry = {"schema_version": 2, "profile": "test", "vehicles": []}
             (root / "vehicle_registry.json").write_text(json.dumps(registry))
