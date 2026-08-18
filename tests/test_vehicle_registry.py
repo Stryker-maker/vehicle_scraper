@@ -851,14 +851,26 @@ class AnalysisProfileTests(unittest.TestCase):
 
 class PauseReasonValidationTests(unittest.TestCase):
     def test_paused_vehicle_with_valid_pause_reason(self):
+        """Test that a paused vehicle with valid pause_reason is accepted.
+        
+        Note: Registry requires at least one enabled vehicle, so we include
+        a second vehicle to satisfy that global constraint while testing
+        the pause_reason behavior of the paused vehicle.
+        """
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / "config.json").write_text(json.dumps(governed_config("test_vehicle")))
-            entry = registry_entry("test_vehicle", "config.json", enabled=False)
-            registry = minimal_registry([entry])
+            (root / "helper.json").write_text(json.dumps(governed_config("helper_vehicle")))
+            
+            subject = registry_entry("test_vehicle", "config.json", enabled=False)
+            helper = registry_entry("helper_vehicle", "helper.json", enabled=True)
+            
+            registry = minimal_registry([subject, helper])
             (root / "vehicle_registry.json").write_text(json.dumps(registry))
             entries = registry_entries(root=root)
-            self.assertEqual(entries[0]["pause_reason"], "test pause")
+            
+            subject_result = [item for item in entries if item["vehicle_key"] == "test_vehicle"][0]
+            self.assertEqual(subject_result["pause_reason"], "test pause")
 
     def test_paused_vehicle_empty_pause_reason_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
