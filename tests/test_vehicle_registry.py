@@ -742,13 +742,18 @@ class ValidateRegistryEntryFieldsTests(unittest.TestCase):
     def test_valid_cadence_disabled(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
+            # Create configs for both vehicles
             (root / "config.json").write_text(json.dumps(governed_config("test_vehicle")))
-            entry = registry_entry("test_vehicle", "config.json", enabled=False)
-            entry["cadence"] = "disabled"
-            registry = minimal_registry([entry])
+            (root / "second.json").write_text(json.dumps(governed_config("second_vehicle")))
+            # Test disabled cadence on a paused vehicle
+            paused = registry_entry("test_vehicle", "config.json", enabled=False)
+            paused["cadence"] = "disabled"
+            second = registry_entry("second_vehicle", "second.json")
+            registry = minimal_registry([paused, second])
             (root / "vehicle_registry.json").write_text(json.dumps(registry))
             entries = registry_entries(root=root)
-            self.assertEqual(entries[0]["cadence"], "disabled")
+            paused_result = next(e for e in entries if e["vehicle_key"] == "test_vehicle")
+            self.assertEqual(paused_result["cadence"], "disabled")
 
 
 class AnalysisProfileTests(unittest.TestCase):
