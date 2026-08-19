@@ -277,7 +277,7 @@ class VehicleRegistryTests(unittest.TestCase):
             entry = registry_entry("test_vehicle", "config.json", enabled_sources=["autotrader", "kijiji"])
             registry = minimal_registry([entry])
             (root / "vehicle_registry.json").write_text(json.dumps(registry))
-            with self.assertRaisesRegex(ValueError, r"enables source\(s\) without config"):
+            with self.assertRaisesRegex(ValueError, r"sources is missing required field\(s\): kijiji"):
                 registry_entries(root=root)
 
     def test_registry_with_no_enabled_vehicles_rejected(self):
