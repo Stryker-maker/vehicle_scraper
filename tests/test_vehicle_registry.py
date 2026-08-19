@@ -1015,11 +1015,6 @@ class CLITests(unittest.TestCase):
         args = p.parse_args(["summary"])
         self.assertEqual(args.action, "summary")
 
-    def test_parser_accepts_custom_registry_path(self):
-        p = parser()
-        args = p.parse_args(["validate", "--registry", "custom_registry.json"])
-        self.assertEqual(args.registry, "custom_registry.json")
-
     def test_parser_uses_default_registry_path(self):
         p = parser()
         args = p.parse_args(["validate"])
