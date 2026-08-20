@@ -15,7 +15,6 @@ from vehicle_registry import (
     main,
     parser,
     registry_entries,
-    validate_registry,
 )
 
 
