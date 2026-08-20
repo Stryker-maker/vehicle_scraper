@@ -78,13 +78,15 @@ jobs:
       - name: Validate governed vehicle registry and configurations
         run: python vehicle_registry.py validate --registry vehicle_registry.json
 
-      - name: Run structured and hostile tests
+      - name: Run structured and hostile tests with coverage
         id: structured-tests
         run: |
           set +e
-          python -m unittest discover -s tests -v > "$RUNNER_TEMP/structured-tests.txt" 2>&1
+          python -m coverage run --source=. -m unittest discover -s tests -v > "$RUNNER_TEMP/structured-tests.txt" 2>&1
           status=$?
           cat "$RUNNER_TEMP/structured-tests.txt"
+          python -m coverage xml -o coverage.xml
+          python -m coverage report
           exit "$status"
 
       - name: Upload failed structured-test log
@@ -93,5 +95,14 @@ jobs:
         with:
           name: structured-test-failure-${{ github.run_id }}
           path: ${{ runner.temp }}/structured-tests.txt
+          if-no-files-found: error
+          retention-days: 3
+
+      - name: Upload Python coverage report
+        if: always() && steps.structured-tests.outcome != 'skipped'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: python-coverage-${{ github.run_id }}
+          path: coverage.xml
           if-no-files-found: error
           retention-days: 3
