@@ -600,14 +600,15 @@ def collect_kijiji(
                 diag = request_record.get("response_diagnostics") or summarize_kijiji_html(
                     response.text
                 )
-                has_block_marker = bool(diag.get("block_markers"))
-                has_structure = (
-                    bool(diag.get("next_data_present"))
-                    or bool(diag.get("item_list_marker_present"))
-                    or int(diag.get("json_ld_script_count") or 0) > 0
-                    or int(diag.get("listing_link_count") or 0) > 0
+                is_legitimate_empty = (
+                    not diag.get("block_markers")
+                    and bool(diag.get("next_data_present"))
+                    and (
+                        bool(diag.get("item_list_marker_present"))
+                        or int(diag.get("json_ld_script_count") or 0) > 0
+                    )
                 )
-                if has_block_marker or not has_structure:
+                if not is_legitimate_empty:
                     request_record["page_status"] = "failed"
                     request_record["stop_reason"] = "suspected_block"
                     requests_evidence.append(request_record)

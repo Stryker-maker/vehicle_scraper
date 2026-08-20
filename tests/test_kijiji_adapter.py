@@ -76,9 +76,10 @@ def page_html(items):
         "itemListElement": [{"item": item} for item in items],
     }
     return (
-        '<html><script type="application/ld+json">'
+        '<html><head><script id="__NEXT_DATA__" type="application/json">{}</script>'
+        '<script type="application/ld+json">'
         + json.dumps(payload)
-        + "</script></html>"
+        + "</script></head></html>"
     )
 
 
