@@ -601,7 +601,8 @@ def collect_kijiji(
                     response.text
                 )
                 is_legitimate_empty = (
-                    not diag.get("block_markers")
+                    not request_record.get("json_ld_errors")
+                    and not diag.get("block_markers")
                     and bool(diag.get("next_data_present"))
                     and (
                         bool(diag.get("item_list_marker_present"))
