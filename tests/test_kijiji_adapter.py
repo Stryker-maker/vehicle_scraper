@@ -76,9 +76,10 @@ def page_html(items):
         "itemListElement": [{"item": item} for item in items],
     }
     return (
-        '<html><script type="application/ld+json">'
+        '<html><head><script id="__NEXT_DATA__" type="application/json">{}</script>'
+        '<script type="application/ld+json">'
         + json.dumps(payload)
-        + "</script></html>"
+        + "</script></head></html>"
     )
 
 
@@ -248,6 +249,127 @@ class KijijiAdapterTests(unittest.TestCase):
             "listing_payload_not_object",
             records[3]["parse_failure_reasons"],
         )
+
+    def test_legitimate_empty_terminal_page_succeeds(self):
+        empty_page = page_html([])
+        session = Session([Response(200, empty_page)])
+        report = collect_kijiji(
+            root=self.root,
+            config_path=self.config_path,
+            run_id="run-empty",
+            session=session,
+            sleep=lambda _seconds: None,
+        )
+        self.assertTrue(report["pagination_complete"])
+        self.assertEqual(report["successful_page_count"], 1)
+        self.assertEqual(report["failed_page_count"], 0)
+        requests = [
+            json.loads(line)
+            for line in (
+                self.root / report["artifacts"]["requests"]
+            ).read_text(encoding="utf-8").splitlines()
+        ]
+        self.assertEqual(requests[0]["page_status"], "success")
+        self.assertEqual(requests[0]["stop_reason"], "empty_page")
+
+    def test_explicit_block_marker_fails_with_suspected_block(self):
+        block_page = (
+            "<html><head><title>Access Denied</title></head>"
+            "<body>Please complete the CAPTCHA to verify you are human.</body></html>"
+        )
+        session = Session([Response(200, block_page)])
+        report = collect_kijiji(
+            root=self.root,
+            config_path=self.config_path,
+            run_id="run-block",
+            session=session,
+            sleep=lambda _seconds: None,
+        )
+        self.assertFalse(report["pagination_complete"])
+        self.assertEqual(report["successful_page_count"], 0)
+        self.assertEqual(report["failed_page_count"], 1)
+        requests = [
+            json.loads(line)
+            for line in (
+                self.root / report["artifacts"]["requests"]
+            ).read_text(encoding="utf-8").splitlines()
+        ]
+        self.assertEqual(requests[0]["page_status"], "failed")
+        self.assertEqual(requests[0]["stop_reason"], "suspected_block")
+
+    def test_malformed_json_ld_script_fails_with_suspected_block(self):
+        malformed_html = (
+            '<html><head><script id="__NEXT_DATA__" type="application/json">{}</script>'
+            '<script type="application/ld+json">{invalid json payload...</script>'
+            '</head><body></body></html>'
+        )
+        session = Session([Response(200, malformed_html)])
+        report = collect_kijiji(
+            root=self.root,
+            config_path=self.config_path,
+            run_id="run-malformed",
+            session=session,
+            sleep=lambda _seconds: None,
+        )
+        self.assertFalse(report["pagination_complete"])
+        self.assertEqual(report["successful_page_count"], 0)
+        self.assertEqual(report["failed_page_count"], 1)
+        requests = [
+            json.loads(line)
+            for line in (
+                self.root / report["artifacts"]["requests"]
+            ).read_text(encoding="utf-8").splitlines()
+        ]
+        self.assertIn("invalid_json_ld_script:0", requests[0]["json_ld_errors"])
+        self.assertEqual(requests[0]["page_status"], "failed")
+        self.assertEqual(requests[0]["stop_reason"], "suspected_block")
+
+    def test_structurally_suspicious_empty_page_fails_with_suspected_block(self):
+        suspicious_page = "<html><head><title>Blank</title></head><body>Nothing here</body></html>"
+        session = Session([Response(200, suspicious_page)])
+        report = collect_kijiji(
+            root=self.root,
+            config_path=self.config_path,
+            run_id="run-suspicious",
+            session=session,
+            sleep=lambda _seconds: None,
+        )
+        self.assertFalse(report["pagination_complete"])
+        self.assertEqual(report["successful_page_count"], 0)
+        self.assertEqual(report["failed_page_count"], 1)
+        requests = [
+            json.loads(line)
+            for line in (
+                self.root / report["artifacts"]["requests"]
+            ).read_text(encoding="utf-8").splitlines()
+        ]
+        self.assertEqual(requests[0]["page_status"], "failed")
+        self.assertEqual(requests[0]["stop_reason"], "suspected_block")
+
+    def test_populated_page_followed_by_empty_terminal_page(self):
+        populated_page = page_html([listing("1"), listing("2")])
+        empty_page = page_html([])
+        session = Session([Response(200, populated_page), Response(200, empty_page)])
+        report = collect_kijiji(
+            root=self.root,
+            config_path=self.config_path,
+            run_id="run-populated",
+            session=session,
+            sleep=lambda _seconds: None,
+            page_size=2,
+        )
+        self.assertTrue(report["pagination_complete"])
+        self.assertEqual(report["successful_page_count"], 2)
+        self.assertEqual(report["failed_page_count"], 0)
+        requests = [
+            json.loads(line)
+            for line in (
+                self.root / report["artifacts"]["requests"]
+            ).read_text(encoding="utf-8").splitlines()
+        ]
+        self.assertEqual(requests[0]["page_status"], "success")
+        self.assertEqual(requests[1]["page_status"], "success")
+        self.assertEqual(requests[1]["stop_reason"], "empty_page")
 
 
 if __name__ == "__main__":
