@@ -597,6 +597,23 @@ def collect_kijiji(
                 source_index += 1
 
             if not items:
+                diag = request_record.get("response_diagnostics") or summarize_kijiji_html(
+                    response.text
+                )
+                is_legitimate_empty = (
+                    not diag.get("block_markers")
+                    and bool(diag.get("next_data_present"))
+                    and (
+                        bool(diag.get("item_list_marker_present"))
+                        or int(diag.get("json_ld_script_count") or 0) > 0
+                    )
+                )
+                if not is_legitimate_empty:
+                    request_record["page_status"] = "failed"
+                    request_record["stop_reason"] = "suspected_block"
+                    requests_evidence.append(request_record)
+                    break
+
                 request_record["stop_reason"] = "empty_page"
                 query_complete = True
                 requests_evidence.append(request_record)
