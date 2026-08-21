@@ -7,7 +7,24 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from identity_lifecycle import IDENTITY_LIFECYCLE_SCHEMA_VERSION, artifact_paths
+from kijiji_adapter import collect_kijiji
 from kijiji_run import run_kijiji
+from workflow_anomalies import compare_health_reports
+
+
+class KijijiResponseStubSession:
+    def __init__(self, responses):
+        self.responses = list(responses)
+
+    def get(self, url, headers, timeout):
+        res = self.responses.pop(0)
+        return res
+
+
+class StubResponse:
+    def __init__(self, status_code, text):
+        self.status_code = status_code
+        self.text = text
 
 
 class KijijiRuntimeTests(unittest.TestCase):
@@ -175,6 +192,61 @@ reconciliation_path.write_text(json.dumps(report, indent=2) + "\n", encoding="ut
         self.assertFalse(
             artifact_paths(self.root, self.config, "kijiji")["state"].exists()
         )
+
+    def test_suspected_block_triggers_pagination_incomplete_and_anomaly(self):
+        block_html = "<html><head><title>Access Denied</title></head><body>Captcha</body></html>"
+        session = KijijiResponseStubSession([StubResponse(200, block_html)])
+        report = collect_kijiji(
+            root=self.root,
+            config_path=self.config_path,
+            run_id="run-block-integration",
+            session=session,
+            sleep=lambda _s: None,
+        )
+        self.assertFalse(report["pagination_complete"])
+        self.assertEqual(report["failed_page_count"], 1)
+
+        health_report = {
+            "run_id": "run-block-integration",
+            "sources": [
+                {
+                    "vehicle_key": "test_vehicle",
+                    "source": "kijiji",
+                    "healthy": report["pagination_complete"] and report["reconciled"],
+                    "execution_status": "degraded",
+                    "pagination_complete": report["pagination_complete"],
+                    "failed_page_count": report["failed_page_count"],
+                    "fetched_record_count": report["fetched_records"],
+                    "parse_failure_count": report["parse_failures"],
+                    "accepted_record_count": report["accepted_records"],
+                    "request_attempt_count": report["request_attempt_count"],
+                    "quality_warning_rows": 0,
+                }
+            ],
+        }
+        anomalies = compare_health_reports(
+            baseline=None, current=health_report, run_id="run-block-integration"
+        )
+        codes = [item["code"] for item in anomalies["anomalies"]]
+        self.assertIn("pagination_incomplete", codes)
+        self.assertIn("failed_source_pages", codes)
+
+    def test_legitimate_empty_page_completes_pagination_normally(self):
+        empty_html = (
+            '<html><head><script id="__NEXT_DATA__" type="application/json">{}</script>'
+            '<script type="application/ld+json">{"@type":"ItemList","itemListElement":[]}'
+            '</script></head><body></body></html>'
+        )
+        session = KijijiResponseStubSession([StubResponse(200, empty_html)])
+        report = collect_kijiji(
+            root=self.root,
+            config_path=self.config_path,
+            run_id="run-empty-integration",
+            session=session,
+            sleep=lambda _s: None,
+        )
+        self.assertTrue(report["pagination_complete"])
+        self.assertEqual(report["failed_page_count"], 0)
 
 
 if __name__ == "__main__":
