@@ -603,6 +603,7 @@ def collect_kijiji(
                 is_legitimate_empty = (
                     not diag.get("block_markers")
                     and bool(diag.get("next_data_present"))
+                    and not request_record.get("json_ld_errors")
                     and (
                         bool(diag.get("item_list_marker_present"))
                         or int(diag.get("json_ld_script_count") or 0) > 0

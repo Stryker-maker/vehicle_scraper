@@ -297,6 +297,32 @@ class KijijiAdapterTests(unittest.TestCase):
         self.assertEqual(requests[0]["page_status"], "failed")
         self.assertEqual(requests[0]["stop_reason"], "suspected_block")
 
+    def test_malformed_json_ld_with_next_data_fails_with_suspected_block(self):
+        malformed_page = (
+            '<html><head><script id="__NEXT_DATA__" type="application/json">{}</script>'
+            '<script type="application/ld+json">{invalid json}</script></head></html>'
+        )
+        session = Session([Response(200, malformed_page)])
+        report = collect_kijiji(
+            root=self.root,
+            config_path=self.config_path,
+            run_id="run-malformed-jsonld",
+            session=session,
+            sleep=lambda _seconds: None,
+        )
+        self.assertFalse(report["pagination_complete"])
+        self.assertEqual(report["successful_page_count"], 0)
+        self.assertEqual(report["failed_page_count"], 1)
+        requests = [
+            json.loads(line)
+            for line in (
+                self.root / report["artifacts"]["requests"]
+            ).read_text(encoding="utf-8").splitlines()
+        ]
+        self.assertEqual(requests[0]["page_status"], "failed")
+        self.assertEqual(requests[0]["stop_reason"], "suspected_block")
+        self.assertEqual(requests[0]["json_ld_errors"], ["invalid_json_ld_script:0"])
+
     def test_structurally_suspicious_empty_page_fails_with_suspected_block(self):
         suspicious_page = "<html><head><title>Blank</title></head><body>Nothing here</body></html>"
         session = Session([Response(200, suspicious_page)])
