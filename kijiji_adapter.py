@@ -556,7 +556,7 @@ def _process_page_items(
                 identity = str(parsed.get("listing_id") or parsed.get("url") or "")
                 if identity and identity in first_identity:
                     rejections = sorted(
-                        set([*rejections, "duplicate_source_listing_identity"])
+                        {*rejections, "duplicate_source_listing_identity"}
                     )
                     adapter_record["duplicate_of_source_record_index"] = (
                         first_identity[identity]
