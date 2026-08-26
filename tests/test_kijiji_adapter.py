@@ -373,6 +373,24 @@ class KijijiAdapterTests(unittest.TestCase):
         self.assertEqual(requests[1]["page_status"], "success")
         self.assertEqual(requests[1]["stop_reason"], "empty_page")
 
+    def test_empty_json_ld_item_list_without_next_data_succeeds(self):
+        empty_jsonld_only = (
+            '<html><head><script type="application/ld+json">'
+            '{"@type": "ItemList", "itemListElement": []}'
+            '</script></head></html>'
+        )
+        session = Session([Response(200, empty_jsonld_only)])
+        report = collect_kijiji(
+            root=self.root,
+            config_path=self.config_path,
+            run_id="run-empty-jsonld-only",
+            session=session,
+            sleep=lambda _seconds: None,
+        )
+        self.assertTrue(report["pagination_complete"])
+        self.assertEqual(report["successful_page_count"], 1)
+        self.assertEqual(report["failed_page_count"], 0)
+
     def test_internal_helpers_behave_as_expected(self):
         query = {
             "config_label": "Edmonton, AB",
@@ -413,7 +431,21 @@ class KijijiAdapterTests(unittest.TestCase):
         self.assertEqual(len(records), 1)
         self.assertEqual(next_index, 1)
 
-        is_legit = _check_legitimate_empty_page(request_record, page_html([]))
+        empty_html = page_html([])
+        empty_req, _, _ = _execute_page_request(
+            session=Session([Response(200, empty_html)]),
+            url="http://test.url",
+            headers={},
+            timeout=10,
+            max_attempts=1,
+            sleep=lambda _: None,
+            backoff_seconds=1.0,
+            active_run="run-test",
+            vehicle_key="ford_f350",
+            query=query,
+            page=1,
+        )
+        is_legit = _check_legitimate_empty_page(empty_req, empty_html)
         self.assertTrue(is_legit)
 
 

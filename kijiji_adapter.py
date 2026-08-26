@@ -501,6 +501,68 @@ def _execute_page_request(
         return request_record, [], None
 
 
+def _process_single_item(
+    item: Any,
+    *,
+    item_index: int,
+    source_index: int,
+    config: dict[str, Any],
+    tiers: dict[str, list[str]],
+    query: dict[str, Any],
+    page: int,
+    url: str,
+    active_run: str,
+    first_identity: dict[str, int],
+) -> dict[str, Any]:
+    provenance = {
+        "query_location": query["config_label"],
+        "query_display_name": query["display_name"],
+        "query_location_id": query["location_id"],
+        "query_slug": query["slug"],
+        "query_page": page,
+        "request_url": url,
+        "response_item_index": item_index,
+    }
+    adapter_record: dict[str, Any] = {
+        "adapter_schema_version": ADAPTER_SCHEMA_VERSION,
+        "run_id": active_run,
+        "vehicle_key": config["vehicle_key"],
+        "source": "kijiji",
+        "source_record_index": source_index,
+        "record_stage": "parse_failure",
+        "raw_payload": item,
+        "provenance": provenance,
+        "parsed_row": None,
+        "rejection_reasons": [],
+        "parse_failure_reasons": [],
+    }
+    if not isinstance(item, dict):
+        adapter_record["parse_failure_reasons"] = ["listing_payload_not_object"]
+        return adapter_record
+
+    parsed, rejections, parse_failures = parse_listing(
+        item,
+        config=config,
+        tiers=tiers,
+        provenance=provenance,
+    )
+    if parse_failures:
+        adapter_record["parse_failure_reasons"] = parse_failures
+        return adapter_record
+
+    adapter_record["parsed_row"] = parsed
+    identity = str(parsed.get("listing_id") or parsed.get("url") or "")
+    if identity and identity in first_identity:
+        rejections = sorted({*rejections, "duplicate_source_listing_identity"})
+        adapter_record["duplicate_of_source_record_index"] = first_identity[identity]
+    elif identity:
+        first_identity[identity] = source_index
+
+    adapter_record["rejection_reasons"] = rejections
+    adapter_record["record_stage"] = "rejected" if rejections else "accepted"
+    return adapter_record
+
+
 def _process_page_items(
     items: list[Any],
     *,
@@ -516,57 +578,18 @@ def _process_page_items(
     records: list[dict[str, Any]] = []
     source_index = source_index_start
     for item_index, item in enumerate(items):
-        provenance = {
-            "query_location": query["config_label"],
-            "query_display_name": query["display_name"],
-            "query_location_id": query["location_id"],
-            "query_slug": query["slug"],
-            "query_page": page,
-            "request_url": url,
-            "response_item_index": item_index,
-        }
-        adapter_record: dict[str, Any] = {
-            "adapter_schema_version": ADAPTER_SCHEMA_VERSION,
-            "run_id": active_run,
-            "vehicle_key": config["vehicle_key"],
-            "source": "kijiji",
-            "source_record_index": source_index,
-            "record_stage": "parse_failure",
-            "raw_payload": item,
-            "provenance": provenance,
-            "parsed_row": None,
-            "rejection_reasons": [],
-            "parse_failure_reasons": [],
-        }
-        if not isinstance(item, dict):
-            adapter_record["parse_failure_reasons"] = [
-                "listing_payload_not_object"
-            ]
-        else:
-            parsed, rejections, parse_failures = parse_listing(
-                item,
-                config=config,
-                tiers=tiers,
-                provenance=provenance,
-            )
-            if parse_failures:
-                adapter_record["parse_failure_reasons"] = parse_failures
-            else:
-                adapter_record["parsed_row"] = parsed
-                identity = str(parsed.get("listing_id") or parsed.get("url") or "")
-                if identity and identity in first_identity:
-                    rejections = sorted(
-                        {*rejections, "duplicate_source_listing_identity"}
-                    )
-                    adapter_record["duplicate_of_source_record_index"] = (
-                        first_identity[identity]
-                    )
-                elif identity:
-                    first_identity[identity] = source_index
-                adapter_record["rejection_reasons"] = rejections
-                adapter_record["record_stage"] = (
-                    "rejected" if rejections else "accepted"
-                )
+        adapter_record = _process_single_item(
+            item,
+            item_index=item_index,
+            source_index=source_index,
+            config=config,
+            tiers=tiers,
+            query=query,
+            page=page,
+            url=url,
+            active_run=active_run,
+            first_identity=first_identity,
+        )
         records.append(adapter_record)
         source_index += 1
     return records, source_index
@@ -581,10 +604,10 @@ def _check_legitimate_empty_page(
     )
     return (
         not diag.get("block_markers")
-        and bool(diag.get("next_data_present"))
         and not request_record.get("json_ld_errors")
         and (
-            bool(diag.get("item_list_marker_present"))
+            bool(diag.get("next_data_present"))
+            or bool(diag.get("item_list_marker_present"))
             or int(diag.get("json_ld_script_count") or 0) > 0
         )
     )
