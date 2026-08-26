@@ -435,205 +435,174 @@ def default_session() -> SessionLike:
     return requests.Session()
 
 
-def collect_kijiji(
+def _execute_page_request(
+    session: SessionLike,
     *,
-    root: Path,
-    config_path: Path,
-    run_id: str | None = None,
-    session: SessionLike | None = None,
-    sleep: Callable[[float], None] = time.sleep,
-    page_size: int = DEFAULT_PAGE_SIZE,
-    max_pages: int = DEFAULT_MAX_PAGES,
-    request_timeout_seconds: float = 20.0,
-    max_attempts: int = 3,
-    backoff_seconds: float = 1.0,
-) -> dict[str, Any]:
-    root = root.resolve()
-    config_path = config_path if config_path.is_absolute() else root / config_path
-    config = load_vehicle_config(config_path)
-    active_run = run_id or os.environ.get("GITHUB_RUN_ID", "local")
-    session = session or default_session()
-    tiers = load_trim_tiers(root, str(config["vehicle_key"]))
-    source_config = config["sources"]["kijiji"]
-    query_plan = validate_query_locations(source_config["search_locations"])
-    headers = chrome_desktop_headers()
-    requests_evidence: list[dict[str, Any]] = []
+    url: str,
+    headers: dict[str, str],
+    timeout: float,
+    max_attempts: int,
+    sleep: Callable[[float], None],
+    backoff_seconds: float,
+    active_run: str,
+    vehicle_key: str,
+    query: dict[str, Any],
+    page: int,
+) -> tuple[dict[str, Any], list[Any], str | None]:
+    request_record: dict[str, Any] = {
+        "adapter_schema_version": ADAPTER_SCHEMA_VERSION,
+        "run_id": active_run,
+        "vehicle_key": vehicle_key,
+        "source": "kijiji",
+        "query_location": query["config_label"],
+        "query_display_name": query["display_name"],
+        "query_location_id": query["location_id"],
+        "query_slug": query["slug"],
+        "query_page": page,
+        "request_url": url,
+        "attempts": [],
+        "http_status": None,
+        "returned_listing_objects": 0,
+        "json_ld_errors": [],
+        "page_status": "failed",
+        "stop_reason": None,
+    }
+    try:
+        response, attempts = request_with_retry(
+            session,
+            url=url,
+            headers=headers,
+            timeout=timeout,
+            max_attempts=max_attempts,
+            sleep=sleep,
+            backoff_seconds=backoff_seconds,
+        )
+        request_record["attempts"] = attempts
+        request_record["http_status"] = int(response.status_code)
+        items, json_errors = extract_page_payload(response.text)
+        request_record["json_ld_errors"] = json_errors
+        request_record["response_diagnostics"] = summarize_kijiji_html(
+            response.text
+        )
+        return request_record, items, response.text
+    except Exception as exc:
+        request_record["attempts"] = (
+            exc.attempts
+            if isinstance(exc, RequestFailure)
+            else [
+                {
+                    "attempt": None,
+                    "http_status": None,
+                    "error": f"{type(exc).__name__}: {exc}",
+                }
+            ]
+        )
+        request_record["stop_reason"] = "request_or_payload_failure"
+        return request_record, [], None
+
+
+def _process_page_items(
+    items: list[Any],
+    *,
+    config: dict[str, Any],
+    tiers: dict[str, list[str]],
+    query: dict[str, Any],
+    page: int,
+    url: str,
+    active_run: str,
+    first_identity: dict[str, int],
+    source_index_start: int,
+) -> tuple[list[dict[str, Any]], int]:
     records: list[dict[str, Any]] = []
-    first_identity: dict[str, int] = {}
-    pagination_complete = True
-    source_index = 0
-
-    for query in query_plan:
-        previous_fingerprint: str | None = None
-        query_complete = False
-        for page in range(1, max_pages + 1):
-            url = build_search_url(
-                make=source_config["make"],
-                model=source_config["model"],
-                query_location=query,
-                page=page,
+    source_index = source_index_start
+    for item_index, item in enumerate(items):
+        provenance = {
+            "query_location": query["config_label"],
+            "query_display_name": query["display_name"],
+            "query_location_id": query["location_id"],
+            "query_slug": query["slug"],
+            "query_page": page,
+            "request_url": url,
+            "response_item_index": item_index,
+        }
+        adapter_record: dict[str, Any] = {
+            "adapter_schema_version": ADAPTER_SCHEMA_VERSION,
+            "run_id": active_run,
+            "vehicle_key": config["vehicle_key"],
+            "source": "kijiji",
+            "source_record_index": source_index,
+            "record_stage": "parse_failure",
+            "raw_payload": item,
+            "provenance": provenance,
+            "parsed_row": None,
+            "rejection_reasons": [],
+            "parse_failure_reasons": [],
+        }
+        if not isinstance(item, dict):
+            adapter_record["parse_failure_reasons"] = [
+                "listing_payload_not_object"
+            ]
+        else:
+            parsed, rejections, parse_failures = parse_listing(
+                item,
+                config=config,
+                tiers=tiers,
+                provenance=provenance,
             )
-            request_record: dict[str, Any] = {
-                "adapter_schema_version": ADAPTER_SCHEMA_VERSION,
-                "run_id": active_run,
-                "vehicle_key": config["vehicle_key"],
-                "source": "kijiji",
-                "query_location": query["config_label"],
-                "query_display_name": query["display_name"],
-                "query_location_id": query["location_id"],
-                "query_slug": query["slug"],
-                "query_page": page,
-                "request_url": url,
-                "attempts": [],
-                "http_status": None,
-                "returned_listing_objects": 0,
-                "json_ld_errors": [],
-                "page_status": "failed",
-                "stop_reason": None,
-            }
-            try:
-                response, attempts = request_with_retry(
-                    session,
-                    url=url,
-                    headers=headers,
-                    timeout=request_timeout_seconds,
-                    max_attempts=max_attempts,
-                    sleep=sleep,
-                    backoff_seconds=backoff_seconds,
-                )
-                request_record["attempts"] = attempts
-                request_record["http_status"] = int(response.status_code)
-                items, json_errors = extract_page_payload(response.text)
-                request_record["json_ld_errors"] = json_errors
-                request_record["response_diagnostics"] = summarize_kijiji_html(
-                    response.text
-                )
-            except Exception as exc:
-                request_record["attempts"] = (
-                    exc.attempts
-                    if isinstance(exc, RequestFailure)
-                    else [
-                        {
-                            "attempt": None,
-                            "http_status": None,
-                            "error": f"{type(exc).__name__}: {exc}",
-                        }
-                    ]
-                )
-                request_record["stop_reason"] = "request_or_payload_failure"
-                requests_evidence.append(request_record)
-                pagination_complete = False
-                break
-
-            fingerprint = hashlib.sha256(
-                json.dumps(items, sort_keys=True, default=str).encode("utf-8")
-            ).hexdigest()
-            if previous_fingerprint is not None and fingerprint == previous_fingerprint and items:
-                request_record.update(
-                    page_status="failed",
-                    returned_listing_objects=len(items),
-                    stop_reason="repeated_page_payload",
-                )
-                requests_evidence.append(request_record)
-                pagination_complete = False
-                break
-            previous_fingerprint = fingerprint
-            request_record["page_status"] = "success"
-            request_record["returned_listing_objects"] = len(items)
-
-            for item_index, item in enumerate(items):
-                provenance = {
-                    "query_location": query["config_label"],
-                    "query_display_name": query["display_name"],
-                    "query_location_id": query["location_id"],
-                    "query_slug": query["slug"],
-                    "query_page": page,
-                    "request_url": url,
-                    "response_item_index": item_index,
-                }
-                adapter_record: dict[str, Any] = {
-                    "adapter_schema_version": ADAPTER_SCHEMA_VERSION,
-                    "run_id": active_run,
-                    "vehicle_key": config["vehicle_key"],
-                    "source": "kijiji",
-                    "source_record_index": source_index,
-                    "record_stage": "parse_failure",
-                    "raw_payload": item,
-                    "provenance": provenance,
-                    "parsed_row": None,
-                    "rejection_reasons": [],
-                    "parse_failure_reasons": [],
-                }
-                if not isinstance(item, dict):
-                    adapter_record["parse_failure_reasons"] = [
-                        "listing_payload_not_object"
-                    ]
-                else:
-                    parsed, rejections, parse_failures = parse_listing(
-                        item,
-                        config=config,
-                        tiers=tiers,
-                        provenance=provenance,
+            if parse_failures:
+                adapter_record["parse_failure_reasons"] = parse_failures
+            else:
+                adapter_record["parsed_row"] = parsed
+                identity = str(parsed.get("listing_id") or parsed.get("url") or "")
+                if identity and identity in first_identity:
+                    rejections = sorted(
+                        set([*rejections, "duplicate_source_listing_identity"])
                     )
-                    if parse_failures:
-                        adapter_record["parse_failure_reasons"] = parse_failures
-                    else:
-                        adapter_record["parsed_row"] = parsed
-                        identity = str(parsed.get("listing_id") or parsed.get("url") or "")
-                        if identity and identity in first_identity:
-                            rejections = sorted(
-                                set([*rejections, "duplicate_source_listing_identity"])
-                            )
-                            adapter_record["duplicate_of_source_record_index"] = (
-                                first_identity[identity]
-                            )
-                        elif identity:
-                            first_identity[identity] = source_index
-                        adapter_record["rejection_reasons"] = rejections
-                        adapter_record["record_stage"] = (
-                            "rejected" if rejections else "accepted"
-                        )
-                records.append(adapter_record)
-                source_index += 1
+                    adapter_record["duplicate_of_source_record_index"] = (
+                        first_identity[identity]
+                    )
+                elif identity:
+                    first_identity[identity] = source_index
+                adapter_record["rejection_reasons"] = rejections
+                adapter_record["record_stage"] = (
+                    "rejected" if rejections else "accepted"
+                )
+        records.append(adapter_record)
+        source_index += 1
+    return records, source_index
 
-            if not items:
-                request_record["stop_reason"] = "empty_page"
-                query_complete = True
-                requests_evidence.append(request_record)
-                break
-            if len(items) < page_size:
-                request_record["stop_reason"] = "short_page"
-                query_complete = True
-                requests_evidence.append(request_record)
-                break
-            requests_evidence.append(request_record)
-        if not query_complete:
-            pagination_complete = False
 
-    accepted_rows = [
-        record["parsed_row"]
-        for record in records
-        if record["record_stage"] == "accepted"
-        and isinstance(record.get("parsed_row"), dict)
-    ]
-    accepted_rows.sort(
-        key=lambda row: (
-            int(row.get("year") or 0),
-            int(row.get("price") or 0),
-            int(row.get("mileage") or 999999),
-            str(row.get("listing_id") or ""),
+def _check_legitimate_empty_page(
+    request_record: dict[str, Any],
+    response_text: str,
+) -> bool:
+    diag = request_record.get("response_diagnostics") or summarize_kijiji_html(
+        response_text
+    )
+    return (
+        not diag.get("block_markers")
+        and bool(diag.get("next_data_present"))
+        and not request_record.get("json_ld_errors")
+        and (
+            bool(diag.get("item_list_marker_present"))
+            or int(diag.get("json_ld_script_count") or 0) > 0
         )
     )
-    apply_price_history(root, config, accepted_rows)
-    archive, latest = write_csv_outputs(root, config, accepted_rows)
 
-    paths = artifact_paths(root, config)
-    write_jsonl(paths["requests"], requests_evidence)
-    for index, record in enumerate(records):
-        record["source_adapter_record_ref"] = (
-            f"{paths['records'].relative_to(root)}#source_record_index={index}"
-        )
-    write_jsonl(paths["records"], records)
+
+def _build_reconciliation_report(
+    *,
+    root: Path,
+    config: dict[str, Any],
+    active_run: str,
+    query_plan: list[dict[str, Any]],
+    requests_evidence: list[dict[str, Any]],
+    records: list[dict[str, Any]],
+    pagination_complete: bool,
+    latest: Path,
+    archive: Path,
+    paths: dict[str, Path],
+) -> dict[str, Any]:
     accepted = sum(record["record_stage"] == "accepted" for record in records)
     rejected = sum(record["record_stage"] == "rejected" for record in records)
     parse_failures = sum(
@@ -695,6 +664,210 @@ def collect_kijiji(
         f"| pagination_complete={pagination_complete}"
     )
     return report
+
+
+def _collect_location_query(
+    session: SessionLike,
+    *,
+    headers: dict[str, str],
+    source_config: dict[str, Any],
+    query: dict[str, Any],
+    max_pages: int,
+    page_size: int,
+    request_timeout_seconds: float,
+    max_attempts: int,
+    sleep: Callable[[float], None],
+    backoff_seconds: float,
+    active_run: str,
+    config: dict[str, Any],
+    tiers: dict[str, list[str]],
+    first_identity: dict[str, int],
+    source_index_start: int,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], int, bool]:
+    requests_evidence: list[dict[str, Any]] = []
+    records: list[dict[str, Any]] = []
+    source_index = source_index_start
+    previous_fingerprint: str | None = None
+    query_complete = False
+
+    for page in range(1, max_pages + 1):
+        url = build_search_url(
+            make=source_config["make"],
+            model=source_config["model"],
+            query_location=query,
+            page=page,
+        )
+        request_record, items, response_text = _execute_page_request(
+            session,
+            url=url,
+            headers=headers,
+            timeout=request_timeout_seconds,
+            max_attempts=max_attempts,
+            sleep=sleep,
+            backoff_seconds=backoff_seconds,
+            active_run=active_run,
+            vehicle_key=str(config["vehicle_key"]),
+            query=query,
+            page=page,
+        )
+        if response_text is None:
+            requests_evidence.append(request_record)
+            break
+
+        fingerprint = hashlib.sha256(
+            json.dumps(items, sort_keys=True, default=str).encode("utf-8")
+        ).hexdigest()
+        if previous_fingerprint is not None and fingerprint == previous_fingerprint and items:
+            request_record.update(
+                page_status="failed",
+                returned_listing_objects=len(items),
+                stop_reason="repeated_page_payload",
+            )
+            requests_evidence.append(request_record)
+            break
+        previous_fingerprint = fingerprint
+        request_record["page_status"] = "success"
+        request_record["returned_listing_objects"] = len(items)
+
+        new_records, source_index = _process_page_items(
+            items,
+            config=config,
+            tiers=tiers,
+            query=query,
+            page=page,
+            url=url,
+            active_run=active_run,
+            first_identity=first_identity,
+            source_index_start=source_index,
+        )
+        records.extend(new_records)
+
+        if not items:
+            if not _check_legitimate_empty_page(request_record, response_text):
+                request_record["page_status"] = "failed"
+                request_record["stop_reason"] = "suspected_block"
+                requests_evidence.append(request_record)
+                break
+
+            request_record["stop_reason"] = "empty_page"
+            query_complete = True
+            requests_evidence.append(request_record)
+            break
+        if len(items) < page_size:
+            request_record["stop_reason"] = "short_page"
+            query_complete = True
+            requests_evidence.append(request_record)
+            break
+        requests_evidence.append(request_record)
+
+    return requests_evidence, records, source_index, query_complete
+
+
+def collect_kijiji(
+    *,
+    root: Path,
+    config_path: Path,
+    run_id: str | None = None,
+    session: SessionLike | None = None,
+    sleep: Callable[[float], None] = time.sleep,
+    page_size: int = DEFAULT_PAGE_SIZE,
+    max_pages: int = DEFAULT_MAX_PAGES,
+    request_timeout_seconds: float = 20.0,
+    max_attempts: int = 3,
+    backoff_seconds: float = 1.0,
+) -> dict[str, Any]:
+    root = root.resolve()
+    config_path = config_path if config_path.is_absolute() else root / config_path
+    config = load_vehicle_config(config_path)
+    active_run = run_id or os.environ.get("GITHUB_RUN_ID", "local")
+    session = session or default_session()
+    tiers = load_trim_tiers(root, str(config["vehicle_key"]))
+    source_config = config["sources"]["kijiji"]
+    query_plan = validate_query_locations(source_config["search_locations"])
+    headers = chrome_desktop_headers()
+    requests_evidence: list[dict[str, Any]] = []
+    records: list[dict[str, Any]] = []
+    first_identity: dict[str, int] = {}
+    pagination_complete = True
+    source_index = 0
+
+    for query in query_plan:
+        location_requests, location_records, source_index, query_complete = (
+            _collect_location_query(
+                session,
+                headers=headers,
+                source_config=source_config,
+                query=query,
+                max_pages=max_pages,
+                page_size=page_size,
+                request_timeout_seconds=request_timeout_seconds,
+                max_attempts=max_attempts,
+                sleep=sleep,
+                backoff_seconds=backoff_seconds,
+                active_run=active_run,
+                config=config,
+                tiers=tiers,
+                first_identity=first_identity,
+                source_index_start=source_index,
+            )
+        )
+        requests_evidence.extend(location_requests)
+        records.extend(location_records)
+        if not query_complete:
+            pagination_complete = False
+
+    archive, latest = _process_accepted_rows(root, config, records)
+    paths = _write_evidence_artifacts(root, config, requests_evidence, records)
+
+    return _build_reconciliation_report(
+        root=root,
+        config=config,
+        active_run=active_run,
+        query_plan=query_plan,
+        requests_evidence=requests_evidence,
+        records=records,
+        pagination_complete=pagination_complete,
+        latest=latest,
+        archive=archive,
+        paths=paths,
+    )
+
+
+def _process_accepted_rows(
+    root: Path, config: dict[str, Any], records: list[dict[str, Any]]
+) -> tuple[Path, Path]:
+    accepted_rows = [
+        record["parsed_row"]
+        for record in records
+        if record["record_stage"] == "accepted"
+        and isinstance(record.get("parsed_row"), dict)
+    ]
+    accepted_rows.sort(
+        key=lambda row: (
+            int(row.get("year") or 0),
+            int(row.get("price") or 0),
+            int(row.get("mileage") or 999999),
+            str(row.get("listing_id") or ""),
+        )
+    )
+    apply_price_history(root, config, accepted_rows)
+    return write_csv_outputs(root, config, accepted_rows)
+
+
+def _write_evidence_artifacts(
+    root: Path,
+    config: dict[str, Any],
+    requests_evidence: list[dict[str, Any]],
+    records: list[dict[str, Any]],
+) -> dict[str, Path]:
+    paths = artifact_paths(root, config)
+    write_jsonl(paths["requests"], requests_evidence)
+    for index, record in enumerate(records):
+        record["source_adapter_record_ref"] = (
+            f"{paths['records'].relative_to(root)}#source_record_index={index}"
+        )
+    write_jsonl(paths["records"], records)
+    return paths
 
 
 def parser() -> argparse.ArgumentParser:
