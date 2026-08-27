@@ -185,7 +185,7 @@ class KijijiAdapterTests(unittest.TestCase):
         with (self.root / report["latest_output"]).open(
             encoding="utf-8", newline=""
         ) as handle:
-            header = next(csv.reader(handle))
+            header = next(csv.reader(handle), [])
         self.assertNotIn("rank", header)
         self.assertNotIn("score", header)
         self.assertIn("query_location_id", header)
