@@ -608,7 +608,6 @@ def _check_legitimate_empty_page(
         and (
             bool(diag.get("next_data_present"))
             or bool(diag.get("item_list_marker_present"))
-            or int(diag.get("json_ld_script_count") or 0) > 0
         )
     )
 

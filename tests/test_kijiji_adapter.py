@@ -266,14 +266,32 @@ class KijijiAdapterTests(unittest.TestCase):
         self.assertTrue(report["pagination_complete"])
         self.assertEqual(report["successful_page_count"], 1)
         self.assertEqual(report["failed_page_count"], 0)
+
+    def test_unrelated_json_ld_without_item_list_fails_as_suspected_block(self):
+        unrelated_jsonld = (
+            '<html><head><script type="application/ld+json">'
+            '{"@type": "Organization", "name": "Kijiji"}'
+            '</script></head></html>'
+        )
+        session = Session([Response(200, unrelated_jsonld)])
+        report = collect_kijiji(
+            root=self.root,
+            config_path=self.config_path,
+            run_id="run-unrelated-jsonld",
+            session=session,
+            sleep=lambda _seconds: None,
+        )
+        self.assertFalse(report["pagination_complete"])
+        self.assertEqual(report["successful_page_count"], 0)
+        self.assertEqual(report["failed_page_count"], 1)
         requests = [
             json.loads(line)
             for line in (
                 self.root / report["artifacts"]["requests"]
             ).read_text(encoding="utf-8").splitlines()
         ]
-        self.assertEqual(requests[0]["page_status"], "success")
-        self.assertEqual(requests[0]["stop_reason"], "empty_page")
+        self.assertEqual(requests[0]["page_status"], "failed")
+        self.assertEqual(requests[0]["stop_reason"], "suspected_block")
 
     def test_explicit_block_marker_fails_with_suspected_block(self):
         block_page = (
