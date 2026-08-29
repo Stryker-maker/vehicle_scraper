@@ -268,7 +268,7 @@ class KijijiAdapterTests(unittest.TestCase):
         self.assertEqual(report["failed_page_count"], 0)
 
     def test_request_failure_yields_failed_page_and_incomplete_pagination(self):
-        session = Session([RuntimeError("Network error")])
+        session = Session([RuntimeError("Network error")] * 3)
         report = collect_kijiji(
             root=self.root,
             config_path=self.config_path,
@@ -279,6 +279,7 @@ class KijijiAdapterTests(unittest.TestCase):
         self.assertFalse(report["pagination_complete"])
         self.assertEqual(report["successful_page_count"], 0)
         self.assertEqual(report["failed_page_count"], 1)
+        self.assertEqual(report["request_attempt_count"], 3)
         requests = [
             json.loads(line)
             for line in (
@@ -287,6 +288,7 @@ class KijijiAdapterTests(unittest.TestCase):
         ]
         self.assertEqual(requests[0]["page_status"], "failed")
         self.assertEqual(requests[0]["stop_reason"], "request_or_payload_failure")
+        self.assertEqual(len(requests[0]["attempts"]), 3)
         self.assertIn("RuntimeError: Network error", requests[0]["attempts"][0]["error"])
 
     def test_unrelated_json_ld_without_item_list_fails_as_suspected_block(self):
