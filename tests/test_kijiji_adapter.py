@@ -12,6 +12,9 @@ from kijiji_adapter import (
     collect_kijiji,
     extract_page_payload,
     parse_listing,
+    _execute_page_request,
+    _process_page_items,
+    _check_legitimate_empty_page,
 )
 from kijiji_locations import query_location, validate_query_locations
 
@@ -76,9 +79,10 @@ def page_html(items):
         "itemListElement": [{"item": item} for item in items],
     }
     return (
-        '<html><script type="application/ld+json">'
+        '<html><head><script id="__NEXT_DATA__" type="application/json">{}</script>'
+        '<script type="application/ld+json">'
         + json.dumps(payload)
-        + "</script></html>"
+        + "</script></head></html>"
     )
 
 
@@ -181,7 +185,7 @@ class KijijiAdapterTests(unittest.TestCase):
         with (self.root / report["latest_output"]).open(
             encoding="utf-8", newline=""
         ) as handle:
-            header = next(csv.reader(handle))
+            header = next(csv.reader(handle), [])
         self.assertNotIn("rank", header)
         self.assertNotIn("score", header)
         self.assertIn("query_location_id", header)
@@ -248,6 +252,243 @@ class KijijiAdapterTests(unittest.TestCase):
             "listing_payload_not_object",
             records[3]["parse_failure_reasons"],
         )
+
+    def test_legitimate_empty_terminal_page_succeeds(self):
+        empty_page = page_html([])
+        session = Session([Response(200, empty_page)])
+        report = collect_kijiji(
+            root=self.root,
+            config_path=self.config_path,
+            run_id="run-empty",
+            session=session,
+            sleep=lambda _seconds: None,
+        )
+        self.assertTrue(report["pagination_complete"])
+        self.assertEqual(report["successful_page_count"], 1)
+        self.assertEqual(report["failed_page_count"], 0)
+
+    def test_request_failure_yields_failed_page_and_incomplete_pagination(self):
+        session = Session([RuntimeError("Network error")] * 3)
+        report = collect_kijiji(
+            root=self.root,
+            config_path=self.config_path,
+            run_id="run-request-failure",
+            session=session,
+            sleep=lambda _seconds: None,
+        )
+        self.assertFalse(report["pagination_complete"])
+        self.assertEqual(report["successful_page_count"], 0)
+        self.assertEqual(report["failed_page_count"], 1)
+        self.assertEqual(report["request_attempt_count"], 3)
+        requests = [
+            json.loads(line)
+            for line in (
+                self.root / report["artifacts"]["requests"]
+            ).read_text(encoding="utf-8").splitlines()
+        ]
+        self.assertEqual(requests[0]["page_status"], "failed")
+        self.assertEqual(requests[0]["stop_reason"], "request_or_payload_failure")
+        self.assertEqual(len(requests[0]["attempts"]), 3)
+        self.assertIn("RuntimeError: Network error", requests[0]["attempts"][0]["error"])
+
+    def test_unrelated_json_ld_without_item_list_fails_as_suspected_block(self):
+        unrelated_jsonld = (
+            '<html><head><script type="application/ld+json">'
+            '{"@type": "Organization", "name": "Kijiji"}'
+            '</script></head></html>'
+        )
+        session = Session([Response(200, unrelated_jsonld)])
+        report = collect_kijiji(
+            root=self.root,
+            config_path=self.config_path,
+            run_id="run-unrelated-jsonld",
+            session=session,
+            sleep=lambda _seconds: None,
+        )
+        self.assertFalse(report["pagination_complete"])
+        self.assertEqual(report["successful_page_count"], 0)
+        self.assertEqual(report["failed_page_count"], 1)
+        requests = [
+            json.loads(line)
+            for line in (
+                self.root / report["artifacts"]["requests"]
+            ).read_text(encoding="utf-8").splitlines()
+        ]
+        self.assertEqual(requests[0]["page_status"], "failed")
+        self.assertEqual(requests[0]["stop_reason"], "suspected_block")
+
+    def test_explicit_block_marker_fails_with_suspected_block(self):
+        block_page = (
+            "<html><head><title>Access Denied</title></head>"
+            "<body>Please complete the CAPTCHA to verify you are human.</body></html>"
+        )
+        session = Session([Response(200, block_page)])
+        report = collect_kijiji(
+            root=self.root,
+            config_path=self.config_path,
+            run_id="run-block",
+            session=session,
+            sleep=lambda _seconds: None,
+        )
+        self.assertFalse(report["pagination_complete"])
+        self.assertEqual(report["successful_page_count"], 0)
+        self.assertEqual(report["failed_page_count"], 1)
+        requests = [
+            json.loads(line)
+            for line in (
+                self.root / report["artifacts"]["requests"]
+            ).read_text(encoding="utf-8").splitlines()
+        ]
+        self.assertEqual(requests[0]["page_status"], "failed")
+        self.assertEqual(requests[0]["stop_reason"], "suspected_block")
+
+    def test_malformed_json_ld_with_next_data_fails_with_suspected_block(self):
+        malformed_page = (
+            '<html><head><script id="__NEXT_DATA__" type="application/json">{}</script>'
+            '<script type="application/ld+json">{invalid json}</script></head></html>'
+        )
+        session = Session([Response(200, malformed_page)])
+        report = collect_kijiji(
+            root=self.root,
+            config_path=self.config_path,
+            run_id="run-malformed-jsonld",
+            session=session,
+            sleep=lambda _seconds: None,
+        )
+        self.assertFalse(report["pagination_complete"])
+        self.assertEqual(report["successful_page_count"], 0)
+        self.assertEqual(report["failed_page_count"], 1)
+        requests = [
+            json.loads(line)
+            for line in (
+                self.root / report["artifacts"]["requests"]
+            ).read_text(encoding="utf-8").splitlines()
+        ]
+        self.assertEqual(requests[0]["page_status"], "failed")
+        self.assertEqual(requests[0]["stop_reason"], "suspected_block")
+        self.assertEqual(requests[0]["json_ld_errors"], ["invalid_json_ld_script:0"])
+
+    def test_structurally_suspicious_empty_page_fails_with_suspected_block(self):
+        suspicious_page = "<html><head><title>Blank</title></head><body>Nothing here</body></html>"
+        session = Session([Response(200, suspicious_page)])
+        report = collect_kijiji(
+            root=self.root,
+            config_path=self.config_path,
+            run_id="run-suspicious",
+            session=session,
+            sleep=lambda _seconds: None,
+        )
+        self.assertFalse(report["pagination_complete"])
+        self.assertEqual(report["successful_page_count"], 0)
+        self.assertEqual(report["failed_page_count"], 1)
+        requests = [
+            json.loads(line)
+            for line in (
+                self.root / report["artifacts"]["requests"]
+            ).read_text(encoding="utf-8").splitlines()
+        ]
+        self.assertEqual(requests[0]["page_status"], "failed")
+        self.assertEqual(requests[0]["stop_reason"], "suspected_block")
+
+    def test_populated_page_followed_by_empty_terminal_page(self):
+        populated_page = page_html([listing("1"), listing("2")])
+        empty_page = page_html([])
+        session = Session([Response(200, populated_page), Response(200, empty_page)])
+        report = collect_kijiji(
+            root=self.root,
+            config_path=self.config_path,
+            run_id="run-populated",
+            session=session,
+            sleep=lambda _seconds: None,
+            page_size=2,
+        )
+        self.assertTrue(report["pagination_complete"])
+        self.assertEqual(report["successful_page_count"], 2)
+        self.assertEqual(report["failed_page_count"], 0)
+        requests = [
+            json.loads(line)
+            for line in (
+                self.root / report["artifacts"]["requests"]
+            ).read_text(encoding="utf-8").splitlines()
+        ]
+        self.assertEqual(requests[0]["page_status"], "success")
+        self.assertEqual(requests[1]["page_status"], "success")
+        self.assertEqual(requests[1]["stop_reason"], "empty_page")
+
+    def test_empty_json_ld_item_list_without_next_data_succeeds(self):
+        empty_jsonld_only = (
+            '<html><head><script type="application/ld+json">'
+            '{"@type": "ItemList", "itemListElement": []}'
+            '</script></head></html>'
+        )
+        session = Session([Response(200, empty_jsonld_only)])
+        report = collect_kijiji(
+            root=self.root,
+            config_path=self.config_path,
+            run_id="run-empty-jsonld-only",
+            session=session,
+            sleep=lambda _seconds: None,
+        )
+        self.assertTrue(report["pagination_complete"])
+        self.assertEqual(report["successful_page_count"], 1)
+        self.assertEqual(report["failed_page_count"], 0)
+
+    def test_internal_helpers_behave_as_expected(self):
+        query = {
+            "config_label": "Edmonton, AB",
+            "display_name": "Edmonton, AB",
+            "location_id": "1700202",
+            "slug": "edmonton-area",
+        }
+        html = page_html([listing("100")])
+        session = Session([Response(200, html)])
+        request_record, items, text = _execute_page_request(
+            session,
+            url="http://test.url",
+            headers={},
+            timeout=10,
+            max_attempts=1,
+            sleep=lambda _: None,
+            backoff_seconds=1.0,
+            active_run="run-test",
+            vehicle_key="ford_f350",
+            query=query,
+            page=1,
+        )
+        self.assertEqual(request_record["http_status"], 200)
+        self.assertEqual(len(items), 1)
+        self.assertEqual(text, html)
+
+        records, next_index = _process_page_items(
+            items,
+            config=self.config,
+            tiers={"tier1": [], "tier2": [], "tier3": []},
+            query=query,
+            page=1,
+            url="http://test.url",
+            active_run="run-test",
+            first_identity={},
+            source_index_start=0,
+        )
+        self.assertEqual(len(records), 1)
+        self.assertEqual(next_index, 1)
+
+        empty_html = page_html([])
+        empty_req, _, _ = _execute_page_request(
+            session=Session([Response(200, empty_html)]),
+            url="http://test.url",
+            headers={},
+            timeout=10,
+            max_attempts=1,
+            sleep=lambda _: None,
+            backoff_seconds=1.0,
+            active_run="run-test",
+            vehicle_key="ford_f350",
+            query=query,
+            page=1,
+        )
+        is_legit = _check_legitimate_empty_page(empty_req, empty_html)
+        self.assertTrue(is_legit)
 
 
 if __name__ == "__main__":
