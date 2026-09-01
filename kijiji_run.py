@@ -33,6 +33,7 @@ from vehicle_config import CONFIG_SCHEMA_VERSION, load_vehicle_config
 
 SOURCE_STATUS_SCHEMA_VERSION = 8
 COLLECTION_SCOPE = "full"
+VALID_COLLECTION_SCOPES = ("full", "single_pair")
 
 
 def _empty_evidence() -> dict[str, Any]:
@@ -88,10 +89,13 @@ def run_kijiji(
     config_path = config_path if config_path.is_absolute() else root / config_path
     original_config = config_path.read_bytes()
     config = load_vehicle_config(config_path)
+    collection_scope = os.environ.get("COLLECTION_SCOPE", COLLECTION_SCOPE)
+    if collection_scope not in VALID_COLLECTION_SCOPES:
+        raise ValueError(f"Unsupported collection scope: {collection_scope}")
     compatibility_identity, compatibility_fingerprint = build_compatibility_fingerprint(
         config=config,
         source="kijiji",
-        collection_scope=COLLECTION_SCOPE,
+        collection_scope=collection_scope,
         adapter_schema_version=ADAPTER_SCHEMA_VERSION,
     )
     active_run = run_id or os.environ.get("GITHUB_RUN_ID", "local")
@@ -264,7 +268,7 @@ def run_kijiji(
         "run_id": active_run,
         "vehicle_key": config["vehicle_key"],
         "source": "kijiji",
-        "collection_scope": COLLECTION_SCOPE,
+        "collection_scope": collection_scope,
         "compatibility_identity": compatibility_identity,
         "compatibility_fingerprint": compatibility_fingerprint,
         "config_path": str(config_path.relative_to(root)),
