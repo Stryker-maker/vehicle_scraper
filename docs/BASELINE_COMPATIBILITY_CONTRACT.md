@@ -22,6 +22,20 @@ A source collection is comparable when all required compatibility dimensions mat
 
 The compatibility identity must be deterministic. Equivalent semantic inputs must produce the same identity regardless of JSON key ordering or query-location ordering.
 
+## Compatibility fingerprint
+
+The implementation represents the compatibility identity as a JSON object and derives its fingerprint with SHA-256 over canonical JSON serialization. Canonical serialization uses:
+
+- UTF-8 encoded JSON
+- sorted object keys
+- compact separators (`,`, `:`)
+- deterministic scalar representations
+- query locations sorted case-insensitively before inclusion in the identity
+
+The resulting hexadecimal SHA-256 digest is the compatibility fingerprint. The hash is an identifier for the semantic contract; it is not a hash of the Python implementation or raw configuration file bytes.
+
+The identity retains its machine-readable fields alongside the fingerprint so a mismatch can later be explained without attempting to reverse the digest.
+
 ## Query locations
 
 Query locations are part of the collection population definition. The identity must use the effective validated locations, not merely the number of locations.
@@ -35,6 +49,8 @@ For governed Kijiji collection, the effective location identity includes the val
 Configuration compatibility is semantic rather than a raw file-byte comparison. Formatting-only changes must not invalidate an otherwise equivalent baseline.
 
 Fields that affect the collected population or acceptance behavior are compatibility inputs. Incidental representation details are not.
+
+The source-specific configuration is canonicalized as part of the identity, including its effective search locations. This keeps a change to an unrelated source from invalidating the baseline for the source being compared.
 
 ## Schema and implementation versions
 
