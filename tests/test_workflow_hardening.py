@@ -39,8 +39,7 @@ class WorkflowControlTests(unittest.TestCase):
     def test_full_and_single_pair_plans_are_registry_governed(self):
         root = Path(__file__).resolve().parents[1]
         import os
-        
-        # Test scheduled runs only collect weekly vehicles
+
         os.environ["GITHUB_EVENT_NAME"] = "schedule"
         full_schedule = build_collection_plan(
             root=root,
@@ -49,8 +48,7 @@ class WorkflowControlTests(unittest.TestCase):
         )
         self.assertEqual(len(full_schedule), 10)
         self.assertFalse(any("f150" in str(p) for p, _ in full_schedule))
-        
-        # Test manual runs collect all active vehicles
+
         os.environ["GITHUB_EVENT_NAME"] = "workflow_dispatch"
         full_manual = build_collection_plan(
             root=root,
@@ -59,9 +57,9 @@ class WorkflowControlTests(unittest.TestCase):
         )
         self.assertEqual(len(full_manual), 12)
         self.assertTrue(any("f150" in str(p) for p, _ in full_manual))
-        
+
         del os.environ["GITHUB_EVENT_NAME"]
-        
+
         single = build_collection_plan(
             root=root,
             scope="single_pair",
@@ -91,6 +89,7 @@ class AnomalyTests(unittest.TestCase):
             "fetched_record_count": fetched,
             "parse_failure_count": 0,
             "quality_warning_rows": 0,
+            "compatibility_fingerprint": "fingerprint-v1",
         }
         value.update(extra)
         return value
@@ -134,6 +133,54 @@ class AnomalyTests(unittest.TestCase):
         )
         self.assertEqual(report["anomaly_status"], "no_baseline")
         self.assertEqual(report["critical_anomaly_count"], 0)
+
+    def test_incompatible_baseline_cannot_drive_count_anomalies(self):
+        baseline = {
+            "run_id": "old",
+            "sources": [self.source(100, 400, compatibility_fingerprint="old-scope")],
+        }
+        current = {
+            "run_id": "new",
+            "sources": [self.source(5, 20)],
+        }
+        report = compare_health_reports(
+            baseline=baseline, current=current, run_id="new"
+        )
+        codes = {value["code"] for value in report["anomalies"]}
+        self.assertIn("baseline_incompatible", codes)
+        self.assertNotIn("accepted_record_count_collapse", codes)
+        self.assertNotIn("fetched_record_count_collapse", codes)
+        self.assertEqual(report["critical_anomaly_count"], 0)
+        self.assertEqual(report["warning_anomaly_count"], 0)
+        self.assertEqual(report["incompatible_source_count"], 1)
+        self.assertEqual(report["anomaly_status"], "baseline_incompatible")
+
+    def test_missing_fingerprint_is_fail_closed(self):
+        baseline = {
+            "run_id": "old",
+            "sources": [self.source(100, 400, compatibility_fingerprint=None)],
+        }
+        current = {"run_id": "new", "sources": [self.source(5, 20)]}
+        report = compare_health_reports(
+            baseline=baseline, current=current, run_id="new"
+        )
+        codes = {value["code"] for value in report["anomalies"]}
+        self.assertIn("baseline_incompatible", codes)
+        self.assertNotIn("accepted_record_count_collapse", codes)
+        self.assertEqual(report["critical_anomaly_count"], 0)
+
+    def test_compatible_baseline_still_drives_existing_anomalies(self):
+        baseline = {"run_id": "old", "sources": [self.source(40, 200)]}
+        current = {"run_id": "new", "sources": [self.source(5, 30)]}
+        report = compare_health_reports(
+            baseline=baseline, current=current, run_id="new"
+        )
+        self.assertEqual(report["compatible_source_count"], 1)
+        self.assertEqual(report["incompatible_source_count"], 0)
+        self.assertIn(
+            "accepted_record_count_collapse",
+            {value["code"] for value in report["anomalies"]},
+        )
 
 
 class PublicationManifestTests(unittest.TestCase):
