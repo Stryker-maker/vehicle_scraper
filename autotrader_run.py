@@ -10,6 +10,7 @@ from typing import Any, Sequence
 
 from autotrader_adapter import ADAPTER_SCHEMA_VERSION
 from autotrader_canonical import build_autotrader_canonical_evidence
+from baseline_compatibility import build_compatibility_fingerprint
 from canonical_evidence import EVIDENCE_SCHEMA_VERSION
 from identity_lifecycle import (
     IDENTITY_LIFECYCLE_SCHEMA_VERSION,
@@ -24,6 +25,7 @@ from phase1_common import (
 from vehicle_config import CONFIG_SCHEMA_VERSION, load_vehicle_config
 
 SOURCE_STATUS_SCHEMA_VERSION = 8
+COLLECTION_SCOPE = "full"
 
 
 def _empty_evidence() -> dict[str, Any]:
@@ -72,6 +74,12 @@ def run_autotrader(
     config_path = config_path if config_path.is_absolute() else root / config_path
     original_config = config_path.read_bytes()
     config = load_vehicle_config(config_path)
+    compatibility_identity, compatibility_fingerprint = build_compatibility_fingerprint(
+        config=config,
+        source="autotrader",
+        collection_scope=COLLECTION_SCOPE,
+        adapter_schema_version=ADAPTER_SCHEMA_VERSION,
+    )
     active_run = run_id or os.environ.get("GITHUB_RUN_ID", "local")
     output_path = expected_output_path(root, config, "autotrader")
     status_path = source_status_path(root, config, "autotrader")
@@ -152,11 +160,8 @@ def run_autotrader(
             if not failures:
                 try:
                     identity = update_source_identity_lifecycle(
-                        root=root,
-                        config=config,
-                        source="autotrader",
-                        run_id=active_run,
-                        observed_at_utc=completed_at,
+                        root=root, config=config, source="autotrader",
+                        run_id=active_run, observed_at_utc=completed_at,
                         accepted_artifact=str(evidence["artifacts"]["accepted"]),
                         adapter_records_artifact=str(
                             evidence.get("source_adapter_artifacts", {}).get("records")
@@ -207,6 +212,9 @@ def run_autotrader(
         "approved_config_contains_legacy_controls": False,
         "run_id": active_run,
         "vehicle_key": config["vehicle_key"], "source": "autotrader",
+        "collection_scope": COLLECTION_SCOPE,
+        "compatibility_identity": compatibility_identity,
+        "compatibility_fingerprint": compatibility_fingerprint,
         "config_path": str(config_path.relative_to(root)), "command": command,
         "started_at_utc": started_at, "completed_at_utc": completed_at,
         "execution_status": status_name, "collection_status": status_name,
@@ -267,27 +275,39 @@ def run_autotrader(
     print(
         f"[{config['vehicle_key']}:autotrader] {status_name} | fetched={status['fetched_record_count']} "
         f"| accepted={status['accepted_record_count']} | rejected={status['rejected_record_count']} "
-        f"| parse_failures={status['parse_failure_count']} | lifecycle={status['identity_lifecycle_status']} "
-        f"| new={status['identity_new_listing_count']} | reappeared={status['identity_reappeared_listing_count']}"
+        f"| parse_failures={status['parse_failure_count']} "
+        f"| lifecycle={status['identity_lifecycle_status']} "
+        f"| new={status['identity_new_listing_count']} "
+        f"| reappeared={status['identity_reappeared_listing_count']}"
     )
     return status
 
 
 def parser() -> argparse.ArgumentParser:
-    root = argparse.ArgumentParser(description="Run the direct AutoTrader adapter with bounded status evidence")
-    root.add_argument("--config", required=True)
-    root.add_argument("--timeout-seconds", type=float, default=DEFAULT_TIMEOUT_SECONDS)
-    root.add_argument("--fail-on-unhealthy", action="store_true")
-    return root
+    result = argparse.ArgumentParser(
+        description="Run the direct AutoTrader adapter with bounded status evidence"
+    )
+    result.add_argument("--config", required=True)
+    result.add_argument(
+        "--timeout-seconds", type=float, default=DEFAULT_TIMEOUT_SECONDS
+    )
+    result.add_argument("--fail-on-unhealthy", action="store_true")
+    return result
 
 
 def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
     status = run_autotrader(
-        root=Path.cwd(), config_path=Path(args.config),
+        root=Path.cwd(),
+        config_path=Path(args.config),
         timeout_seconds=args.timeout_seconds,
     )
-    return 1 if args.fail_on_unhealthy and status["execution_status"] != "success" else 0
+    return (
+        1
+        if args.fail_on_unhealthy
+        and status["execution_status"] != "success"
+        else 0
+    )
 
 
 if __name__ == "__main__":
