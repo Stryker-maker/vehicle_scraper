@@ -37,8 +37,9 @@ def build_compatibility_identity(
     if source not in config.get("sources", {}):
         raise ValueError(f"Unsupported source for compatibility: {source!r}")
 
-    source_config = config["sources"][source]
+    source_config = dict(config["sources"][source])
     locations = _canonical_locations(source_config["search_locations"])
+    source_config["search_locations"] = locations
     config_identity = {
         "schema_version": config["schema_version"],
         "vehicle_key": config["vehicle_key"],
