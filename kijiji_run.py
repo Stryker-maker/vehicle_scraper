@@ -8,6 +8,7 @@ import time
 from pathlib import Path
 from typing import Any, Sequence
 
+from baseline_compatibility import build_compatibility_fingerprint
 from canonical_evidence import EVIDENCE_SCHEMA_VERSION
 from identity_lifecycle import (
     IDENTITY_LIFECYCLE_SCHEMA_VERSION,
@@ -31,6 +32,7 @@ from phase1_common import (
 from vehicle_config import CONFIG_SCHEMA_VERSION, load_vehicle_config
 
 SOURCE_STATUS_SCHEMA_VERSION = 8
+COLLECTION_SCOPE = "full"
 
 
 def _empty_evidence() -> dict[str, Any]:
@@ -86,6 +88,12 @@ def run_kijiji(
     config_path = config_path if config_path.is_absolute() else root / config_path
     original_config = config_path.read_bytes()
     config = load_vehicle_config(config_path)
+    compatibility_identity, compatibility_fingerprint = build_compatibility_fingerprint(
+        config=config,
+        source="kijiji",
+        collection_scope=COLLECTION_SCOPE,
+        adapter_schema_version=ADAPTER_SCHEMA_VERSION,
+    )
     active_run = run_id or os.environ.get("GITHUB_RUN_ID", "local")
     output_path = expected_output_path(root, config, "kijiji")
     status_path = source_status_path(root, config, "kijiji")
@@ -256,6 +264,9 @@ def run_kijiji(
         "run_id": active_run,
         "vehicle_key": config["vehicle_key"],
         "source": "kijiji",
+        "collection_scope": COLLECTION_SCOPE,
+        "compatibility_identity": compatibility_identity,
+        "compatibility_fingerprint": compatibility_fingerprint,
         "config_path": str(config_path.relative_to(root)),
         "command": command,
         "started_at_utc": started_at,
@@ -296,9 +307,7 @@ def run_kijiji(
         "query_location_count": int(evidence.get("query_location_count", 0)),
         "page_request_count": int(evidence.get("page_request_count", 0)),
         "request_attempt_count": int(evidence.get("request_attempt_count", 0)),
-        "successful_page_count": int(
-            evidence.get("successful_page_count", 0)
-        ),
+        "successful_page_count": int(evidence.get("successful_page_count", 0)),
         "failed_page_count": int(evidence.get("failed_page_count", 0)),
         "listing_specific_location_record_count": int(
             evidence.get("listing_specific_location_records", 0)
