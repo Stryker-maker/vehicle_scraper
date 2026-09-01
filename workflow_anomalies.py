@@ -22,6 +22,13 @@ def _number(value: Any) -> int:
         return 0
 
 
+def _compatibility_fingerprint(value: dict[str, Any]) -> str | None:
+    fingerprint = value.get("compatibility_fingerprint")
+    if not isinstance(fingerprint, str) or not fingerprint.strip():
+        return None
+    return fingerprint.strip()
+
+
 def _anomaly(
     *,
     severity: str,
@@ -63,6 +70,8 @@ def compare_health_reports(
     current_sources = [
         entry for entry in current.get("sources", []) if isinstance(entry, dict)
     ]
+    compatible_source_count = 0
+    incompatible_source_count = 0
 
     for entry in current_sources:
         vehicle_key, source = _source_key(entry)
@@ -145,6 +154,24 @@ def compare_health_reports(
                 )
             )
             continue
+
+        current_fingerprint = _compatibility_fingerprint(entry)
+        baseline_fingerprint = _compatibility_fingerprint(previous)
+        if current_fingerprint is None or baseline_fingerprint is None or current_fingerprint != baseline_fingerprint:
+            incompatible_source_count += 1
+            anomalies.append(
+                _anomaly(
+                    severity="info",
+                    code="baseline_incompatible",
+                    vehicle_key=vehicle_key,
+                    source=source,
+                    message="Baseline is semantically incompatible with the current source run and will not drive anomaly comparison.",
+                    baseline=baseline_fingerprint,
+                    current=current_fingerprint,
+                )
+            )
+            continue
+        compatible_source_count += 1
 
         for metric, minimum, warning_ratio, critical_ratio in (
             ("accepted_record_count", 10, 0.50, 0.25),
@@ -233,6 +260,7 @@ def compare_health_reports(
     status = (
         "critical" if counts["critical"] else
         "warning" if counts["warning"] else
+        "baseline_incompatible" if incompatible_source_count else
         "clean" if baseline_status == "available" else
         "no_baseline"
     )
@@ -243,6 +271,8 @@ def compare_health_reports(
         "baseline_status": baseline_status,
         "baseline_run_id": (baseline or {}).get("run_id"),
         "current_health_run_id": current.get("run_id"),
+        "compatible_source_count": compatible_source_count,
+        "incompatible_source_count": incompatible_source_count,
         "anomaly_status": status,
         "critical_anomaly_count": counts["critical"],
         "warning_anomaly_count": counts["warning"],
