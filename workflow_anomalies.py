@@ -53,14 +53,82 @@ def _anomaly(
 
 
 def compare_health_reports(
-    *, baseline: dict[str, Any] | None, current: dict[str, Any], run_id: str
+    *,
+    baseline: dict[str, Any] | None,
+    current: dict[str, Any],
+    run_id: str,
+    baseline_candidates: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
+    if baseline_candidates is not None and baseline is not None:
+        raise ValueError("Provide baseline or baseline_candidates, not both")
+
+    if baseline_candidates is not None:
+        baseline = _select_compatible_baseline(
+            baseline_candidates=baseline_candidates, current=current
+        )
+
     anomalies: list[dict[str, Any]] = []
     baseline_status = "available"
     if not baseline or not isinstance(baseline.get("sources"), list):
         baseline_status = "unavailable"
     elif baseline.get("run_id") == current.get("run_id"):
         baseline_status = "same_run_not_compared"
+    
+    return _perform_comparison(
+        baseline=baseline,
+        current=current,
+        run_id=run_id,
+        baseline_status=baseline_status,
+        anomalies=anomalies,
+    )
+
+
+def _select_compatible_baseline(
+    *, baseline_candidates: list[dict[str, Any]], current: dict[str, Any]
+) -> dict[str, Any] | None:
+    current_sources = [
+        entry for entry in current.get("sources", []) if isinstance(entry, dict)
+    ]
+    current_fingerprints = {
+        _source_key(entry): _compatibility_fingerprint(entry)
+        for entry in current_sources
+    }
+
+    for candidate in baseline_candidates:
+        if not isinstance(candidate, dict) or not isinstance(
+            candidate.get("sources"), list
+        ):
+            continue
+        candidate_sources = {
+            _source_key(entry): entry
+            for entry in candidate.get("sources", [])
+            if isinstance(entry, dict)
+        }
+        all_compatible = True
+        for (vehicle_key, source), current_fp in current_fingerprints.items():
+            candidate_entry = candidate_sources.get((vehicle_key, source))
+            if candidate_entry is None:
+                continue
+            candidate_fp = _compatibility_fingerprint(candidate_entry)
+            if current_fp is None or candidate_fp is None:
+                all_compatible = False
+                break
+            if current_fp != candidate_fp:
+                all_compatible = False
+                break
+        if all_compatible and current_fingerprints:
+            return candidate
+    return None
+
+
+def _perform_comparison(
+    *,
+    baseline: dict[str, Any] | None,
+    current: dict[str, Any],
+    run_id: str,
+    baseline_status: str,
+    anomalies: list[dict[str, Any]],
+) -> dict[str, Any]:
 
     baseline_sources = {
         _source_key(entry): entry

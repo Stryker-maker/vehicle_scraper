@@ -156,6 +156,44 @@ class RunStatusCompatibilityMetadataTests(unittest.TestCase):
         self.assertEqual(identity["location_registry_version"], LOCATION_REGISTRY_VERSION)
         self.assertEqual(identity["query_location_count"], 1)
         self.assertEqual(len(fingerprint), 64)
+    def test_compatibility_metadata_propagates_to_health_report(self):
+        from phase1_reporting import collect_health
+        
+        for source_runner, source_name, module_name in [
+            (run_kijiji, "kijiji", "kijiji_run"),
+            (run_autotrader, "autotrader", "autotrader_run"),
+        ]:
+            with self.subTest(source=source_name):
+                status, _ = self._run_with_patches(source_runner, module_name, self._evidence())
+                self.assertIn("compatibility_fingerprint", status)
+                self.assertIn("compatibility_identity", status)
+                self.assertIsNotNone(status["compatibility_fingerprint"])
+                self.assertIsNotNone(status["compatibility_identity"])
+                
+                health = collect_health(
+                    root=self.root,
+                    source_plan=[(self.config_path, [source_name])],
+                    run_id=status["run_id"],
+                )
+                
+                self.assertEqual(len(health["sources"]), 1)
+                health_entry = health["sources"][0]
+                
+                self.assertEqual(
+                    health_entry.get("compatibility_fingerprint"),
+                    status["compatibility_fingerprint"],
+                    f"Fingerprint must propagate from {source_name} status to health report"
+                )
+                self.assertEqual(
+                    health_entry.get("compatibility_identity"),
+                    status["compatibility_identity"],
+                    f"Identity must propagate from {source_name} status to health report"
+                )
+                
+                self.assertIsNotNone(
+                    health_entry.get("compatibility_fingerprint"),
+                    "Health report entry must contain non-None fingerprint"
+                )
 
 
 if __name__ == "__main__":
