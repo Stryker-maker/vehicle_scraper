@@ -16,7 +16,6 @@ from canonical_evidence import EVIDENCE_SCHEMA_VERSION
 from kijiji_adapter import ADAPTER_SCHEMA_VERSION as KIJIJI_ADAPTER_SCHEMA_VERSION
 from kijiji_locations import LOCATION_REGISTRY_VERSION
 from kijiji_run import COLLECTION_SCOPE as KIJIJI_COLLECTION_SCOPE
-from kijiji_run import run_kijiji
 from vehicle_config import CONFIG_SCHEMA_VERSION
 
 

@@ -22,8 +22,8 @@ def _canonical_json(value: Any) -> str:
 
 
 def _canonical_locations(values: list[str]) -> list[str]:
-    """Return query locations in canonical, order-independent form."""
-    return sorted((str(value) for value in values), key=str.casefold)
+    """Return query locations in canonical, deterministic total ordering."""
+    return sorted((str(value) for value in values), key=lambda s: (s.casefold(), s))
 
 
 def build_compatibility_identity(

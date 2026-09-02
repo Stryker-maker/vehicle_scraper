@@ -92,6 +92,25 @@ class BaselineCompatibilityFingerprintTests(unittest.TestCase):
         )
         self.assertEqual(first, second)
 
+    def test_location_case_variations_produce_stable_fingerprints(self):
+        config_upper = copy.deepcopy(self.config)
+        config_upper["sources"]["kijiji"]["search_locations"] = ["CALGARY, AB", "Calgary, AB"]
+        _, upper = build_compatibility_fingerprint(
+            config=config_upper,
+            source="kijiji",
+            collection_scope="full",
+            adapter_schema_version=1,
+        )
+        config_lower = copy.deepcopy(self.config)
+        config_lower["sources"]["kijiji"]["search_locations"] = ["Calgary, AB", "CALGARY, AB"]
+        _, lower = build_compatibility_fingerprint(
+            config=config_lower,
+            source="kijiji",
+            collection_scope="full",
+            adapter_schema_version=1,
+        )
+        self.assertEqual(upper, lower)
+
     def test_adding_a_location_changes_fingerprint(self):
         _, baseline = build_compatibility_fingerprint(
             config=self.config,
