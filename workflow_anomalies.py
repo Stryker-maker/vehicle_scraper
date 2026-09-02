@@ -106,11 +106,14 @@ def _select_compatible_baseline(
         }
         all_compatible = True
         for (vehicle_key, source), current_fp in current_fingerprints.items():
+            if not current_fp:
+                all_compatible = False
+                break
             candidate_entry = candidate_sources.get((vehicle_key, source))
             if candidate_entry is None:
                 continue
             candidate_fp = _compatibility_fingerprint(candidate_entry)
-            if current_fp is None or candidate_fp is None:
+            if not candidate_fp:
                 all_compatible = False
                 break
             if current_fp != candidate_fp:
