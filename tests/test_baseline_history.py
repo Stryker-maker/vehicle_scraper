@@ -1,5 +1,4 @@
 import json
-import subprocess
 import sys
 import tempfile
 import unittest
@@ -49,7 +48,7 @@ class BaselineHistoryTests(unittest.TestCase):
 
     def test_invalid_candidates_are_skipped(self):
         candidates = [
-            {"run_id": "same", "overall_status": "success", "sources": [self.source()]},
+            {"run_id": "current", "overall_status": "success", "sources": [self.source()]},
             {"run_id": "failed", "overall_status": "failure", "sources": [self.source()]},
             {"run_id": "missing-fingerprint", "overall_status": "success", "sources": [self.source(None)]},
             {"run_id": "missing-source", "overall_status": "success", "sources": []},
@@ -93,10 +92,11 @@ class WorkflowBaselineWiringTests(unittest.TestCase):
         workflow = (Path(__file__).resolve().parents[1] / ".github" / "workflows" / "scrape.yml").read_text(
             encoding="utf-8"
         )
+        self.assertIn("Discover compatible historical health baseline", workflow)
         self.assertIn("python baseline_history.py", workflow)
         self.assertNotIn("cp data/run_status/latest.json", workflow)
         self.assertIn("--baseline", workflow)
-        self.assertIn("baseline-history", workflow)
+        self.assertIn("--history-limit 50", workflow)
 
 
 if __name__ == "__main__":
