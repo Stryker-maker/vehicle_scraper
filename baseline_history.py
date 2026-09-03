@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -9,9 +10,18 @@ from typing import Any
 from workflow_anomalies import _select_compatible_baseline
 
 
+def _git_executable() -> str:
+    executable = shutil.which("git")
+    if executable is None:
+        raise RuntimeError("git executable is required for historical baseline discovery")
+    return executable
+
+
 def _git_history_paths(root: Path, path: str, limit: int) -> list[str]:
+    if limit <= 0:
+        raise ValueError("history_limit must be greater than zero")
     result = subprocess.run(
-        ["git", "log", f"-{limit}", "--format=%H", "--", path],
+        [_git_executable(), "log", f"-{limit}", "--format=%H", "--", path],
         cwd=root,
         check=True,
         capture_output=True,
@@ -22,7 +32,7 @@ def _git_history_paths(root: Path, path: str, limit: int) -> list[str]:
 
 def _read_git_json(root: Path, revision: str, path: str) -> dict[str, Any] | None:
     result = subprocess.run(
-        ["git", "show", f"{revision}:{path}"],
+        [_git_executable(), "show", f"{revision}:{path}"],
         cwd=root,
         check=False,
         capture_output=True,
@@ -76,7 +86,12 @@ def discover_compatible_baseline(
 ) -> dict[str, Any] | None:
     """Return the newest successful historical report compatible with current."""
     current_run_id = current.get("run_id")
-    for revision in _git_history_paths(root, path, history_limit):
+    try:
+        revisions = _git_history_paths(root, path, history_limit)
+    except (OSError, subprocess.CalledProcessError, RuntimeError, ValueError):
+        return None
+
+    for revision in revisions:
         candidate = _read_git_json(root, revision, path)
         if not candidate:
             continue
