@@ -91,17 +91,6 @@ jobs:
           python vehicle_registry.py validate --registry vehicle_registry.json
           python vehicle_registry.py summary --registry vehicle_registry.json
 
-      - name: Preserve previous health baseline
-        id: baseline
-        run: |
-          baseline="$RUNNER_TEMP/baseline-health.json"
-          if [[ -f data/run_status/latest.json ]]; then
-            cp data/run_status/latest.json "$baseline"
-          else
-            printf '{}\n' > "$baseline"
-          fi
-          echo "path=$baseline" >> "$GITHUB_OUTPUT"
-
       - name: Build governed collection plan
         id: collection-plan
         run: |
@@ -225,6 +214,19 @@ jobs:
         run: |
           python phase1_pipeline.py report-health --registry vehicle_registry.json
           cat data/run_status/latest.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Discover compatible historical health baseline
+        id: baseline
+        if: env.COLLECTION_SCOPE == 'full'
+        run: |
+          baseline="$RUNNER_TEMP/baseline-health.json"
+          python baseline_history.py \
+            --current data/run_status/latest.json \
+            --output "$baseline" \
+            --history-limit 50
+          echo "path=$baseline" >> "$GITHUB_OUTPUT"
+          echo "Selected historical baseline:" \
+            "$(python -c 'import json,sys; print(json.load(open(sys.argv[1])).get("run_id") or "none")' "$baseline")"
 
       - name: Build baseline-aware anomaly report
         if: env.COLLECTION_SCOPE == 'full'
