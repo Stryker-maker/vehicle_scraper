@@ -182,11 +182,9 @@ class AnomalyTests(unittest.TestCase):
             {value["code"] for value in report["anomalies"]},
         )
 
-
     def test_selecting_compatible_baseline_from_candidate_list(self):
         """When given multiple baselines, the first compatible one should be used."""
         current = {"run_id": "current_run", "sources": [self.source(5, 30)]}
-        
         wrong_fp_baseline = {
             "run_id": "run_1",
             "sources": [self.source(40, 200, compatibility_fingerprint="bad-fp")],
@@ -199,24 +197,21 @@ class AnomalyTests(unittest.TestCase):
             "run_id": "run_3",
             "sources": [self.source(40, 200)],
         }
-        
         anomaly_report = compare_health_reports(
             baseline=None,
             current=current,
             run_id="current_run",
             baseline_candidates=[wrong_fp_baseline, another_wrong, good_baseline],
         )
-        
         self.assertEqual(anomaly_report["compatible_source_count"], 1)
         self.assertEqual(anomaly_report["incompatible_source_count"], 0)
         found_codes = {item["code"] for item in anomaly_report["anomalies"]}
         self.assertIn("accepted_record_count_collapse", found_codes)
         self.assertIn("fetched_record_count_collapse", found_codes)
 
-    def test_no_compatible_candidates_yields_incompatible_status(self):
-        """When no compatible baseline exists, status should reflect incompatibility."""
+    def test_no_compatible_candidates_yields_no_baseline_status(self):
+        """When no compatible baseline exists, comparison must fail closed without count anomalies."""
         current = {"run_id": "current_run", "sources": [self.source(5, 30)]}
-        
         bad_candidate_1 = {
             "run_id": "old_run_1",
             "sources": [self.source(40, 200, compatibility_fingerprint="mismatch-A")],
@@ -225,27 +220,24 @@ class AnomalyTests(unittest.TestCase):
             "run_id": "old_run_2",
             "sources": [self.source(40, 200, compatibility_fingerprint="mismatch-B")],
         }
-        
         anomaly_report = compare_health_reports(
             baseline=None,
             current=current,
             run_id="current_run",
             baseline_candidates=[bad_candidate_1, bad_candidate_2],
         )
-        
-        self.assertEqual(anomaly_report["anomaly_status"], "baseline_incompatible")
+        self.assertEqual(anomaly_report["anomaly_status"], "no_baseline")
+        self.assertEqual(anomaly_report["critical_anomaly_count"], 0)
         found_codes = {item["code"] for item in anomaly_report["anomalies"]}
-        self.assertIn("baseline_incompatible", found_codes)
         self.assertNotIn("accepted_record_count_collapse", found_codes)
+        self.assertNotIn("fetched_record_count_collapse", found_codes)
 
     def test_empty_candidate_list_yields_no_baseline_status(self):
         """An empty candidate list should behave like having no baseline."""
         current = {"run_id": "current_run", "sources": [self.source(5, 30)]}
-        
         anomaly_report = compare_health_reports(
             baseline=None, current=current, run_id="current_run", baseline_candidates=[]
         )
-        
         self.assertEqual(anomaly_report["anomaly_status"], "no_baseline")
         self.assertEqual(anomaly_report["critical_anomaly_count"], 0)
 
@@ -253,12 +245,13 @@ class AnomalyTests(unittest.TestCase):
         """Supplying both baseline and baseline_candidates should trigger an error."""
         current = {"run_id": "current_run", "sources": [self.source(5, 30)]}
         existing_baseline = {"run_id": "old_run", "sources": [self.source(40, 200)]}
-        
         with self.assertRaisesRegex(ValueError, "baseline or baseline_candidates"):
             compare_health_reports(
                 baseline=existing_baseline, current=current, run_id="current_run",
                 baseline_candidates=[existing_baseline]
             )
+
+
 class PublicationManifestTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
