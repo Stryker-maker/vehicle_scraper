@@ -1,4 +1,5 @@
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -9,14 +10,12 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from autotrader_adapter import ADAPTER_SCHEMA_VERSION as AUTOTRADER_ADAPTER_SCHEMA_VERSION
-from autotrader_run import COLLECTION_SCOPE as AUTOTRADER_COLLECTION_SCOPE
 from autotrader_run import run_autotrader
 from kijiji_run import run_kijiji
 from baseline_compatibility import build_compatibility_fingerprint
 from canonical_evidence import EVIDENCE_SCHEMA_VERSION
 from kijiji_adapter import ADAPTER_SCHEMA_VERSION as KIJIJI_ADAPTER_SCHEMA_VERSION
 from kijiji_locations import LOCATION_REGISTRY_VERSION
-from kijiji_run import COLLECTION_SCOPE as KIJIJI_COLLECTION_SCOPE
 from vehicle_config import CONFIG_SCHEMA_VERSION
 
 
@@ -108,7 +107,13 @@ class RunStatusCompatibilityMetadataTests(unittest.TestCase):
             "quality_warning_count": 0,
             "quality_warning_summary": {},
         }
-        with patch(f"{module_name}.subprocess.run", return_value=SimpleNamespace(returncode=0, stdout="", stderr="")), \
+
+        def persist_status(path, value):
+            captured["status"] = value
+            Path(path).write_text(json.dumps(value), encoding="utf-8")
+
+        with patch.dict(os.environ, {"COLLECTION_SCOPE": "full"}, clear=False), \
+             patch(f"{module_name}.subprocess.run", return_value=SimpleNamespace(returncode=0, stdout="", stderr="")), \
              patch(f"{module_name}.file_signature", side_effect=[(1, 1), (2, 2)]), \
              patch(f"{module_name}.validate_csv", return_value=validation), \
              patch(f"{module_name}.expected_output_path", return_value=output_path), \
@@ -117,7 +122,7 @@ class RunStatusCompatibilityMetadataTests(unittest.TestCase):
              patch(f"{module_name}.build_{'kijiji' if module_name == 'kijiji_run' else 'autotrader'}_canonical_evidence", return_value=evidence), \
              patch(f"{module_name}.update_source_identity_lifecycle", return_value=self._identity()), \
              patch(f"{module_name}.analyze_csv_quality", return_value=quality), \
-             patch(f"{module_name}.write_json", side_effect=lambda path, value: captured.update(status=value)):
+             patch(f"{module_name}.write_json", side_effect=persist_status):
             status = runner(
                 root=self.root,
                 config_path=self.config_path,
@@ -147,7 +152,7 @@ class RunStatusCompatibilityMetadataTests(unittest.TestCase):
         identity, fingerprint = build_compatibility_fingerprint(
             config=self.config,
             source="kijiji",
-            collection_scope=KIJIJI_COLLECTION_SCOPE,
+            collection_scope="full",
             adapter_schema_version=KIJIJI_ADAPTER_SCHEMA_VERSION,
         )
         self.assertEqual(identity["compatibility_schema_version"], 1)
@@ -166,16 +171,15 @@ class RunStatusCompatibilityMetadataTests(unittest.TestCase):
             (run_autotrader, "autotrader", "autotrader_run"),
         ]:
             with self.subTest(source=source_name):
-                status, _ = self._run_with_patches(
+                status, persisted_status = self._run_with_patches(
                     source_runner, module_name, self._evidence()
                 )
-                self.assertIn("compatibility_fingerprint", status)
-                self.assertIn("compatibility_identity", status)
-                self.assertIsNotNone(status["compatibility_fingerprint"])
-                self.assertIsNotNone(status["compatibility_identity"])
+                self.assertIn("compatibility_fingerprint", persisted_status)
+                self.assertIn("compatibility_identity", persisted_status)
+                self.assertIsNotNone(persisted_status["compatibility_fingerprint"])
+                self.assertIsNotNone(persisted_status["compatibility_identity"])
 
-                with patch("phase1_reporting.source_status_path", return_value=self.root / "status.json"), \
-                     patch("phase1_reporting.load_json", return_value=status):
+                with patch("phase1_reporting.source_status_path", return_value=self.root / "status.json"):
                     health = collect_health(
                         root=self.root,
                         source_plan=[(self.config_path, [source_name])],
@@ -186,18 +190,21 @@ class RunStatusCompatibilityMetadataTests(unittest.TestCase):
                 health_entry = health["sources"][0]
                 self.assertEqual(
                     health_entry.get("compatibility_fingerprint"),
-                    status["compatibility_fingerprint"],
+                    persisted_status["compatibility_fingerprint"],
                     f"Fingerprint must propagate from {source_name} status to health report",
                 )
                 self.assertEqual(
                     health_entry.get("compatibility_identity"),
-                    status["compatibility_identity"],
+                    persisted_status["compatibility_identity"],
                     f"Identity must propagate from {source_name} status to health report",
                 )
-                self.assertIsNotNone(
-                    health_entry.get("compatibility_fingerprint"),
-                    "Health report entry must contain non-None fingerprint",
-                )
+
+    def test_collection_scope_isolated_from_outer_environment(self):
+        with patch.dict(os.environ, {"COLLECTION_SCOPE": "single_pair"}, clear=False):
+            _, persisted_status = self._run_with_patches(
+                run_kijiji, "kijiji_run", self._evidence()
+            )
+        self.assertEqual(persisted_status["collection_scope"], "full")
 
 
 if __name__ == "__main__":
