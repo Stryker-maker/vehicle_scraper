@@ -7,7 +7,7 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-from workflow_anomalies import _candidate_is_eligible, _select_compatible_baseline
+from workflow_anomalies import _candidate_is_eligible
 
 BASELINE_SELECTION_SCHEMA_VERSION = 1
 
