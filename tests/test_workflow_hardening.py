@@ -160,18 +160,51 @@ class PublicationManifestTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)
         self.config = {
-            "schema_version": 2, "vehicle_key": "test_vehicle", "make": "Test", "model": "Vehicle",
-            "criteria": {"min_year": 2020, "max_year": 2026, "max_price_cad": 100000, "fuel": "Gas", "engine": ""},
-            "origin": {"home_city": "Red Deer, AB", "home_coords": [52.2681, -113.8112], "max_distance_km": 800},
+            "schema_version": 2,
+            "vehicle_key": "test_vehicle",
+            "make": "Test",
+            "model": "Vehicle",
+            "criteria": {
+                "min_year": 2020,
+                "max_year": 2026,
+                "max_price_cad": 100000,
+                "fuel": "Gas",
+                "engine": "",
+            },
+            "origin": {
+                "home_city": "Red Deer, AB",
+                "home_coords": [52.2681, -113.8112],
+                "max_distance_km": 800,
+            },
             "sources": {
-                "autotrader": {"make": "test", "model": "vehicle", "search_locations": ["Red Deer, AB"]},
-                "kijiji": {"make": "Test", "model": "Vehicle", "search_locations": ["Calgary, AB"]},
+                "autotrader": {
+                    "make": "test",
+                    "model": "vehicle",
+                    "search_locations": ["Red Deer, AB"],
+                },
+                "kijiji": {
+                    "make": "Test",
+                    "model": "Vehicle",
+                    "search_locations": ["Calgary, AB"],
+                },
             },
         }
         (self.root / "config.json").write_text(json.dumps(self.config), encoding="utf-8")
         registry = {
-            "schema_version": 2, "profile": "test",
-            "vehicles": [{"vehicle_key": "test_vehicle", "config_path": "config.json", "enabled": True, "purpose": "primary_purchase", "priority": 1, "cadence": "weekly", "enabled_sources": ["autotrader", "kijiji"], "analysis_profile": "f350_purchase"}],
+            "schema_version": 2,
+            "profile": "test",
+            "vehicles": [
+                {
+                    "vehicle_key": "test_vehicle",
+                    "config_path": "config.json",
+                    "enabled": True,
+                    "purpose": "primary_purchase",
+                    "priority": 1,
+                    "cadence": "weekly",
+                    "enabled_sources": ["autotrader", "kijiji"],
+                    "analysis_profile": "f350_purchase",
+                }
+            ],
         }
         (self.root / "vehicle_registry.json").write_text(json.dumps(registry), encoding="utf-8")
         subprocess.run(["git", "init"], cwd=self.root, check=True, capture_output=True)
@@ -181,24 +214,22 @@ class PublicationManifestTests(unittest.TestCase):
     def tearDown(self):
         self.temp.cleanup()
 
-    def test_manifest_generation_and_verification(self):
-        manifest = prepare_manifest(self.root, Path("vehicle_registry.json"))
-        self.assertEqual(manifest["schema_version"], 1)
-        self.assertIn("vehicle_registry.json", manifest["files"])
-        staged = self.root / "staged"
-        staged.mkdir()
-        (staged / "vehicle_registry.json").write_text((self.root / "vehicle_registry.json").read_text(), encoding="utf-8")
-        report = verify_staged_manifest(self.root, staged, manifest)
-        self.assertTrue(report["valid"])
+    def test_manifest_matches_staged_governed_data(self):
+        data = self.root / "data/test_vehicle/latest/example.csv"
+        data.parent.mkdir(parents=True)
+        data.write_text("a,b\n1,2\n", encoding="utf-8")
+        subprocess.run(["git", "add", "data/"], cwd=self.root, check=True)
+        manifest = prepare_manifest(root=self.root, registry_path=Path("vehicle_registry.json"), run_id="123", source_sha="a" * 40, event_name="workflow_dispatch", ref_name="ai/test")
+        self.assertEqual(manifest["published_paths"], ["data/test_vehicle/latest/example.csv"])
+        subprocess.run(["git", "add", MANIFEST_PATH.as_posix()], cwd=self.root, check=True)
+        verified = verify_staged_manifest(root=self.root, registry_path=Path("vehicle_registry.json"))
+        self.assertEqual(verified["verification_status"], "pass")
 
-    def test_manifest_detects_modified_file(self):
-        manifest = prepare_manifest(self.root, Path("vehicle_registry.json"))
-        staged = self.root / "staged"
-        staged.mkdir()
-        (staged / "vehicle_registry.json").write_text("modified", encoding="utf-8")
-        report = verify_staged_manifest(self.root, staged, manifest)
-        self.assertFalse(report["valid"])
-        self.assertTrue(report["errors"])
+    def test_non_data_staged_path_is_rejected(self):
+        (self.root / "README.md").write_text("unsafe", encoding="utf-8")
+        subprocess.run(["git", "add", "README.md"], cwd=self.root, check=True)
+        with self.assertRaisesRegex(ValueError, "outside_data"):
+            prepare_manifest(root=self.root, registry_path=Path("vehicle_registry.json"), run_id="123", source_sha="a" * 40, event_name="workflow_dispatch", ref_name="ai/test")
 
 
 if __name__ == "__main__":
