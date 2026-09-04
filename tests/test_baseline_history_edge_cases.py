@@ -63,6 +63,28 @@ class BaselineHistoryEdgeCaseTests(unittest.TestCase):
             selected = discover_compatible_baseline(root=Path("."), current=current)
         self.assertEqual(selected["run_id"], "historical")
 
+    def test_same_run_only_history_is_unavailable_not_incompatible(self):
+        current = self.current()
+        current_report = {"run_id": "current-run", "overall_status": "success", "sources": [self.source()]}
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            current_path = root / "current.json"
+            baseline_path = root / "baseline.json"
+            current_path.write_text(json.dumps(current), encoding="utf-8")
+            with patch("baseline_history._git_history_paths", return_value=["current-revision"]), patch(
+                "baseline_history._read_git_json", return_value=current_report
+            ):
+                artifact = write_selected_baseline(
+                    root=root, current_path=current_path, output_path=baseline_path
+                )
+            metadata = artifact["_baseline_selection"]
+            report = compare_health_reports(baseline=artifact, current=current, run_id="current-run")
+        self.assertEqual(metadata["status"], "unavailable")
+        self.assertEqual(metadata["reason"], "no_historical_reports")
+        self.assertEqual(metadata["historical_candidate_count"], 0)
+        self.assertNotIn("baseline_incompatible", {item["code"] for item in report["anomalies"]})
+        self.assertEqual(report["anomaly_status"], "no_baseline")
+
     def test_mixed_source_candidate_must_be_complete(self):
         current = self.current([self.source(source="autotrader"), self.source(source="kijiji")])
         incomplete = {"run_id": "incomplete", "overall_status": "success", "sources": [self.source(source="autotrader")]}
