@@ -11,7 +11,9 @@ from baseline_history import discover_compatible_baseline, write_selected_baseli
 
 
 class BaselineHistoryTests(unittest.TestCase):
-    def source(self, fingerprint="fp", **extra):
+    @staticmethod
+    def source(fingerprint="fp", **extra):
+        """Build a minimal health-report source fixture for baseline tests."""
         value = {
             "vehicle_key": "ford_f350",
             "source": "autotrader",
