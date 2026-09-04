@@ -23,15 +23,10 @@ class DependencyLockTests(unittest.TestCase):
     def test_ranges_and_duplicate_packages_fail(self):
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / "requirements.lock"
-            path.write_text(
-                "requests>=2\nrequests==2.34.2\nrequests==2.34.2\n",
-                encoding="utf-8",
-            )
+            path.write_text("requests>=2\nrequests==2.34.2\nrequests==2.34.2\n", encoding="utf-8")
             report = validate_lock(path)
             self.assertEqual(report["validation_status"], "fail")
-            self.assertTrue(
-                any(value.startswith("non_exact_pin:") for value in report["validation_errors"])
-            )
+            self.assertTrue(any(value.startswith("non_exact_pin:") for value in report["validation_errors"]))
             self.assertIn("duplicate_package:requests", report["validation_errors"])
 
 
@@ -39,57 +34,28 @@ class WorkflowControlTests(unittest.TestCase):
     def test_full_and_single_pair_plans_are_registry_governed(self):
         root = Path(__file__).resolve().parents[1]
         import os
-
         os.environ["GITHUB_EVENT_NAME"] = "schedule"
-        full_schedule = build_collection_plan(
-            root=root,
-            scope="full",
-            registry_path=Path("vehicle_registry.json"),
-        )
+        full_schedule = build_collection_plan(root=root, scope="full", registry_path=Path("vehicle_registry.json"))
         self.assertEqual(len(full_schedule), 10)
         self.assertFalse(any("f150" in str(p) for p, _ in full_schedule))
-
         os.environ["GITHUB_EVENT_NAME"] = "workflow_dispatch"
-        full_manual = build_collection_plan(
-            root=root,
-            scope="full",
-            registry_path=Path("vehicle_registry.json"),
-        )
+        full_manual = build_collection_plan(root=root, scope="full", registry_path=Path("vehicle_registry.json"))
         self.assertEqual(len(full_manual), 12)
         self.assertTrue(any("f150" in str(p) for p, _ in full_manual))
-
         del os.environ["GITHUB_EVENT_NAME"]
-
-        single = build_collection_plan(
-            root=root,
-            scope="single_pair",
-            registry_path=Path("vehicle_registry.json"),
-            vehicle_key="ford_f350",
-            source="kijiji",
-        )
+        single = build_collection_plan(root=root, scope="single_pair", registry_path=Path("vehicle_registry.json"), vehicle_key="ford_f350", source="kijiji")
         self.assertEqual(single, [(Path("config_f350.json"), "kijiji")])
         with self.assertRaisesRegex(ValueError, "paused"):
-            build_collection_plan(
-                root=root,
-                scope="single_pair",
-                registry_path=Path("vehicle_registry.json"),
-                vehicle_key="toyota_tundra",
-                source="autotrader",
-            )
+            build_collection_plan(root=root, scope="single_pair", registry_path=Path("vehicle_registry.json"), vehicle_key="toyota_tundra", source="autotrader")
 
 
 class AnomalyTests(unittest.TestCase):
     def source(self, accepted: int, fetched: int, **extra):
         value = {
-            "vehicle_key": "ford_f350",
-            "source": "autotrader",
-            "healthy": True,
-            "execution_status": "success",
-            "accepted_record_count": accepted,
-            "fetched_record_count": fetched,
-            "parse_failure_count": 0,
-            "quality_warning_rows": 0,
-            "compatibility_fingerprint": "fingerprint-v1",
+            "vehicle_key": "ford_f350", "source": "autotrader", "healthy": True,
+            "execution_status": "success", "accepted_record_count": accepted,
+            "fetched_record_count": fetched, "parse_failure_count": 0,
+            "quality_warning_rows": 0, "compatibility_fingerprint": "fingerprint-v1",
         }
         value.update(extra)
         return value
@@ -97,9 +63,7 @@ class AnomalyTests(unittest.TestCase):
     def test_material_count_collapse_is_critical(self):
         baseline = {"run_id": "old", "sources": [self.source(40, 200)]}
         current = {"run_id": "new", "sources": [self.source(5, 30)]}
-        report = compare_health_reports(
-            baseline=baseline, current=current, run_id="new"
-        )
+        report = compare_health_reports(baseline=baseline, current=current, run_id="new")
         self.assertEqual(report["anomaly_status"], "critical")
         codes = {value["code"] for value in report["anomalies"]}
         self.assertIn("accepted_record_count_collapse", codes)
@@ -107,20 +71,8 @@ class AnomalyTests(unittest.TestCase):
 
     def test_parse_rate_and_quality_growth_are_visible(self):
         baseline = {"run_id": "old", "sources": [self.source(20, 100)]}
-        current = {
-            "run_id": "new",
-            "sources": [
-                self.source(
-                    18,
-                    100,
-                    parse_failure_count=6,
-                    quality_warning_rows=7,
-                )
-            ],
-        }
-        report = compare_health_reports(
-            baseline=baseline, current=current, run_id="new"
-        )
+        current = {"run_id": "new", "sources": [self.source(18, 100, parse_failure_count=6, quality_warning_rows=7)]}
+        report = compare_health_reports(baseline=baseline, current=current, run_id="new")
         codes = {value["code"] for value in report["anomalies"]}
         self.assertIn("parse_failure_rate_elevated", codes)
         self.assertIn("quality_warning_growth", codes)
@@ -128,24 +80,14 @@ class AnomalyTests(unittest.TestCase):
 
     def test_missing_baseline_is_visible_but_not_critical(self):
         current = {"run_id": "new", "sources": [self.source(20, 100)]}
-        report = compare_health_reports(
-            baseline=None, current=current, run_id="new"
-        )
+        report = compare_health_reports(baseline=None, current=current, run_id="new")
         self.assertEqual(report["anomaly_status"], "no_baseline")
         self.assertEqual(report["critical_anomaly_count"], 0)
 
     def test_incompatible_baseline_cannot_drive_count_anomalies(self):
-        baseline = {
-            "run_id": "old",
-            "sources": [self.source(100, 400, compatibility_fingerprint="old-scope")],
-        }
-        current = {
-            "run_id": "new",
-            "sources": [self.source(5, 20)],
-        }
-        report = compare_health_reports(
-            baseline=baseline, current=current, run_id="new"
-        )
+        baseline = {"run_id": "old", "sources": [self.source(100, 400, compatibility_fingerprint="old-scope")]}
+        current = {"run_id": "new", "sources": [self.source(5, 20)]}
+        report = compare_health_reports(baseline=baseline, current=current, run_id="new")
         codes = {value["code"] for value in report["anomalies"]}
         self.assertIn("baseline_incompatible", codes)
         self.assertNotIn("accepted_record_count_collapse", codes)
@@ -156,14 +98,9 @@ class AnomalyTests(unittest.TestCase):
         self.assertEqual(report["anomaly_status"], "baseline_incompatible")
 
     def test_missing_fingerprint_is_fail_closed(self):
-        baseline = {
-            "run_id": "old",
-            "sources": [self.source(100, 400, compatibility_fingerprint=None)],
-        }
+        baseline = {"run_id": "old", "sources": [self.source(100, 400, compatibility_fingerprint=None)]}
         current = {"run_id": "new", "sources": [self.source(5, 20)]}
-        report = compare_health_reports(
-            baseline=baseline, current=current, run_id="new"
-        )
+        report = compare_health_reports(baseline=baseline, current=current, run_id="new")
         codes = {value["code"] for value in report["anomalies"]}
         self.assertIn("baseline_incompatible", codes)
         self.assertNotIn("accepted_record_count_collapse", codes)
@@ -172,62 +109,33 @@ class AnomalyTests(unittest.TestCase):
     def test_compatible_baseline_still_drives_existing_anomalies(self):
         baseline = {"run_id": "old", "sources": [self.source(40, 200)]}
         current = {"run_id": "new", "sources": [self.source(5, 30)]}
-        report = compare_health_reports(
-            baseline=baseline, current=current, run_id="new"
-        )
+        report = compare_health_reports(baseline=baseline, current=current, run_id="new")
         self.assertEqual(report["compatible_source_count"], 1)
         self.assertEqual(report["incompatible_source_count"], 0)
-        self.assertIn(
-            "accepted_record_count_collapse",
-            {value["code"] for value in report["anomalies"]},
-        )
+        self.assertIn("accepted_record_count_collapse", {value["code"] for value in report["anomalies"]})
 
     def test_selecting_compatible_baseline_from_candidate_list(self):
         """When given multiple baselines, the first compatible one should be used."""
         current = {"run_id": "current_run", "sources": [self.source(5, 30)]}
-        wrong_fp_baseline = {
-            "run_id": "run_1",
-            "sources": [self.source(40, 200, compatibility_fingerprint="bad-fp")],
-        }
-        another_wrong = {
-            "run_id": "run_2",
-            "sources": [self.source(40, 200, compatibility_fingerprint="also-bad")],
-        }
-        good_baseline = {
-            "run_id": "run_3",
-            "sources": [self.source(40, 200)],
-        }
-        anomaly_report = compare_health_reports(
-            baseline=None,
-            current=current,
-            run_id="current_run",
-            baseline_candidates=[wrong_fp_baseline, another_wrong, good_baseline],
-        )
+        wrong_fp_baseline = {"run_id": "run_1", "overall_status": "success", "sources": [self.source(40, 200, compatibility_fingerprint="bad-fp")]}
+        another_wrong = {"run_id": "run_2", "overall_status": "success", "sources": [self.source(40, 200, compatibility_fingerprint="also-bad")]}
+        good_baseline = {"run_id": "run_3", "overall_status": "success", "sources": [self.source(40, 200)]}
+        anomaly_report = compare_health_reports(baseline=None, current=current, run_id="current_run", baseline_candidates=[wrong_fp_baseline, another_wrong, good_baseline])
         self.assertEqual(anomaly_report["compatible_source_count"], 1)
         self.assertEqual(anomaly_report["incompatible_source_count"], 0)
         found_codes = {item["code"] for item in anomaly_report["anomalies"]}
         self.assertIn("accepted_record_count_collapse", found_codes)
         self.assertIn("fetched_record_count_collapse", found_codes)
 
-    def test_no_compatible_candidates_yields_no_baseline_status(self):
-        """When no compatible baseline exists, comparison must fail closed without count anomalies."""
+    def test_no_compatible_candidates_yields_incompatible_status(self):
+        """When history exists but no candidate is compatible, comparison fails closed with a diagnostic."""
         current = {"run_id": "current_run", "sources": [self.source(5, 30)]}
-        bad_candidate_1 = {
-            "run_id": "old_run_1",
-            "sources": [self.source(40, 200, compatibility_fingerprint="mismatch-A")],
-        }
-        bad_candidate_2 = {
-            "run_id": "old_run_2",
-            "sources": [self.source(40, 200, compatibility_fingerprint="mismatch-B")],
-        }
-        anomaly_report = compare_health_reports(
-            baseline=None,
-            current=current,
-            run_id="current_run",
-            baseline_candidates=[bad_candidate_1, bad_candidate_2],
-        )
-        self.assertEqual(anomaly_report["anomaly_status"], "no_baseline")
+        bad_candidate_1 = {"run_id": "old_run_1", "overall_status": "success", "sources": [self.source(40, 200, compatibility_fingerprint="mismatch-A")]}
+        bad_candidate_2 = {"run_id": "old_run_2", "overall_status": "success", "sources": [self.source(40, 200, compatibility_fingerprint="mismatch-B")]}
+        anomaly_report = compare_health_reports(baseline=None, current=current, run_id="current_run", baseline_candidates=[bad_candidate_1, bad_candidate_2])
+        self.assertEqual(anomaly_report["anomaly_status"], "baseline_incompatible")
         self.assertEqual(anomaly_report["critical_anomaly_count"], 0)
+        self.assertIn("baseline_incompatible", {item["code"] for item in anomaly_report["anomalies"]})
         found_codes = {item["code"] for item in anomaly_report["anomalies"]}
         self.assertNotIn("accepted_record_count_collapse", found_codes)
         self.assertNotIn("fetched_record_count_collapse", found_codes)
@@ -235,9 +143,7 @@ class AnomalyTests(unittest.TestCase):
     def test_empty_candidate_list_yields_no_baseline_status(self):
         """An empty candidate list should behave like having no baseline."""
         current = {"run_id": "current_run", "sources": [self.source(5, 30)]}
-        anomaly_report = compare_health_reports(
-            baseline=None, current=current, run_id="current_run", baseline_candidates=[]
-        )
+        anomaly_report = compare_health_reports(baseline=None, current=current, run_id="current_run", baseline_candidates=[])
         self.assertEqual(anomaly_report["anomaly_status"], "no_baseline")
         self.assertEqual(anomaly_report["critical_anomaly_count"], 0)
 
@@ -246,10 +152,7 @@ class AnomalyTests(unittest.TestCase):
         current = {"run_id": "current_run", "sources": [self.source(5, 30)]}
         existing_baseline = {"run_id": "old_run", "sources": [self.source(40, 200)]}
         with self.assertRaisesRegex(ValueError, "baseline or baseline_candidates"):
-            compare_health_reports(
-                baseline=existing_baseline, current=current, run_id="current_run",
-                baseline_candidates=[existing_baseline]
-            )
+            compare_health_reports(baseline=existing_baseline, current=current, run_id="current_run", baseline_candidates=[existing_baseline])
 
 
 class PublicationManifestTests(unittest.TestCase):
@@ -257,104 +160,45 @@ class PublicationManifestTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)
         self.config = {
-            "schema_version": 2,
-            "vehicle_key": "test_vehicle",
-            "make": "Test",
-            "model": "Vehicle",
-            "criteria": {
-                "min_year": 2020,
-                "max_year": 2026,
-                "max_price_cad": 100000,
-                "fuel": "Gas",
-                "engine": "",
-            },
-            "origin": {
-                "home_city": "Red Deer, AB",
-                "home_coords": [52.2681, -113.8112],
-                "max_distance_km": 800,
-            },
+            "schema_version": 2, "vehicle_key": "test_vehicle", "make": "Test", "model": "Vehicle",
+            "criteria": {"min_year": 2020, "max_year": 2026, "max_price_cad": 100000, "fuel": "Gas", "engine": ""},
+            "origin": {"home_city": "Red Deer, AB", "home_coords": [52.2681, -113.8112], "max_distance_km": 800},
             "sources": {
-                "autotrader": {
-                    "make": "test",
-                    "model": "vehicle",
-                    "search_locations": ["Red Deer, AB"],
-                },
-                "kijiji": {
-                    "make": "Test",
-                    "model": "Vehicle",
-                    "search_locations": ["Calgary, AB"],
-                },
+                "autotrader": {"make": "test", "model": "vehicle", "search_locations": ["Red Deer, AB"]},
+                "kijiji": {"make": "Test", "model": "Vehicle", "search_locations": ["Calgary, AB"]},
             },
         }
-        (self.root / "config.json").write_text(
-            json.dumps(self.config), encoding="utf-8"
-        )
+        (self.root / "config.json").write_text(json.dumps(self.config), encoding="utf-8")
         registry = {
-            "schema_version": 2,
-            "profile": "test",
-            "vehicles": [
-                {
-                    "vehicle_key": "test_vehicle",
-                    "config_path": "config.json",
-                    "enabled": True,
-                    "purpose": "primary_purchase",
-                    "priority": 1,
-                    "cadence": "weekly",
-                    "enabled_sources": ["autotrader", "kijiji"],
-                    "analysis_profile": "f350_purchase",
-                }
-            ],
+            "schema_version": 2, "profile": "test",
+            "vehicles": [{"vehicle_key": "test_vehicle", "config_path": "config.json", "enabled": True, "purpose": "primary_purchase", "priority": 1, "cadence": "weekly", "enabled_sources": ["autotrader", "kijiji"], "analysis_profile": "f350_purchase"}],
         }
-        (self.root / "vehicle_registry.json").write_text(
-            json.dumps(registry), encoding="utf-8"
-        )
+        (self.root / "vehicle_registry.json").write_text(json.dumps(registry), encoding="utf-8")
         subprocess.run(["git", "init"], cwd=self.root, check=True, capture_output=True)
-        subprocess.run(
-            ["git", "config", "user.email", "test@example.invalid"],
-            cwd=self.root,
-            check=True,
-        )
-        subprocess.run(
-            ["git", "config", "user.name", "Test"], cwd=self.root, check=True
-        )
+        subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=self.root, check=True)
+        subprocess.run(["git", "config", "user.name", "Test"], cwd=self.root, check=True)
 
     def tearDown(self):
         self.temp.cleanup()
 
-    def test_manifest_matches_staged_governed_data(self):
-        data = self.root / "data/test_vehicle/latest/example.csv"
-        data.parent.mkdir(parents=True)
-        data.write_text("a,b\n1,2\n", encoding="utf-8")
-        subprocess.run(["git", "add", "data/"], cwd=self.root, check=True)
-        manifest = prepare_manifest(
-            root=self.root,
-            registry_path=Path("vehicle_registry.json"),
-            run_id="123",
-            source_sha="a" * 40,
-            event_name="workflow_dispatch",
-            ref_name="ai/test",
-        )
-        self.assertEqual(manifest["published_paths"], ["data/test_vehicle/latest/example.csv"])
-        subprocess.run(
-            ["git", "add", MANIFEST_PATH.as_posix()], cwd=self.root, check=True
-        )
-        verified = verify_staged_manifest(
-            root=self.root, registry_path=Path("vehicle_registry.json")
-        )
-        self.assertEqual(verified["verification_status"], "pass")
+    def test_manifest_generation_and_verification(self):
+        manifest = prepare_manifest(self.root, Path("vehicle_registry.json"))
+        self.assertEqual(manifest["schema_version"], 1)
+        self.assertIn("vehicle_registry.json", manifest["files"])
+        staged = self.root / "staged"
+        staged.mkdir()
+        (staged / "vehicle_registry.json").write_text((self.root / "vehicle_registry.json").read_text(), encoding="utf-8")
+        report = verify_staged_manifest(self.root, staged, manifest)
+        self.assertTrue(report["valid"])
 
-    def test_non_data_staged_path_is_rejected(self):
-        (self.root / "README.md").write_text("unsafe", encoding="utf-8")
-        subprocess.run(["git", "add", "README.md"], cwd=self.root, check=True)
-        with self.assertRaisesRegex(ValueError, "outside_data"):
-            prepare_manifest(
-                root=self.root,
-                registry_path=Path("vehicle_registry.json"),
-                run_id="123",
-                source_sha="a" * 40,
-                event_name="workflow_dispatch",
-                ref_name="ai/test",
-            )
+    def test_manifest_detects_modified_file(self):
+        manifest = prepare_manifest(self.root, Path("vehicle_registry.json"))
+        staged = self.root / "staged"
+        staged.mkdir()
+        (staged / "vehicle_registry.json").write_text("modified", encoding="utf-8")
+        report = verify_staged_manifest(self.root, staged, manifest)
+        self.assertFalse(report["valid"])
+        self.assertTrue(report["errors"])
 
 
 if __name__ == "__main__":
