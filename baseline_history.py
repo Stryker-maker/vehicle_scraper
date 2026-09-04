@@ -113,10 +113,10 @@ def _discover_selection(*, root: Path, current: dict[str, Any], path: str, histo
         if not candidate:
             reasons["missing_or_malformed"] = reasons.get("missing_or_malformed", 0) + 1
             continue
-        seen += 1
         if candidate.get("run_id") == current_run_id:
             reasons["same_run"] = reasons.get("same_run", 0) + 1
             continue
+        seen += 1
         if not _is_successful_report(candidate):
             reasons["unsuccessful"] = reasons.get("unsuccessful", 0) + 1
             continue
