@@ -4,6 +4,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -33,16 +34,14 @@ class DependencyLockTests(unittest.TestCase):
 class WorkflowControlTests(unittest.TestCase):
     def test_full_and_single_pair_plans_are_registry_governed(self):
         root = Path(__file__).resolve().parents[1]
-        import os
-        os.environ["GITHUB_EVENT_NAME"] = "schedule"
-        full_schedule = build_collection_plan(root=root, scope="full", registry_path=Path("vehicle_registry.json"))
-        self.assertEqual(len(full_schedule), 10)
-        self.assertFalse(any("f150" in str(p) for p, _ in full_schedule))
-        os.environ["GITHUB_EVENT_NAME"] = "workflow_dispatch"
-        full_manual = build_collection_plan(root=root, scope="full", registry_path=Path("vehicle_registry.json"))
-        self.assertEqual(len(full_manual), 12)
-        self.assertTrue(any("f150" in str(p) for p, _ in full_manual))
-        del os.environ["GITHUB_EVENT_NAME"]
+        with patch.dict("os.environ", {"GITHUB_EVENT_NAME": "schedule"}):
+            full_schedule = build_collection_plan(root=root, scope="full", registry_path=Path("vehicle_registry.json"))
+            self.assertEqual(len(full_schedule), 10)
+            self.assertFalse(any("f150" in str(p) for p, _ in full_schedule))
+        with patch.dict("os.environ", {"GITHUB_EVENT_NAME": "workflow_dispatch"}):
+            full_manual = build_collection_plan(root=root, scope="full", registry_path=Path("vehicle_registry.json"))
+            self.assertEqual(len(full_manual), 12)
+            self.assertTrue(any("f150" in str(p) for p, _ in full_manual))
         single = build_collection_plan(root=root, scope="single_pair", registry_path=Path("vehicle_registry.json"), vehicle_key="ford_f350", source="kijiji")
         self.assertEqual(single, [(Path("config_f350.json"), "kijiji")])
         with self.assertRaisesRegex(ValueError, "paused"):
@@ -61,7 +60,7 @@ class AnomalyTests(unittest.TestCase):
         return value
 
     def test_material_count_collapse_is_critical(self):
-        baseline = {"run_id": "old", "sources": [self.source(40, 200)]}
+        baseline = {"run_id": "old", "overall_status": "success", "sources": [self.source(40, 200)]}
         current = {"run_id": "new", "sources": [self.source(5, 30)]}
         report = compare_health_reports(baseline=baseline, current=current, run_id="new")
         self.assertEqual(report["anomaly_status"], "critical")
@@ -70,7 +69,7 @@ class AnomalyTests(unittest.TestCase):
         self.assertIn("fetched_record_count_collapse", codes)
 
     def test_parse_rate_and_quality_growth_are_visible(self):
-        baseline = {"run_id": "old", "sources": [self.source(20, 100)]}
+        baseline = {"run_id": "old", "overall_status": "success", "sources": [self.source(20, 100)]}
         current = {"run_id": "new", "sources": [self.source(18, 100, parse_failure_count=6, quality_warning_rows=7)]}
         report = compare_health_reports(baseline=baseline, current=current, run_id="new")
         codes = {value["code"] for value in report["anomalies"]}
@@ -85,7 +84,7 @@ class AnomalyTests(unittest.TestCase):
         self.assertEqual(report["critical_anomaly_count"], 0)
 
     def test_incompatible_baseline_cannot_drive_count_anomalies(self):
-        baseline = {"run_id": "old", "sources": [self.source(100, 400, compatibility_fingerprint="old-scope")]}
+        baseline = {"run_id": "old", "overall_status": "success", "sources": [self.source(100, 400, compatibility_fingerprint="old-scope")]}
         current = {"run_id": "new", "sources": [self.source(5, 20)]}
         report = compare_health_reports(baseline=baseline, current=current, run_id="new")
         codes = {value["code"] for value in report["anomalies"]}
@@ -98,7 +97,7 @@ class AnomalyTests(unittest.TestCase):
         self.assertEqual(report["anomaly_status"], "baseline_incompatible")
 
     def test_missing_fingerprint_is_fail_closed(self):
-        baseline = {"run_id": "old", "sources": [self.source(100, 400, compatibility_fingerprint=None)]}
+        baseline = {"run_id": "old", "overall_status": "success", "sources": [self.source(100, 400, compatibility_fingerprint=None)]}
         current = {"run_id": "new", "sources": [self.source(5, 20)]}
         report = compare_health_reports(baseline=baseline, current=current, run_id="new")
         codes = {value["code"] for value in report["anomalies"]}
@@ -107,7 +106,7 @@ class AnomalyTests(unittest.TestCase):
         self.assertEqual(report["critical_anomaly_count"], 0)
 
     def test_compatible_baseline_still_drives_existing_anomalies(self):
-        baseline = {"run_id": "old", "sources": [self.source(40, 200)]}
+        baseline = {"run_id": "old", "overall_status": "success", "sources": [self.source(40, 200)]}
         current = {"run_id": "new", "sources": [self.source(5, 30)]}
         report = compare_health_reports(baseline=baseline, current=current, run_id="new")
         self.assertEqual(report["compatible_source_count"], 1)
@@ -150,7 +149,7 @@ class AnomalyTests(unittest.TestCase):
     def test_providing_both_baseline_and_candidates_raises_error(self):
         """Supplying both baseline and baseline_candidates should trigger an error."""
         current = {"run_id": "current_run", "sources": [self.source(5, 30)]}
-        existing_baseline = {"run_id": "old_run", "sources": [self.source(40, 200)]}
+        existing_baseline = {"run_id": "old_run", "overall_status": "success", "sources": [self.source(40, 200)]}
         with self.assertRaisesRegex(ValueError, "baseline or baseline_candidates"):
             compare_health_reports(baseline=existing_baseline, current=current, run_id="current_run", baseline_candidates=[existing_baseline])
 
