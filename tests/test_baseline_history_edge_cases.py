@@ -26,9 +26,7 @@ class BaselineHistoryEdgeCaseTests(unittest.TestCase):
             "middle": {"run_id": "middle", "overall_status": "success", "sources": [self.source(fingerprint="fp-bad-2")]},
             "old": {"run_id": "old", "overall_status": "success", "sources": [self.source()]},
         }
-        with patch("baseline_history._git_history_paths", return_value=["new", "middle", "old"]) as history, patch(
-            "baseline_history._read_git_json", side_effect=lambda root, revision, path: reports[revision]
-        ) as reader:
+        with patch("baseline_history._git_history_paths", return_value=["new", "middle", "old"]) as history, patch("baseline_history._read_git_json", side_effect=lambda root, revision, path: reports[revision]) as reader:
             selected = discover_compatible_baseline(root=Path("."), current=current, history_limit=3)
         self.assertEqual(selected["run_id"], "old")
         history.assert_called_once_with(Path("."), "data/run_status/latest.json", 3)
@@ -37,9 +35,7 @@ class BaselineHistoryEdgeCaseTests(unittest.TestCase):
     def test_malformed_and_missing_historical_reports_are_skipped(self):
         current = self.current()
         reports = {"malformed": None, "missing": None, "good": {"run_id": "good", "overall_status": "success", "sources": [self.source()]}}
-        with patch("baseline_history._git_history_paths", return_value=["malformed", "missing", "good"]), patch(
-            "baseline_history._read_git_json", side_effect=lambda root, revision, path: reports[revision]
-        ):
+        with patch("baseline_history._git_history_paths", return_value=["malformed", "missing", "good"]), patch("baseline_history._read_git_json", side_effect=lambda root, revision, path: reports[revision]):
             selected = discover_compatible_baseline(root=Path("."), current=current)
         self.assertEqual(selected["run_id"], "good")
 
@@ -51,9 +47,7 @@ class BaselineHistoryEdgeCaseTests(unittest.TestCase):
 
     def test_history_limit_is_passed_to_git_history_discovery(self):
         current = self.current()
-        with patch("baseline_history._git_history_paths", return_value=["new"]) as history, patch(
-            "baseline_history._read_git_json", return_value={"run_id": "new", "overall_status": "success", "sources": [self.source(fingerprint="bad")]}
-        ) as reader:
+        with patch("baseline_history._git_history_paths", return_value=["new"]) as history, patch("baseline_history._read_git_json", return_value={"run_id": "new", "overall_status": "success", "sources": [self.source(fingerprint="bad")]} ) as reader:
             selected = discover_compatible_baseline(root=Path("."), current=current, history_limit=1)
         self.assertIsNone(selected)
         history.assert_called_once_with(Path("."), "data/run_status/latest.json", 1)
@@ -111,7 +105,7 @@ class BaselineHistoryEdgeCaseTests(unittest.TestCase):
     def test_direct_selector_rejects_invalid_candidates_and_chooses_next_complete_one(self):
         current = self.current([self.source(source="autotrader"), self.source(source="kijiji")])
         candidates = [
-            {"run_id": "same", "overall_status": "success", "sources": [self.source(source="autotrader"), self.source(source="kijiji")]},
+            {"run_id": "current-run", "overall_status": "success", "sources": [self.source(source="autotrader"), self.source(source="kijiji")]},
             {"run_id": "failed", "overall_status": "failure", "sources": [self.source(source="autotrader"), self.source(source="kijiji")]},
             {"run_id": "incomplete", "overall_status": "success", "sources": [self.source(source="autotrader")]},
             {"run_id": "bad-fp", "overall_status": "success", "sources": [self.source(source="autotrader", fingerprint="bad"), self.source(source="kijiji")]},
@@ -146,7 +140,6 @@ class BaselineHistoryEdgeCaseTests(unittest.TestCase):
             commit({"run_id": "bad", "overall_status": "success", "sources": [self.source(fingerprint="bad")]}, "incompatible")
             commit({"run_id": "current-run", "overall_status": "success", "sources": [self.source()]}, "current")
             selected = discover_compatible_baseline(root=root, current=self.current(), history_limit=3)
-
         self.assertEqual(selected["run_id"], "good")
 
 
