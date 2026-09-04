@@ -73,6 +73,23 @@ def _candidate_is_eligible(*, candidate: Any, current: dict[str, Any]) -> bool:
     )
 
 
+def _direct_baseline_is_usable(*, baseline: Any, current: dict[str, Any]) -> bool:
+    """Validate a direct baseline's structure before per-source fingerprint checks."""
+    if not isinstance(baseline, dict):
+        return False
+    if baseline.get("run_id") == current.get("run_id"):
+        return False
+    status = baseline.get("overall_status")
+    if status is not None and status not in {"success", "success_with_warnings"}:
+        return False
+    current_sources = _source_entries(current)
+    baseline_sources = _source_entries(baseline)
+    if current_sources is None or not current_sources or baseline_sources is None:
+        return False
+    baseline_keys = {_source_key(entry) for entry in baseline_sources}
+    return all(_source_key(entry) in baseline_keys for entry in current_sources)
+
+
 def _select_compatible_baseline(*, baseline_candidates: list[dict[str, Any]], current: dict[str, Any]) -> dict[str, Any] | None:
     """Select the first candidate satisfying the complete baseline eligibility contract."""
     for candidate in baseline_candidates:
@@ -94,7 +111,7 @@ def compare_health_reports(*, baseline: dict[str, Any] | None, current: dict[str
             baseline_selection = {"status": "incompatible"}
     elif isinstance(baseline, dict):
         baseline_selection = baseline.get("_baseline_selection")
-        if baseline_selection is None and not _candidate_is_eligible(candidate=baseline, current=current):
+        if baseline_selection is None and not _direct_baseline_is_usable(baseline=baseline, current=current):
             baseline_selection = {"status": "incompatible"}
 
     anomalies: list[dict[str, Any]] = []
@@ -105,9 +122,9 @@ def compare_health_reports(*, baseline: dict[str, Any] | None, current: dict[str
         baseline_status = "unavailable"
     elif baseline.get("run_id") == current.get("run_id"):
         baseline_status = "same_run_not_compared"
-    elif _source_entries(baseline) is None:
+    elif _source_entries(current) is None:
         baseline_status = "incompatible"
-    elif baseline.get("overall_status") not in {None, "success", "success_with_warnings"}:
+    elif not _direct_baseline_is_usable(baseline=baseline, current=current):
         baseline_status = "incompatible"
 
     return _perform_comparison(baseline=baseline, current=current, run_id=run_id,
