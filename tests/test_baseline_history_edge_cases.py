@@ -30,8 +30,8 @@ class BaselineHistoryEdgeCaseTests(unittest.TestCase):
     def test_history_is_evaluated_newest_to_oldest(self):
         current = self.current()
         reports = {
-            "new": {"run_id": "new", "overall_status": "success", "sources": [self.source("fp-bad")]},
-            "middle": {"run_id": "middle", "overall_status": "success", "sources": [self.source("fp-bad-2")]},
+            "new": {"run_id": "new", "overall_status": "success", "sources": [self.source(fingerprint="fp-bad")]},
+            "middle": {"run_id": "middle", "overall_status": "success", "sources": [self.source(fingerprint="fp-bad-2")]},
             "old": {"run_id": "old", "overall_status": "success", "sources": [self.source()]},
         }
         with patch("baseline_history._git_history_paths", return_value=["new", "middle", "old"]) as history, patch(
@@ -61,16 +61,17 @@ class BaselineHistoryEdgeCaseTests(unittest.TestCase):
         with patch("baseline_history._git_history_paths", side_effect=failure):
             self.assertIsNone(discover_compatible_baseline(root=Path("."), current=current))
 
-    def test_history_limit_excludes_candidates_beyond_requested_window(self):
+    def test_history_limit_is_passed_to_git_history_discovery(self):
         current = self.current()
-        with patch("baseline_history._git_history_paths", return_value=["new", "old"]) as history, patch(
+        with patch("baseline_history._git_history_paths", return_value=["new"]) as history, patch(
             "baseline_history._read_git_json", return_value={
-                "run_id": "old", "overall_status": "success", "sources": [self.source()]
+                "run_id": "new", "overall_status": "success", "sources": [self.source(fingerprint="bad")]
             }
-        ):
+        ) as reader:
             selected = discover_compatible_baseline(root=Path("."), current=current, history_limit=1)
-        self.assertEqual(selected["run_id"], "old")
+        self.assertIsNone(selected)
         history.assert_called_once_with(Path("."), "data/run_status/latest.json", 1)
+        self.assertEqual(reader.call_count, 1)
 
     def test_same_run_candidate_is_skipped_before_compatible_history(self):
         current = self.current()
