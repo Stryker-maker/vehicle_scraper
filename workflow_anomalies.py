@@ -55,7 +55,8 @@ def _candidate_is_eligible(*, candidate: Any, current: dict[str, Any]) -> bool:
         return False
     if candidate.get("run_id") == current.get("run_id"):
         return False
-    if candidate.get("overall_status") not in {"success", "success_with_warnings"}:
+    status = candidate.get("overall_status")
+    if status is not None and status not in {"success", "success_with_warnings"}:
         return False
     current_sources = _source_entries(current)
     candidate_entries = _source_entries(candidate)
@@ -106,7 +107,7 @@ def compare_health_reports(*, baseline: dict[str, Any] | None, current: dict[str
         baseline_status = "same_run_not_compared"
     elif _source_entries(baseline) is None:
         baseline_status = "incompatible"
-    elif baseline.get("overall_status") not in {"success", "success_with_warnings"}:
+    elif baseline.get("overall_status") not in {None, "success", "success_with_warnings"}:
         baseline_status = "incompatible"
 
     return _perform_comparison(baseline=baseline, current=current, run_id=run_id,
@@ -157,7 +158,6 @@ def _append_count_anomalies(entry: dict[str, Any], previous: dict[str, Any],
         elif new >= old * 3 and new - old >= minimum * 2:
             anomalies.append(_anomaly(severity="warning", code=f"{metric}_surge", vehicle_key=vehicle_key, source=source,
                                       message=f"{metric} increased to at least three times baseline.", baseline=old, current=new, threshold=3.0))
-
     old_attempts = _number(previous.get("request_attempt_count"))
     new_attempts = _number(entry.get("request_attempt_count"))
     if old_attempts >= 1 and new_attempts >= old_attempts * 3 and new_attempts - old_attempts >= 5:
@@ -178,11 +178,9 @@ def _perform_comparison(*, baseline: dict[str, Any] | None, current: dict[str, A
     baseline_sources = {_source_key(e): e for e in (_source_entries(baseline) or [])}
     compatible_source_count = 0
     incompatible_source_count = 0
-
     if baseline_status == "incompatible":
         anomalies.append(_anomaly(severity="info", code="baseline_incompatible", vehicle_key="", source="",
                                   message="Historical health reports existed but none was semantically compatible with the current source run; count-based baseline anomalies were not evaluated."))
-
     for entry in current_sources:
         _append_current_health_anomalies(entry, anomalies)
         if baseline_status != "available":
@@ -203,7 +201,6 @@ def _perform_comparison(*, baseline: dict[str, Any] | None, current: dict[str, A
             continue
         compatible_source_count += 1
         _append_count_anomalies(entry, previous, vehicle_key, source, anomalies)
-
     counts = {severity: sum(value["severity"] == severity for value in anomalies) for severity in ("critical", "warning", "info")}
     status = ("critical" if counts["critical"] else "warning" if counts["warning"] else
               "baseline_incompatible" if baseline_status == "incompatible" else
