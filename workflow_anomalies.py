@@ -12,10 +12,12 @@ ANOMALY_POLICIES = ("enforce", "report_only")
 
 
 def _source_key(value: dict[str, Any]) -> tuple[str, str]:
+    """Return the stable vehicle/source key for a health-report entry."""
     return str(value.get("vehicle_key") or ""), str(value.get("source") or "")
 
 
 def _number(value: Any) -> int:
+    """Convert a report metric to an integer, treating invalid values as zero."""
     try:
         return int(value)
     except (TypeError, ValueError):
@@ -23,6 +25,7 @@ def _number(value: Any) -> int:
 
 
 def _compatibility_fingerprint(value: dict[str, Any]) -> str | None:
+    """Return a normalized compatibility fingerprint when one is present."""
     fingerprint = value.get("compatibility_fingerprint")
     if not isinstance(fingerprint, str) or not fingerprint.strip():
         return None
@@ -31,6 +34,7 @@ def _compatibility_fingerprint(value: dict[str, Any]) -> str | None:
 
 def _anomaly(*, severity: str, code: str, vehicle_key: str, source: str, message: str,
              baseline: Any = None, current: Any = None, threshold: Any = None) -> dict[str, Any]:
+    """Build one structured anomaly diagnostic."""
     return {"severity": severity, "code": code, "vehicle_key": vehicle_key,
             "source": source, "message": message, "baseline": baseline,
             "current": current, "threshold": threshold}
@@ -55,8 +59,7 @@ def _candidate_is_eligible(*, candidate: Any, current: dict[str, Any]) -> bool:
         return False
     if candidate.get("run_id") == current.get("run_id"):
         return False
-    status = candidate.get("overall_status")
-    if status is not None and status not in {"success", "success_with_warnings"}:
+    if candidate.get("overall_status") not in {"success", "success_with_warnings"}:
         return False
     current_sources = _source_entries(current)
     candidate_entries = _source_entries(candidate)
@@ -79,8 +82,7 @@ def _direct_baseline_is_usable(*, baseline: Any, current: dict[str, Any]) -> boo
         return False
     if baseline.get("run_id") == current.get("run_id"):
         return False
-    status = baseline.get("overall_status")
-    if status is not None and status not in {"success", "success_with_warnings"}:
+    if baseline.get("overall_status") not in {"success", "success_with_warnings"}:
         return False
     current_sources = _source_entries(current)
     baseline_sources = _source_entries(baseline)
@@ -188,6 +190,39 @@ def _append_count_anomalies(entry: dict[str, Any], previous: dict[str, Any],
                                   threshold=max(5, old_warnings * 2 + 1)))
 
 
+def _append_baseline_anomalies(*, entry: dict[str, Any], baseline_sources: dict[tuple[str, str], dict[str, Any]],
+                               anomalies: list[dict[str, Any]]) -> tuple[bool, bool]:
+    """Compare one current source with its baseline and return compatibility/count flags."""
+    vehicle_key, source = _source_key(entry)
+    previous = baseline_sources.get((vehicle_key, source))
+    if previous is None:
+        anomalies.append(_anomaly(severity="info", code="source_has_no_baseline", vehicle_key=vehicle_key, source=source,
+                                  message="No prior source baseline is available."))
+        return False, False
+    current_fingerprint = _compatibility_fingerprint(entry)
+    baseline_fingerprint = _compatibility_fingerprint(previous)
+    if current_fingerprint is None or baseline_fingerprint is None or current_fingerprint != baseline_fingerprint:
+        anomalies.append(_anomaly(severity="info", code="baseline_incompatible", vehicle_key=vehicle_key, source=source,
+                                  message="Baseline is semantically incompatible with the current source run and will not drive anomaly comparison.",
+                                  baseline=baseline_fingerprint, current=current_fingerprint))
+        return False, True
+    _append_count_anomalies(entry, previous, vehicle_key, source, anomalies)
+    return True, False
+
+
+def _anomaly_status(*, counts: dict[str, int], baseline_status: str, incompatible_source_count: int) -> str:
+    """Return overall anomaly status in descending order of severity."""
+    if counts["critical"]:
+        return "critical"
+    if counts["warning"]:
+        return "warning"
+    if baseline_status == "incompatible" or incompatible_source_count:
+        return "baseline_incompatible"
+    if baseline_status == "available":
+        return "clean"
+    return "no_baseline"
+
+
 def _perform_comparison(*, baseline: dict[str, Any] | None, current: dict[str, Any],
                         run_id: str, baseline_status: str, anomalies: list[dict[str, Any]]) -> dict[str, Any]:
     """Evaluate current-run health and count anomalies only against an eligible baseline."""
@@ -202,27 +237,14 @@ def _perform_comparison(*, baseline: dict[str, Any] | None, current: dict[str, A
         _append_current_health_anomalies(entry, anomalies)
         if baseline_status != "available":
             continue
-        vehicle_key, source = _source_key(entry)
-        previous = baseline_sources.get((vehicle_key, source))
-        if previous is None:
-            anomalies.append(_anomaly(severity="info", code="source_has_no_baseline", vehicle_key=vehicle_key, source=source,
-                                      message="No prior source baseline is available."))
-            continue
-        current_fingerprint = _compatibility_fingerprint(entry)
-        baseline_fingerprint = _compatibility_fingerprint(previous)
-        if current_fingerprint is None or baseline_fingerprint is None or current_fingerprint != baseline_fingerprint:
-            incompatible_source_count += 1
-            anomalies.append(_anomaly(severity="info", code="baseline_incompatible", vehicle_key=vehicle_key, source=source,
-                                      message="Baseline is semantically incompatible with the current source run and will not drive anomaly comparison.",
-                                      baseline=baseline_fingerprint, current=current_fingerprint))
-            continue
-        compatible_source_count += 1
-        _append_count_anomalies(entry, previous, vehicle_key, source, anomalies)
+        compatible, incompatible = _append_baseline_anomalies(
+            entry=entry, baseline_sources=baseline_sources, anomalies=anomalies
+        )
+        compatible_source_count += int(compatible)
+        incompatible_source_count += int(incompatible)
     counts = {severity: sum(value["severity"] == severity for value in anomalies) for severity in ("critical", "warning", "info")}
-    status = ("critical" if counts["critical"] else "warning" if counts["warning"] else
-              "baseline_incompatible" if baseline_status == "incompatible" else
-              "baseline_incompatible" if incompatible_source_count else
-              "clean" if baseline_status == "available" else "no_baseline")
+    status = _anomaly_status(counts=counts, baseline_status=baseline_status,
+                             incompatible_source_count=incompatible_source_count)
     return {"anomaly_schema_version": ANOMALY_SCHEMA_VERSION, "run_id": run_id, "generated_at_utc": utc_now(),
             "baseline_status": baseline_status, "baseline_run_id": (baseline or {}).get("run_id"),
             "current_health_run_id": current.get("run_id"), "compatible_source_count": compatible_source_count,
