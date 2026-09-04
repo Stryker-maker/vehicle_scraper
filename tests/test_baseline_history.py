@@ -67,31 +67,47 @@ class BaselineHistoryTests(unittest.TestCase):
         with patch("baseline_history._git_history_paths", return_value=["r1"]), patch(
             "baseline_history._read_git_json", side_effect=candidates
         ):
-            self.assertIsNone(
-                discover_compatible_baseline(root=Path("."), current=self.current())
-            )
+            self.assertIsNone(discover_compatible_baseline(root=Path("."), current=self.current()))
 
-    def test_selected_baseline_is_written(self):
+    def test_selected_baseline_is_written_with_selection_metadata(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             current_path = root / "current.json"
             output_path = root / "baseline.json"
-            current = self.current()
-            current_path.write_text(json.dumps(current), encoding="utf-8")
+            current_path.write_text(json.dumps(self.current()), encoding="utf-8")
             selected = {"run_id": "older", "overall_status": "success", "sources": [self.source()]}
-            with patch("baseline_history.discover_compatible_baseline", return_value=selected):
-                result = write_selected_baseline(
-                    root=root, current_path=current_path, output_path=output_path
-                )
+            metadata = {"schema_version": 1, "status": "selected", "historical_candidate_count": 1}
+            with patch("baseline_history._discover_selection", return_value=(selected, metadata)):
+                result = write_selected_baseline(root=root, current_path=current_path, output_path=output_path)
+            artifact = json.loads(output_path.read_text(encoding="utf-8"))
             self.assertEqual(result["run_id"], "older")
-            self.assertEqual(json.loads(output_path.read_text(encoding="utf-8"))["run_id"], "older")
+            self.assertEqual(artifact["run_id"], "older")
+            self.assertEqual(artifact["_baseline_selection"]["status"], "selected")
+
+    def test_no_compatible_history_writes_incompatibility_metadata(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            current_path = root / "current.json"
+            output_path = root / "baseline.json"
+            current_path.write_text(json.dumps(self.current()), encoding="utf-8")
+            metadata = {
+                "schema_version": 1,
+                "status": "incompatible",
+                "reason": "no_compatible_historical_baseline",
+                "historical_candidate_count": 2,
+                "rejection_reasons": {"incompatible": 2},
+            }
+            with patch("baseline_history._discover_selection", return_value=(None, metadata)):
+                result = write_selected_baseline(root=root, current_path=current_path, output_path=output_path)
+            artifact = json.loads(output_path.read_text(encoding="utf-8"))
+            self.assertEqual(result["_baseline_selection"]["status"], "incompatible")
+            self.assertEqual(artifact["_baseline_selection"]["historical_candidate_count"], 2)
+            self.assertEqual(artifact["sources"], [])
 
 
 class WorkflowBaselineWiringTests(unittest.TestCase):
     def test_scrape_workflow_discovers_history_instead_of_copying_latest(self):
-        workflow = (Path(__file__).resolve().parents[1] / ".github" / "workflows" / "scrape.yml").read_text(
-            encoding="utf-8"
-        )
+        workflow = (Path(__file__).resolve().parents[1] / ".github" / "workflows" / "scrape.yml").read_text(encoding="utf-8")
         self.assertIn("Discover compatible historical health baseline", workflow)
         self.assertIn("python baseline_history.py", workflow)
         self.assertNotIn("cp data/run_status/latest.json", workflow)
