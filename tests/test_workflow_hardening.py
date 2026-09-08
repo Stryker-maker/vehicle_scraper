@@ -59,6 +59,14 @@ class AnomalyTests(unittest.TestCase):
         value.update(extra)
         return value
 
+    @staticmethod
+    def count_anomaly_codes(report):
+        return {
+            value["code"]
+            for value in report["anomalies"]
+            if value["code"].endswith(("_collapse", "_drop", "_surge"))
+        }
+
     def test_material_count_collapse_is_critical(self):
         baseline = {"run_id": "old", "overall_status": "success", "sources": [self.source(40, 200)]}
         current = {"run_id": "new", "sources": [self.source(5, 30)]}
@@ -93,7 +101,6 @@ class AnomalyTests(unittest.TestCase):
         self.assertNotIn("fetched_record_count_collapse", codes)
         self.assertEqual(report["critical_anomaly_count"], 0)
         self.assertEqual(report["warning_anomaly_count"], 0)
-        self.assertEqual(report["incompatible_source_count"], 1)
         self.assertEqual(report["anomaly_status"], "baseline_incompatible")
 
     def test_missing_fingerprint_is_fail_closed(self):
@@ -104,6 +111,35 @@ class AnomalyTests(unittest.TestCase):
         self.assertIn("baseline_incompatible", codes)
         self.assertNotIn("accepted_record_count_collapse", codes)
         self.assertEqual(report["critical_anomaly_count"], 0)
+
+    def test_direct_unsuccessful_baseline_is_rejected(self):
+        baseline = {"run_id": "failed", "overall_status": "failure", "sources": [self.source(100, 400)]}
+        current = {"run_id": "new", "sources": [self.source(5, 20)]}
+        report = compare_health_reports(baseline=baseline, current=current, run_id="new")
+        self.assertEqual(report["baseline_status"], "incompatible")
+        self.assertEqual(self.count_anomaly_codes(report), set())
+        self.assertIn("baseline_incompatible", {item["code"] for item in report["anomalies"]})
+
+    def test_direct_incomplete_baseline_is_rejected(self):
+        current = {"run_id": "new", "sources": [self.source(5, 20), self.source(5, 20, source="kijiji")]}
+        baseline = {"run_id": "old", "overall_status": "success", "sources": [self.source(100, 400)]}
+        report = compare_health_reports(baseline=baseline, current=current, run_id="new")
+        self.assertEqual(report["baseline_status"], "incompatible")
+        self.assertEqual(self.count_anomaly_codes(report), set())
+
+    def test_direct_duplicate_baseline_sources_are_rejected(self):
+        baseline = {"run_id": "old", "overall_status": "success", "sources": [self.source(100, 400), self.source(90, 350)]}
+        current = {"run_id": "new", "sources": [self.source(5, 20)]}
+        report = compare_health_reports(baseline=baseline, current=current, run_id="new")
+        self.assertEqual(report["baseline_status"], "incompatible")
+        self.assertEqual(self.count_anomaly_codes(report), set())
+
+    def test_direct_malformed_baseline_source_is_rejected(self):
+        baseline = {"run_id": "old", "overall_status": "success", "sources": [self.source(100, 400), "not-a-source-object"]}
+        current = {"run_id": "new", "sources": [self.source(5, 20)]}
+        report = compare_health_reports(baseline=baseline, current=current, run_id="new")
+        self.assertEqual(report["baseline_status"], "incompatible")
+        self.assertEqual(self.count_anomaly_codes(report), set())
 
     def test_compatible_baseline_still_drives_existing_anomalies(self):
         baseline = {"run_id": "old", "overall_status": "success", "sources": [self.source(40, 200)]}
@@ -138,6 +174,15 @@ class AnomalyTests(unittest.TestCase):
         found_codes = {item["code"] for item in anomaly_report["anomalies"]}
         self.assertNotIn("accepted_record_count_collapse", found_codes)
         self.assertNotIn("fetched_record_count_collapse", found_codes)
+
+    def test_malformed_candidate_entry_is_rejected(self):
+        """A candidate containing a non-object source entry cannot become a baseline."""
+        current = {"run_id": "current_run", "sources": [self.source(5, 30)]}
+        malformed = {"run_id": "malformed", "overall_status": "success", "sources": [self.source(40, 200), "malformed-entry"]}
+        report = compare_health_reports(baseline=None, current=current, run_id="current_run", baseline_candidates=[malformed])
+        self.assertEqual(report["baseline_status"], "incompatible")
+        self.assertEqual(self.count_anomaly_codes(report), set())
+        self.assertIn("baseline_incompatible", {item["code"] for item in report["anomalies"]})
 
     def test_empty_candidate_list_yields_no_baseline_status(self):
         """An empty candidate list should behave like having no baseline."""
