@@ -560,26 +560,51 @@ def load_optional_json(path: Path) -> dict[str, Any] | None:
 
 def parser() -> argparse.ArgumentParser:
     """Build the command-line parser for anomaly reporting."""
-    result = argparse.ArgumentParser(description="Build vehicle collection anomaly report")
-    result.add_argument("--baseline")
-    result.add_argument("--current", required=True)
-    result.add_argument("--run-id", required=True)
-    result.add_argument("--policy", choices=ANOMALY_POLICIES, default="enforce")
+    result = argparse.ArgumentParser(description="Compare collection health with baseline")
+    sub = result.add_subparsers(dest="action", required=True)
+    build = sub.add_parser("build")
+    build.add_argument("--baseline", required=True)
+    build.add_argument("--current", required=True)
+    build.add_argument("--run-id", required=True)
+    check = sub.add_parser("check")
+    check.add_argument("--report", default="data/run_status/anomalies_latest.json")
+    check.add_argument("--policy", choices=ANOMALY_POLICIES, required=True)
     return result
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Generate and persist the anomaly report from command-line inputs."""
+    """Run anomaly report construction or policy checking from CLI arguments."""
     args = parser().parse_args(argv)
     root = Path.cwd()
-    current = load_optional_json(Path(args.current)) or {}
-    baseline = load_optional_json(Path(args.baseline)) if args.baseline else None
-    report = compare_health_reports(baseline=baseline, current=current, run_id=args.run_id)
-    write_anomaly_report(root=root, report=report)
-    print(json.dumps(report, indent=2, sort_keys=True))
-    if args.policy == "enforce" and report["anomaly_status"] == "critical":
-        return 1
-    return 0
+    if args.action == "build":
+        baseline = load_optional_json(Path(args.baseline))
+        current = load_optional_json(Path(args.current))
+        if current is None:
+            raise SystemExit("Current health report is missing or invalid")
+        report = compare_health_reports(
+            baseline=baseline,
+            current=current,
+            run_id=args.run_id,
+        )
+        paths = write_anomaly_report(root=root, report=report)
+        print(
+            json.dumps(
+                {"report": report, "artifacts": [str(path) for path in paths]},
+                indent=2,
+                sort_keys=True,
+            )
+        )
+        return 0
+    if args.action == "check":
+        report = load_optional_json(Path(args.report))
+        if report is None or report.get("anomaly_schema_version") != ANOMALY_SCHEMA_VERSION:
+            print("Anomaly report is missing or invalid")
+            return 1
+        print(json.dumps(report, indent=2, sort_keys=True))
+        if args.policy == "enforce" and int(report.get("critical_anomaly_count", 0)) > 0:
+            return 1
+        return 0
+    raise AssertionError(args.action)
 
 
 if __name__ == "__main__":
