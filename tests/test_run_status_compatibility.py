@@ -17,6 +17,7 @@ from canonical_evidence import EVIDENCE_SCHEMA_VERSION
 from kijiji_adapter import ADAPTER_SCHEMA_VERSION as KIJIJI_ADAPTER_SCHEMA_VERSION
 from kijiji_locations import LOCATION_REGISTRY_VERSION
 from vehicle_config import CONFIG_SCHEMA_VERSION
+from workflow_anomalies import compare_health_reports
 
 
 class RunStatusCompatibilityMetadataTests(unittest.TestCase):
@@ -171,39 +172,53 @@ class RunStatusCompatibilityMetadataTests(unittest.TestCase):
             (run_autotrader, "autotrader", "autotrader_run"),
         ]:
             with self.subTest(source=source_name):
-                status, persisted_status = self._run_with_patches(
-                    source_runner, module_name, self._evidence()
-                )
+                status, persisted_status = self._run_with_patches(source_runner, module_name, self._evidence())
                 self.assertIn("compatibility_fingerprint", persisted_status)
                 self.assertIn("compatibility_identity", persisted_status)
                 self.assertIsNotNone(persisted_status["compatibility_fingerprint"])
                 self.assertIsNotNone(persisted_status["compatibility_identity"])
 
                 with patch("phase1_reporting.source_status_path", return_value=self.root / "status.json"):
-                    health = collect_health(
-                        root=self.root,
-                        source_plan=[(self.config_path, [source_name])],
-                        run_id=status["run_id"],
-                    )
+                    health = collect_health(root=self.root, source_plan=[(self.config_path, [source_name])], run_id=status["run_id"])
 
                 self.assertEqual(len(health["sources"]), 1)
                 health_entry = health["sources"][0]
-                self.assertEqual(
-                    health_entry.get("compatibility_fingerprint"),
-                    persisted_status["compatibility_fingerprint"],
-                    f"Fingerprint must propagate from {source_name} status to health report",
-                )
-                self.assertEqual(
-                    health_entry.get("compatibility_identity"),
-                    persisted_status["compatibility_identity"],
-                    f"Identity must propagate from {source_name} status to health report",
-                )
+                self.assertEqual(health_entry.get("compatibility_fingerprint"), persisted_status["compatibility_fingerprint"],
+                                 f"Fingerprint must propagate from {source_name} status to health report")
+                self.assertEqual(health_entry.get("compatibility_identity"), persisted_status["compatibility_identity"],
+                                 f"Identity must propagate from {source_name} status to health report")
+
+    def test_persisted_status_to_health_to_anomaly_comparison_is_end_to_end(self):
+        """Verify source status metadata survives consolidation and enables a compatible baseline comparison."""
+        from phase1_reporting import collect_health
+
+        status, persisted_status = self._run_with_patches(run_kijiji, "kijiji_run", self._evidence())
+        with patch("phase1_reporting.source_status_path", return_value=self.root / "status.json"):
+            health = collect_health(root=self.root, source_plan=[(self.config_path, ["kijiji"])], run_id=status["run_id"])
+
+        current_entry = health["sources"][0]
+        baseline_entry = dict(current_entry)
+        baseline_entry.update({
+            "accepted_record_count": 40,
+            "fetched_record_count": 200,
+            "healthy": True,
+            "execution_status": "success",
+        })
+        baseline = {
+            "run_id": "historical-run",
+            "overall_status": "success",
+            "sources": [baseline_entry],
+        }
+        report = compare_health_reports(baseline=baseline, current=health, run_id=status["run_id"])
+        self.assertEqual(current_entry["compatibility_fingerprint"], persisted_status["compatibility_fingerprint"])
+        self.assertEqual(report["baseline_status"], "available")
+        self.assertEqual(report["compatible_source_count"], 1)
+        self.assertIn("accepted_record_count_collapse", {item["code"] for item in report["anomalies"]})
+        self.assertIn("fetched_record_count_collapse", {item["code"] for item in report["anomalies"]})
 
     def test_collection_scope_isolated_from_outer_environment(self):
         with patch.dict(os.environ, {"COLLECTION_SCOPE": "single_pair"}, clear=False):
-            _, persisted_status = self._run_with_patches(
-                run_kijiji, "kijiji_run", self._evidence()
-            )
+            _, persisted_status = self._run_with_patches(run_kijiji, "kijiji_run", self._evidence())
         self.assertEqual(persisted_status["collection_scope"], "full")
 
 
