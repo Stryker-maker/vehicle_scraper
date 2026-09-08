@@ -11,44 +11,41 @@ from baseline_history import discover_compatible_baseline, write_selected_baseli
 
 
 class BaselineHistoryTests(unittest.TestCase):
+    """Verify historical baseline discovery, rejection, and artifact persistence."""
+
     @staticmethod
     def source(fingerprint="fp", **extra):
         """Build a minimal health-report source fixture for baseline tests."""
-        value = {
-            "vehicle_key": "ford_f350",
-            "source": "autotrader",
-            "healthy": True,
-            "compatibility_fingerprint": fingerprint,
-        }
+        value = {"vehicle_key": "ford_f350", "source": "autotrader", "healthy": True, "compatibility_fingerprint": fingerprint}
         value.update(extra)
         return value
 
     def current(self):
+        """Build the current health report used by history tests."""
         return {"run_id": "current", "sources": [self.source()]}
 
     def test_newest_compatible_candidate_is_selected(self):
+        """Select the newest compatible historical report."""
         candidates = [
             {"run_id": "newest", "overall_status": "success", "sources": [self.source()]},
             {"run_id": "older", "overall_status": "success", "sources": [self.source()]},
         ]
-        with patch("baseline_history._git_history_paths", return_value=["r1", "r2"]), patch(
-            "baseline_history._read_git_json", side_effect=candidates
-        ):
+        with patch("baseline_history._git_history_paths", return_value=["r1", "r2"]), patch("baseline_history._read_git_json", side_effect=candidates):
             selected = discover_compatible_baseline(root=Path("."), current=self.current())
         self.assertEqual(selected["run_id"], "newest")
 
     def test_newest_incompatible_candidate_falls_back_to_older_compatible(self):
+        """Continue backward through history when the newest candidate is incompatible."""
         candidates = [
             {"run_id": "newest", "overall_status": "success", "sources": [self.source("bad")]},
             {"run_id": "older", "overall_status": "success", "sources": [self.source()]},
         ]
-        with patch("baseline_history._git_history_paths", return_value=["r1", "r2"]), patch(
-            "baseline_history._read_git_json", side_effect=candidates
-        ):
+        with patch("baseline_history._git_history_paths", return_value=["r1", "r2"]), patch("baseline_history._read_git_json", side_effect=candidates):
             selected = discover_compatible_baseline(root=Path("."), current=self.current())
         self.assertEqual(selected["run_id"], "older")
 
     def test_invalid_candidates_are_skipped(self):
+        """Skip current-run, failed, incomplete, and fingerprint-invalid candidates."""
         candidates = [
             {"run_id": "current", "overall_status": "success", "sources": [self.source()]},
             {"run_id": "failed", "overall_status": "failure", "sources": [self.source()]},
@@ -56,22 +53,18 @@ class BaselineHistoryTests(unittest.TestCase):
             {"run_id": "missing-source", "overall_status": "success", "sources": []},
             {"run_id": "good", "overall_status": "success_with_warnings", "sources": [self.source()]},
         ]
-        with patch("baseline_history._git_history_paths", return_value=["1", "2", "3", "4", "5"]), patch(
-            "baseline_history._read_git_json", side_effect=candidates
-        ):
+        with patch("baseline_history._git_history_paths", return_value=["1", "2", "3", "4", "5"]), patch("baseline_history._read_git_json", side_effect=candidates):
             selected = discover_compatible_baseline(root=Path("."), current=self.current())
         self.assertEqual(selected["run_id"], "good")
 
     def test_no_usable_candidate_returns_none(self):
-        candidates = [
-            {"run_id": "bad", "overall_status": "success", "sources": [self.source("bad")]},
-        ]
-        with patch("baseline_history._git_history_paths", return_value=["r1"]), patch(
-            "baseline_history._read_git_json", side_effect=candidates
-        ):
+        """Return no baseline when every historical candidate is incompatible."""
+        candidates = [{"run_id": "bad", "overall_status": "success", "sources": [self.source("bad")]}]
+        with patch("baseline_history._git_history_paths", return_value=["r1"]), patch("baseline_history._read_git_json", side_effect=candidates):
             self.assertIsNone(discover_compatible_baseline(root=Path("."), current=self.current()))
 
     def test_selected_baseline_is_written_with_selection_metadata(self):
+        """Persist a selected baseline together with its selection metadata."""
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             current_path = root / "current.json"
@@ -87,18 +80,13 @@ class BaselineHistoryTests(unittest.TestCase):
             self.assertEqual(artifact["_baseline_selection"]["status"], "selected")
 
     def test_no_compatible_history_writes_incompatibility_metadata(self):
+        """Persist incompatibility metadata when history exists but no baseline is usable."""
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             current_path = root / "current.json"
             output_path = root / "baseline.json"
             current_path.write_text(json.dumps(self.current()), encoding="utf-8")
-            metadata = {
-                "schema_version": 1,
-                "status": "incompatible",
-                "reason": "no_compatible_historical_baseline",
-                "historical_candidate_count": 2,
-                "rejection_reasons": {"incompatible": 2},
-            }
+            metadata = {"schema_version": 1, "status": "incompatible", "reason": "no_compatible_historical_baseline", "historical_candidate_count": 2, "rejection_reasons": {"incompatible": 2}}
             with patch("baseline_history._discover_selection", return_value=(None, metadata)):
                 result = write_selected_baseline(root=root, current_path=current_path, output_path=output_path)
             artifact = json.loads(output_path.read_text(encoding="utf-8"))
@@ -108,7 +96,10 @@ class BaselineHistoryTests(unittest.TestCase):
 
 
 class WorkflowBaselineWiringTests(unittest.TestCase):
+    """Verify the scrape workflow invokes historical baseline discovery."""
+
     def test_scrape_workflow_discovers_history_instead_of_copying_latest(self):
+        """Ensure the workflow uses baseline_history.py rather than copying latest.json."""
         workflow = (Path(__file__).resolve().parents[1] / ".github" / "workflows" / "scrape.yml").read_text(encoding="utf-8")
         self.assertIn("Discover compatible historical health baseline", workflow)
         self.assertIn("python baseline_history.py", workflow)
