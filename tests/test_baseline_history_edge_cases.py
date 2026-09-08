@@ -47,7 +47,7 @@ class BaselineHistoryEdgeCaseTests(unittest.TestCase):
 
     def test_history_limit_is_passed_to_git_history_discovery(self):
         current = self.current()
-        with patch("baseline_history._git_history_paths", return_value=["new"]) as history, patch("baseline_history._read_git_json", return_value={"run_id": "new", "overall_status": "success", "sources": [self.source(fingerprint="bad")]} ) as reader:
+        with patch("baseline_history._git_history_paths", return_value=["new"]) as history, patch("baseline_history._read_git_json", return_value={"run_id": "new", "overall_status": "success", "sources": [self.source(fingerprint="bad")]}) as reader:
             selected = discover_compatible_baseline(root=Path("."), current=current, history_limit=1)
         self.assertIsNone(selected)
         history.assert_called_once_with(Path("."), "data/run_status/latest.json", 1)
@@ -92,6 +92,24 @@ class BaselineHistoryEdgeCaseTests(unittest.TestCase):
         with patch("baseline_history._git_history_paths", return_value=["r1", "r2"]), patch("baseline_history._read_git_json", side_effect=[incomplete, complete]):
             selected = discover_compatible_baseline(root=Path("."), current=current)
         self.assertEqual(selected["run_id"], "complete")
+
+    def test_historical_candidate_with_malformed_source_is_rejected(self):
+        current = self.current()
+        malformed = {
+            "run_id": "malformed",
+            "overall_status": "success",
+            "sources": [self.source(), "malformed-entry"],
+        }
+        compatible = {
+            "run_id": "compatible",
+            "overall_status": "success",
+            "sources": [self.source()],
+        }
+        with patch("baseline_history._git_history_paths", return_value=["r1", "r2"]), patch(
+            "baseline_history._read_git_json", side_effect=[malformed, compatible]
+        ):
+            selected = discover_compatible_baseline(root=Path("."), current=current)
+        self.assertEqual(selected["run_id"], "compatible")
 
     def test_selected_artifact_drives_anomaly_comparison(self):
         current = {"run_id": "current-run", "sources": [self.source(accepted_record_count=5, fetched_record_count=20)]}
