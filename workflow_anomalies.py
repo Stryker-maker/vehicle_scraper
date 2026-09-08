@@ -42,7 +42,9 @@ def _anomaly(*, severity: str, code: str, vehicle_key: str, source: str, message
 
 def _source_entries(report: Any) -> list[dict[str, Any]] | None:
     """Return source entries only when the report has a well-formed source list."""
-    if not isinstance(report, dict) or not isinstance(report.get("sources"), list):
+    """Return source entries when the report contains a valid, non-duplicate source list.
+    
+    Validates that all entries are dictionaries and that no duplicate (vehicle_key, source) pairs exist."""
         return None
     entries = report["sources"]
     if any(not isinstance(entry, dict) for entry in entries):
@@ -54,7 +56,10 @@ def _source_entries(report: Any) -> list[dict[str, Any]] | None:
 
 
 def _candidate_is_eligible(*, candidate: Any, current: dict[str, Any]) -> bool:
-    """Return whether a candidate is complete, successful, distinct, and compatible."""
+    """Validate that a historical candidate satisfies all baseline eligibility requirements.
+    
+    Checks run ID distinctness, success status, structural integrity, source completeness,
+    and compatibility fingerprint matching for all current sources."""
     if not isinstance(candidate, dict):
         return False
     if candidate.get("run_id") == current.get("run_id"):
@@ -77,7 +82,10 @@ def _candidate_is_eligible(*, candidate: Any, current: dict[str, Any]) -> bool:
 
 
 def _direct_baseline_is_usable(*, baseline: Any, current: dict[str, Any]) -> bool:
-    """Validate a direct baseline's structure before per-source fingerprint checks."""
+    """Perform initial structural validation for a directly supplied baseline.
+    
+    Verifies the baseline is a distinct, successful report with complete source coverage
+    before per-source fingerprint compatibility checks occur."""
     if not isinstance(baseline, dict):
         return False
     if baseline.get("run_id") == current.get("run_id"):
@@ -93,7 +101,9 @@ def _direct_baseline_is_usable(*, baseline: Any, current: dict[str, Any]) -> boo
 
 
 def _select_compatible_baseline(*, baseline_candidates: list[dict[str, Any]], current: dict[str, Any]) -> dict[str, Any] | None:
-    """Select the first candidate satisfying the complete baseline eligibility contract."""
+    """Return the first candidate from the ordered list that satisfies all eligibility requirements.
+    
+    Applies comprehensive validation including success status, completeness, and compatibility."""
     for candidate in baseline_candidates:
         if _candidate_is_eligible(candidate=candidate, current=current):
             return candidate
@@ -134,7 +144,11 @@ def compare_health_reports(*, baseline: dict[str, Any] | None, current: dict[str
 
 
 def _append_current_health_anomalies(entry: dict[str, Any], anomalies: list[dict[str, Any]]) -> None:
-    """Append anomalies caused by current-run source health and collection quality."""
+    """Evaluate and record current-run health failures and quality issues.
+    
+    Checks for unhealthy execution status, pagination incompleteness, failed page requests,
+    and elevated parse failure rates. These anomalies are independent of baseline comparison
+    and are always evaluated regardless of baseline availability or compatibility."""
     vehicle_key, source = _source_key(entry)
     if not entry.get("healthy"):
         anomalies.append(_anomaly(severity="critical", code="source_unhealthy", vehicle_key=vehicle_key, source=source,
@@ -161,7 +175,12 @@ def _append_current_health_anomalies(entry: dict[str, Any], anomalies: list[dict
 
 def _append_count_anomalies(entry: dict[str, Any], previous: dict[str, Any],
                             vehicle_key: str, source: str, anomalies: list[dict[str, Any]]) -> None:
-    """Append baseline count, request, and quality anomalies for one compatible source."""
+    """Compare current metrics against a compatible baseline and record threshold violations.
+    
+    Evaluates accepted and fetched record counts for collapse, drop, and surge patterns,
+    request attempt increases, and quality warning growth. Only invoked when the baseline
+    source is confirmed compatible via fingerprint matching. Count anomalies require minimum
+    baseline values and use established ratio thresholds to avoid false positives."""
     for metric, minimum, warning_ratio, critical_ratio in (("accepted_record_count", 10, 0.50, 0.25), ("fetched_record_count", 20, 0.50, 0.25)):
         old = _number(previous.get(metric))
         new = _number(entry.get(metric))
@@ -192,7 +211,12 @@ def _append_count_anomalies(entry: dict[str, Any], previous: dict[str, Any],
 
 def _append_baseline_anomalies(*, entry: dict[str, Any], baseline_sources: dict[tuple[str, str], dict[str, Any]],
                                anomalies: list[dict[str, Any]]) -> tuple[bool, bool]:
-    """Compare one current source with its baseline and return compatibility/count flags."""
+    """Attempt to compare one current source against its baseline and return outcome flags.
+    
+    Returns (compatible, incompatible) booleans indicating whether count comparison occurred
+    and whether incompatibility was detected. Emits informational diagnostics for missing
+    or incompatible baselines and delegates count-based anomaly evaluation only when
+    fingerprints match."""
     vehicle_key, source = _source_key(entry)
     previous = baseline_sources.get((vehicle_key, source))
     if previous is None:
@@ -211,7 +235,11 @@ def _append_baseline_anomalies(*, entry: dict[str, Any], baseline_sources: dict[
 
 
 def _anomaly_status(*, counts: dict[str, int], baseline_status: str, incompatible_source_count: int) -> str:
-    """Return overall anomaly status in descending order of severity."""
+    """Determine the highest-severity anomaly status from severity counts and baseline state.
+    
+    Implements precedence: critical > warning > baseline_incompatible > clean > no_baseline.
+    Baseline incompatibility is surfaced as a distinct status when count-based anomalies are
+    absent but no compatible baseline was available."""
     if counts["critical"]:
         return "critical"
     if counts["warning"]:
@@ -225,7 +253,13 @@ def _anomaly_status(*, counts: dict[str, int], baseline_status: str, incompatibl
 
 def _perform_comparison(*, baseline: dict[str, Any] | None, current: dict[str, Any],
                         run_id: str, baseline_status: str, anomalies: list[dict[str, Any]]) -> dict[str, Any]:
-    """Evaluate current-run health and count anomalies only against an eligible baseline."""
+    """Perform the core anomaly comparison workflow after baseline eligibility is established.
+    
+    Always evaluates current-run health failures. Performs count-based baseline comparison
+    only when baseline_status is available and fingerprints match. Records per-source
+    compatibility outcomes and aggregates severity counts. Returns a complete anomaly report
+    with run metadata, baseline status, source counts, severity tallies, and the full anomaly
+    list."""
     current_sources = _source_entries(current) or []
     baseline_sources = {_source_key(e): e for e in (_source_entries(baseline) or [])}
     compatible_source_count = 0
