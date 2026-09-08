@@ -109,6 +109,20 @@ class BaselineHistoryEdgeCaseTests(unittest.TestCase):
             selected = discover_compatible_baseline(root=Path("."), current=current)
         self.assertEqual(selected["run_id"], "compatible")
 
+    def test_direct_selector_skips_malformed_identity_candidate(self):
+        """Skip a direct candidate with missing source identity and select the next valid candidate."""
+        current = self.current()
+        malformed = {"run_id": "malformed", "overall_status": "success", "sources": [self.source(vehicle_key="")]}
+        compatible = {"run_id": "good", "overall_status": "success", "sources": [self.source()]}
+        report = compare_health_reports(
+            baseline=None,
+            current=current,
+            run_id="current-run",
+            baseline_candidates=[malformed, compatible],
+        )
+        self.assertEqual(report["baseline_run_id"], "good")
+        self.assertEqual(report["baseline_status"], "available")
+
     def test_selected_artifact_drives_anomaly_comparison(self):
         """Verify a selected artifact can drive normal compatible baseline anomaly detection."""
         current = {"run_id": "current-run", "sources": [self.source(accepted_record_count=5, fetched_record_count=20)]}
@@ -182,6 +196,28 @@ class BaselineHistoryEdgeCaseTests(unittest.TestCase):
 
             commit({"run_id": "good", "overall_status": "success", "sources": [self.source()]}, "good")
             commit({"run_id": "bad", "overall_status": "success", "sources": [self.source(fingerprint="bad")]}, "incompatible")
+            commit({"run_id": "current-run", "overall_status": "success", "sources": [self.source()]}, "current")
+            selected = discover_compatible_baseline(root=root, current=self.current(), history_limit=3)
+        self.assertEqual(selected["run_id"], "good")
+
+    def test_real_git_history_skips_missing_source_identity(self):
+        """Verify Git-history discovery skips a successful report with missing source identity."""
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            subprocess.run(["git", "init"], cwd=root, check=True, capture_output=True, text=True)
+            subprocess.run(["git", "config", "user.email", "tests@example.invalid"], cwd=root, check=True)
+            subprocess.run(["git", "config", "user.name", "Vehicle Scraper Tests"], cwd=root, check=True)
+            report_path = root / "data" / "run_status" / "latest.json"
+            report_path.parent.mkdir(parents=True)
+
+            def commit(report, message):
+                """Write a historical report and commit it to the temporary Git repository."""
+                report_path.write_text(json.dumps(report), encoding="utf-8")
+                subprocess.run(["git", "add", str(report_path.relative_to(root))], cwd=root, check=True)
+                subprocess.run(["git", "commit", "-m", message], cwd=root, check=True, capture_output=True, text=True)
+
+            commit({"run_id": "good", "overall_status": "success", "sources": [self.source()]}, "good")
+            commit({"run_id": "bad-identity", "overall_status": "success", "sources": [self.source(source=" ")]}, "missing source")
             commit({"run_id": "current-run", "overall_status": "success", "sources": [self.source()]}, "current")
             selected = discover_compatible_baseline(root=root, current=self.current(), history_limit=3)
         self.assertEqual(selected["run_id"], "good")
