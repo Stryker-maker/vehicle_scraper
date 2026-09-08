@@ -14,7 +14,7 @@ BASELINE_SELECTION_SCHEMA_VERSION = 1
 
 def _validated_path(path: Path, *, label: str) -> Path:
     """Validate and resolve a filesystem path to prevent directory traversal attacks.
-    
+
     Rejects paths containing NUL bytes or parent-directory traversal components,
     then resolves to an absolute path."""
     if "\x00" in str(path):
@@ -26,7 +26,7 @@ def _validated_path(path: Path, *, label: str) -> Path:
 
 def _validated_git_path(path: str) -> str:
     """Ensure a repository-relative path is safe for use in Git commands.
-    
+
     Rejects absolute paths, parent traversal, NUL bytes, and empty strings to prevent
     command injection and unintended repository access."""
     candidate = Path(path)
@@ -37,7 +37,7 @@ def _validated_git_path(path: str) -> str:
 
 def _git_executable() -> str:
     """Locate and return the absolute path to the Git executable.
-    
+
     Raises RuntimeError if Git is not found in PATH."""
     executable = shutil.which("git")
     if executable is None:
@@ -47,7 +47,7 @@ def _git_executable() -> str:
 
 def _git_history_paths(root: Path, path: str, limit: int) -> list[str]:
     """Query Git history for commit revisions that modified the specified file.
-    
+
     Returns a list of commit SHA identifiers in reverse chronological order (newest first).
     Validates the path and limit, then executes git log with format output to retrieve
     revision identifiers."""
@@ -66,7 +66,7 @@ def _git_history_paths(root: Path, path: str, limit: int) -> list[str]:
 
 def _read_git_json(root: Path, revision: str, path: str) -> dict[str, Any] | None:
     """Retrieve and parse a JSON object from a specific Git revision.
-    
+
     Uses git show to read the file content at the specified commit. Returns None if
     the file does not exist at that revision, the content is malformed JSON, or the
     parsed result is not a dictionary object."""
@@ -89,14 +89,14 @@ def _read_git_json(root: Path, revision: str, path: str) -> dict[str, Any] | Non
 
 def _is_successful_report(report: dict[str, Any]) -> bool:
     """Check if a report represents a successful collection run.
-    
+
     Only success and success_with_warnings statuses qualify as usable historical baselines."""
     return report.get("overall_status") in {"success", "success_with_warnings"}
 
 
 def _candidate_is_complete(candidate: dict[str, Any], current: dict[str, Any]) -> bool:
     """Verify that a candidate contains valid compatibility fingerprints for all current sources.
-    
+
     A complete candidate must have source entries for every (vehicle_key, source) pair in the
     current report, and each candidate entry must contain a non-empty compatibility_fingerprint
     string. Incomplete candidates are skipped during historical baseline selection to prevent
@@ -123,7 +123,7 @@ def _candidate_is_complete(candidate: dict[str, Any], current: dict[str, Any]) -
 
 def _discover_selection(*, root: Path, current: dict[str, Any], path: str, history_limit: int) -> tuple[dict[str, Any] | None, dict[str, Any]]:
     """Search Git history for a compatible baseline and record the selection outcome.
-    
+
     Examines historical health reports in reverse chronological order, applying validation
     for success status, completeness, and compatibility. Skips same-run, unsuccessful,
     incomplete, and fingerprint-mismatched candidates. Returns the first compatible baseline
@@ -174,7 +174,7 @@ def _discover_selection(*, root: Path, current: dict[str, Any], path: str, histo
 
 def discover_compatible_baseline(*, root: Path, current: dict[str, Any], path: str = "data/run_status/latest.json", history_limit: int = 50) -> dict[str, Any] | None:
     """Search Git history for the most recent compatible baseline report.
-    
+
     A simplified interface to _discover_selection that returns only the selected baseline,
     discarding selection metadata."""
     selected, _ = _discover_selection(root=root, current=current, path=path, history_limit=history_limit)
@@ -183,7 +183,7 @@ def discover_compatible_baseline(*, root: Path, current: dict[str, Any], path: s
 
 def write_selected_baseline(*, root: Path, current_path: Path, output_path: Path, history_limit: int = 50) -> dict[str, Any]:
     """Discover a compatible historical baseline and write it to disk with selection metadata.
-    
+
     Reads the current health report, searches Git history for a compatible baseline, and
     constructs an artifact containing either the selected baseline or an empty sources list.
     Embeds _baseline_selection metadata describing the outcome (selected, incompatible, or
