@@ -374,8 +374,8 @@ def _append_baseline_anomalies(
     entry: dict[str, Any],
     baseline_sources: dict[tuple[str, str], dict[str, Any]],
     anomalies: list[dict[str, Any]],
-) -> tuple[bool, bool]:
-    """Compare one source with its compatible baseline and return compatibility flags."""
+) -> bool:
+    """Compare one source with its compatible baseline and report whether it matched."""
     vehicle_key, source = _source_key(entry)
     previous = baseline_sources.get((vehicle_key, source))
     if previous is None:
@@ -388,41 +388,22 @@ def _append_baseline_anomalies(
                 message="No prior source baseline is available.",
             )
         )
-        return False, False
-    current_fingerprint = _compatibility_fingerprint(entry)
-    baseline_fingerprint = _compatibility_fingerprint(previous)
-    if current_fingerprint is None or baseline_fingerprint != current_fingerprint:
-        anomalies.append(
-            _anomaly(
-                severity="info",
-                code="baseline_incompatible",
-                vehicle_key=vehicle_key,
-                source=source,
-                message=(
-                    "Baseline is semantically incompatible with the current source "
-                    "run and will not drive anomaly comparison."
-                ),
-                baseline=baseline_fingerprint,
-                current=current_fingerprint,
-            )
-        )
-        return False, True
+        return False
     _append_count_anomalies(entry, previous, vehicle_key, source, anomalies)
-    return True, False
+    return True
 
 
 def _anomaly_status(
     *,
     counts: dict[str, int],
     baseline_status: str,
-    incompatible_source_count: int,
 ) -> str:
     """Determine final anomaly status from severity counts and baseline state."""
     if counts["critical"]:
         return "critical"
     if counts["warning"]:
         return "warning"
-    if baseline_status == "incompatible" or incompatible_source_count:
+    if baseline_status == "incompatible":
         return "baseline_incompatible"
     if baseline_status == "available":
         return "clean"
@@ -435,22 +416,21 @@ def _source_comparison_counts(
     baseline_sources: dict[tuple[str, str], dict[str, Any]],
     baseline_status: str,
     anomalies: list[dict[str, Any]],
-) -> tuple[int, int]:
-    """Evaluate current sources and return compatible and incompatible source counts."""
+) -> int:
+    """Evaluate current sources and return the number with compatible baselines."""
     compatible_count = 0
-    incompatible_count = 0
     for entry in current_sources:
         _append_current_health_anomalies(entry, anomalies)
         if baseline_status != "available":
             continue
-        compatible, incompatible = _append_baseline_anomalies(
-            entry=entry,
-            baseline_sources=baseline_sources,
-            anomalies=anomalies,
+        compatible_count += int(
+            _append_baseline_anomalies(
+                entry=entry,
+                baseline_sources=baseline_sources,
+                anomalies=anomalies,
+            )
         )
-        compatible_count += int(compatible)
-        incompatible_count += int(incompatible)
-    return compatible_count, incompatible_count
+    return compatible_count
 
 
 def _perform_comparison(
@@ -480,7 +460,7 @@ def _perform_comparison(
                 ),
             )
         )
-    compatible_source_count, incompatible_source_count = _source_comparison_counts(
+    compatible_source_count = _source_comparison_counts(
         current_sources=current_sources,
         baseline_sources=baseline_sources,
         baseline_status=baseline_status,
@@ -498,11 +478,9 @@ def _perform_comparison(
         "baseline_run_id": (baseline or {}).get("run_id"),
         "current_health_run_id": current.get("run_id"),
         "compatible_source_count": compatible_source_count,
-        "incompatible_source_count": incompatible_source_count,
         "anomaly_status": _anomaly_status(
             counts=counts,
             baseline_status=baseline_status,
-            incompatible_source_count=incompatible_source_count,
         ),
         "critical_anomaly_count": counts["critical"],
         "warning_anomaly_count": counts["warning"],
