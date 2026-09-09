@@ -71,12 +71,16 @@ class BaselineCompatibilityFingerprintTests(unittest.TestCase):
         self.assertEqual(first, second)
 
     def test_location_case_variations_produce_stable_fingerprints(self):
-        """Verify case-equivalent location permutations produce the same fingerprint."""
+        """Verify case-equivalent location sets produce the same fingerprint."""
         config_upper = copy.deepcopy(self.config)
-        config_upper["sources"]["kijiji"]["search_locations"] = ["CALGARY, AB", "Calgary, AB"]
+        config_upper["sources"]["kijiji"]["search_locations"] = [
+            "EDMONTON, AB", "CALGARY, AB", "SASKATOON, SK", "REGINA, SK"
+        ]
         _, upper = build_compatibility_fingerprint(config=config_upper, source="kijiji", collection_scope="full", adapter_schema_version=1)
         config_lower = copy.deepcopy(self.config)
-        config_lower["sources"]["kijiji"]["search_locations"] = ["Calgary, AB", "CALGARY, AB"]
+        config_lower["sources"]["kijiji"]["search_locations"] = [
+            "Regina, SK", "Saskatoon, SK", "Calgary, AB", "Edmonton, AB"
+        ]
         _, lower = build_compatibility_fingerprint(config=config_lower, source="kijiji", collection_scope="full", adapter_schema_version=1)
         self.assertEqual(upper, lower)
 
