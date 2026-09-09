@@ -52,6 +52,7 @@ jobs:
           dependency_lock.py
           workflow_control.py
           workflow_anomalies.py
+          baseline_history.py
           generated_data_publish.py
           generated_data_validation.py
           autotrader_distance.py

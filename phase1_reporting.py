@@ -388,6 +388,8 @@ def collect_health(
                     status.get("current_row_count", status.get("row_count", 0))
                 ) if current_run else 0
                 stale_rows = int(status.get("stale_row_count", 0))
+                compatibility_fingerprint = status.get("compatibility_fingerprint")
+                compatibility_identity = status.get("compatibility_identity")
                 entries.append({
                     "vehicle_key": config["vehicle_key"], "source": source,
                     "healthy": status_is_current_success(status, active_run),
@@ -433,6 +435,8 @@ def collect_health(
                     ) if current_run else 0,
                     "failure_reasons": status.get("failure_reasons", []),
                     "status_path": str(status_path.relative_to(root)),
+                    "compatibility_fingerprint": compatibility_fingerprint,
+                    "compatibility_identity": compatibility_identity,
                 })
             else:
                 entries.append({
