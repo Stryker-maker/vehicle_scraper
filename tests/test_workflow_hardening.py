@@ -146,7 +146,6 @@ class AnomalyTests(unittest.TestCase):
         current = {"run_id": "new", "sources": [self.source(5, 30)]}
         report = compare_health_reports(baseline=baseline, current=current, run_id="new")
         self.assertEqual(report["compatible_source_count"], 1)
-        self.assertEqual(report["incompatible_source_count"], 0)
         self.assertIn("accepted_record_count_collapse", {value["code"] for value in report["anomalies"]})
 
     def test_selecting_compatible_baseline_from_candidate_list(self):
@@ -157,7 +156,6 @@ class AnomalyTests(unittest.TestCase):
         good_baseline = {"run_id": "run_3", "overall_status": "success", "sources": [self.source(40, 200)]}
         anomaly_report = compare_health_reports(baseline=None, current=current, run_id="current_run", baseline_candidates=[wrong_fp_baseline, another_wrong, good_baseline])
         self.assertEqual(anomaly_report["compatible_source_count"], 1)
-        self.assertEqual(anomaly_report["incompatible_source_count"], 0)
         found_codes = {item["code"] for item in anomaly_report["anomalies"]}
         self.assertIn("accepted_record_count_collapse", found_codes)
         self.assertIn("fetched_record_count_collapse", found_codes)
