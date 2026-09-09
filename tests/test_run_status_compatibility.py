@@ -101,7 +101,7 @@ class RunStatusCompatibilityMetadataTests(unittest.TestCase):
         self.assertEqual(status["execution_status"], "success")
         self.assertEqual(status["collection_scope"], "full")
         self.assertEqual(status["compatibility_fingerprint"], written["compatibility_fingerprint"])
-        self.assertEqual(status["compatibility_identity"]["query_locations"], ["Edmonton, AB"])
+        self.assertEqual(status["compatibility_identity"]["query_locations"], ["edmonton, ab"])
         self.assertEqual(status["compatibility_identity"]["location_registry_version"], LOCATION_REGISTRY_VERSION)
         self.assertEqual(status["compatibility_identity"]["adapter_schema_version"], KIJIJI_ADAPTER_SCHEMA_VERSION)
 
