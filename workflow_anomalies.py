@@ -518,19 +518,18 @@ def write_anomaly_report(
         f"- Critical: {report['critical_anomaly_count']}",
         f"- Warnings: {report['warning_anomaly_count']}",
         f"- Informational: {report['informational_anomaly_count']}",
-        "",
-        "| Severity | Vehicle | Source | Code | Message | Baseline | Current | Threshold |",
-        "|---|---|---|---|---|---:|---:|---:|",
     ]
     if report.get("isolated_collections"):
         isolated_str = ", ".join(
             f"`{item['vehicle_key']}:{item['source']}`"
             for item in report["isolated_collections"]
         )
-        lines.extend([
-            f"- Isolated collections: {isolated_str}",
-            "",
-        ])
+        lines.append(f"- Isolated collections: {isolated_str}")
+    lines.extend([
+        "",
+        "| Severity | Vehicle | Source | Code | Message | Baseline | Current | Threshold |",
+        "|---|---|---|---|---|---:|---:|---:|",
+    ])
     for anomaly in report["anomalies"]:
         lines.append(
             f"| {anomaly['severity']} | {anomaly['vehicle_key'] or '—'} | "
@@ -567,18 +566,31 @@ def parser() -> argparse.ArgumentParser:
     return result
 
 
+IDENTIFIER_PATTERN = __import__("re").compile(r"^[a-z0-9_]+$")
+
+
 def isolate_anomalous_collections(root: Path, report: dict[str, Any]) -> list[dict[str, str]]:
-    """Isolate critical anomaly collections by removing untrusted raw CSV files while preserving diagnostic evidence."""
+    """Isolate critical anomaly collections by removing untrusted CSV outputs while preserving diagnostic evidence."""
     root = root.resolve()
     isolated = report.get("isolated_collections", [])
+    valid_isolated: list[dict[str, str]] = []
     for entry in isolated:
-        vk = entry.get("vehicle_key")
-        src = entry.get("source")
-        if vk and src:
-            latest_csv = root / "data" / vk / "latest" / f"{vk}_{src}_latest.csv"
-            if latest_csv.exists():
-                latest_csv.unlink()
-    return isolated
+        vk = str(entry.get("vehicle_key") or "").strip()
+        src = str(entry.get("source") or "").strip()
+        if not vk or not src or not IDENTIFIER_PATTERN.match(vk) or not IDENTIFIER_PATTERN.match(src):
+            continue
+        valid_isolated.append({"vehicle_key": vk, "source": src})
+        # 1. Latest CSV output
+        latest_csv = root / "data" / vk / "latest" / f"{vk}_{src}_latest.csv"
+        if latest_csv.exists():
+            latest_csv.unlink()
+        # 2. Historical timestamped source archives under data/<vehicle_key>/<source>/
+        source_dir = root / "data" / vk / src
+        if source_dir.exists() and source_dir.is_dir():
+            for archive_path in source_dir.glob(f"{vk}_{src}_*.csv"):
+                if archive_path.is_file():
+                    archive_path.unlink()
+    return valid_isolated
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -616,9 +628,13 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Isolated collections due to critical anomalies: {isolated}")
         if args.policy == "enforce" and int(report.get("critical_anomaly_count", 0)) > 0:
             health_path = root / "data" / "run_status" / "latest.json"
-            health = load_optional_json(health_path) or {}
-            total_sources = health.get("expected_source_runs", 0)
-            if total_sources > 0 and len(isolated) >= total_sources:
+            health = load_optional_json(health_path)
+            if not health or not isinstance(health.get("expected_source_runs"), int) or health.get("expected_source_runs") <= 0:
+                print("Health report missing or invalid expected_source_runs; failing closed.")
+                return 1
+            total_sources = health["expected_source_runs"]
+            if len(isolated) >= total_sources:
+                print(f"All expected collections ({total_sources}) are isolated; failing closed.")
                 return 1
         return 0
     raise AssertionError(args.action)

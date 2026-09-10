@@ -90,13 +90,21 @@ class CollectionIsolationTests(unittest.TestCase):
         health_dir.mkdir(parents=True, exist_ok=True)
         (health_dir / "latest.json").write_text(json.dumps(current_health), encoding="utf-8")
 
-        # Mock CSV latest outputs on disk
+        # Mock CSV latest outputs and timestamped historical source archives on disk
         f350_latest_csv = self.root / "data" / "ford_f350" / "latest" / "ford_f350_autotrader_latest.csv"
+        f350_archive_csv = self.root / "data" / "ford_f350" / "autotrader" / "ford_f350_autotrader_2026-08-01_00-00-00.csv"
         f150_latest_csv = self.root / "data" / "ford_f150" / "latest" / "ford_f150_autotrader_latest.csv"
+        f150_archive_csv = self.root / "data" / "ford_f150" / "autotrader" / "ford_f150_autotrader_2026-08-01_00-00-00.csv"
+
         f350_latest_csv.parent.mkdir(parents=True, exist_ok=True)
+        f350_archive_csv.parent.mkdir(parents=True, exist_ok=True)
         f150_latest_csv.parent.mkdir(parents=True, exist_ok=True)
+        f150_archive_csv.parent.mkdir(parents=True, exist_ok=True)
+
         f350_latest_csv.write_text("year,make,model,price_cad\n2023,Ford,F-350,75000\n", encoding="utf-8")
+        f350_archive_csv.write_text("year,make,model,price_cad\n2023,Ford,F-350,75000\n", encoding="utf-8")
         f150_latest_csv.write_text("year,make,model,price_cad\n2022,Ford,F-150,50000\n", encoding="utf-8")
+        f150_archive_csv.write_text("year,make,model,price_cad\n2022,Ford,F-150,50000\n", encoding="utf-8")
 
         # Mock diagnostic evidence artifacts on disk for the anomalous source
         f150_status_file = self.root / "data" / "ford_f150" / "run_status" / "autotrader_latest.json"
@@ -123,14 +131,16 @@ class CollectionIsolationTests(unittest.TestCase):
         self.assertEqual(len(isolated), 1)
 
         # Requirement 4 & 5:
-        # Untrusted latest CSV for anomalous collection is isolated (deleted from latest publication path)
+        # Untrusted latest CSV and newly generated timestamped historical archive for anomalous collection are excluded/unlinked
         self.assertFalse(f150_latest_csv.exists())
+        self.assertFalse(f150_archive_csv.exists())
         # Diagnostic evidence for anomalous collection remains preserved on disk
         self.assertTrue(f150_status_file.exists())
 
         # Requirement 2 & 3:
-        # Successful collection's latest CSV remains intact and eligible for publication
+        # Successful collection's latest CSV and historical archive remain intact and eligible for publication
         self.assertTrue(f350_latest_csv.exists())
+        self.assertTrue(f350_archive_csv.exists())
 
         # Save anomaly report to disk for manifest check
         (health_dir / "anomalies_latest.json").write_text(json.dumps(anomaly_report), encoding="utf-8")
@@ -211,10 +221,12 @@ class CollectionIsolationTests(unittest.TestCase):
             manifest["isolated_collections"],
             [{"vehicle_key": "ford_f150", "source": "autotrader"}],
         )
-        # Successful vehicle data is published
+        # Successful vehicle data (latest and historical archive) is published
         self.assertIn("data/ford_f350/latest/ford_f350_autotrader_latest.csv", manifest["published_paths"])
-        # Anomalous latest CSV is excluded (since it was unlinked during isolation)
+        self.assertIn("data/ford_f350/autotrader/ford_f350_autotrader_2026-08-01_00-00-00.csv", manifest["published_paths"])
+        # Anomalous CSV outputs (latest and timestamped archive) are excluded
         self.assertNotIn("data/ford_f150/latest/ford_f150_autotrader_latest.csv", manifest["published_paths"])
+        self.assertNotIn("data/ford_f150/autotrader/ford_f150_autotrader_2026-08-01_00-00-00.csv", manifest["published_paths"])
         # Diagnostic evidence for anomalous collection is published in manifest for investigation
         self.assertIn("data/ford_f150/run_status/autotrader_latest.json", manifest["published_paths"])
 
@@ -333,6 +345,177 @@ class CollectionIsolationTests(unittest.TestCase):
         # Output was built successfully using valid source (autotrader) without raising error for failed kijiji
         self.assertEqual(summary["listing_claim_count"], 1)
         self.assertEqual(summary["sources"], ["autotrader"])
+
+        # Also exercise purpose_outputs.build partial-source path
+        ram_config = {
+            "schema_version": 2,
+            "vehicle_key": "ram_3500",
+            "make": "Ram",
+            "model": "3500",
+            "criteria": {
+                "min_year": 2020,
+                "max_year": 2024,
+                "max_price_cad": 100000,
+                "fuel": "Diesel",
+                "engine": "6.7L Cummins",
+            },
+            "origin": {"home_city": "Calgary, AB", "home_coords": [51.0447, -114.0719], "max_distance_km": 1000},
+            "sources": {
+                "autotrader": {"make": "Ram", "model": "3500", "search_locations": ["Calgary, AB"]},
+                "kijiji": {"make": "Ram", "model": "3500", "search_locations": ["Calgary, AB"]},
+            },
+        }
+        ram_config_path = self.root / "config_ram3500.json"
+        ram_config_path.write_text(json.dumps(ram_config), encoding="utf-8")
+
+        # Create valid autotrader status & artifacts for ram_3500
+        ram_at_status = self._source_entry("ram_3500", "autotrader", healthy=True, accepted=1, fetched=1)
+        ram_at_status["schema_version"] = 8
+        ram_at_status["run_id"] = run_id
+        ram_at_status["output_updated_this_run"] = True
+        ram_at_status["schema_valid"] = True
+        ram_at_status["canonical_evidence_schema_version"] = 1
+        ram_at_status["identity_lifecycle_schema_version"] = 2
+        ram_at_status["identity_lifecycle_status"] = "updated"
+        ram_at_status["identity_observed_current_count"] = 1
+        ram_at_status["row_cap_disabled"] = True
+        ram_at_status["config_isolated"] = True
+        ram_at_status["canonical_evidence_artifacts"] = {"accepted": "data/ram_3500/evidence/autotrader/accepted.jsonl"}
+        ram_at_status["source_adapter_artifacts"] = {"records": "data/ram_3500/adapter_evidence/autotrader/records.jsonl"}
+
+        ram_status_path = self.root / "data" / "ram_3500" / "run_status" / "autotrader_latest.json"
+        ram_status_path.parent.mkdir(parents=True, exist_ok=True)
+        ram_status_path.write_text(json.dumps(ram_at_status), encoding="utf-8")
+
+        ram_accepted_path = self.root / "data" / "ram_3500" / "evidence" / "autotrader" / "accepted.jsonl"
+        ram_accepted_path.parent.mkdir(parents=True, exist_ok=True)
+        ram_accepted_record = {
+            "evidence_schema_version": 1,
+            "run_id": run_id,
+            "vehicle_key": "ram_3500",
+            "source": "autotrader",
+            "canonical_listing_id": "autotrader-222",
+            "source_listing_id": "222",
+            "record_stage": "accepted",
+            "source_record_index": 0,
+            "raw_record_ref": "ref1",
+            "source_adapter_record_ref": "ref2",
+            "normalized": {
+                "year": 2022,
+                "make": "Ram",
+                "model": "3500",
+                "price_cad": 75000,
+                "mileage_km": 40000,
+                "listing_url": "https://autotrader.ca/222",
+            },
+        }
+        ram_accepted_path.write_text(json.dumps(ram_accepted_record) + "\n", encoding="utf-8")
+
+        ram_adapter_path = self.root / "data" / "ram_3500" / "adapter_evidence" / "autotrader" / "records.jsonl"
+        ram_adapter_path.parent.mkdir(parents=True, exist_ok=True)
+        ram_adapter_record = {
+            "run_id": run_id,
+            "source": "autotrader",
+            "source_record_index": 0,
+            "raw_payload": {"trim": "Limited"},
+        }
+        ram_adapter_path.write_text(json.dumps(ram_adapter_record) + "\n", encoding="utf-8")
+
+        ram_identity_path = self.root / "data" / "ram_3500" / "identity_lifecycle" / "autotrader" / "current_latest.jsonl"
+        ram_identity_path.parent.mkdir(parents=True, exist_ok=True)
+        ram_identity_record = {
+            "identity_lifecycle_schema_version": 2,
+            "run_id": run_id,
+            "vehicle_key": "ram_3500",
+            "source": "autotrader",
+            "canonical_listing_id": "autotrader-222",
+            "lifecycle_state": "new",
+            "vin_evidence_status": "not_reported",
+        }
+        ram_identity_path.write_text(json.dumps(ram_identity_record) + "\n", encoding="utf-8")
+
+        # Mock inputs file for purpose outputs
+        inputs_data = {
+            "schema_version": 1,
+            "vehicles": {
+                "ram_3500": {
+                    "analysis_profile": "owned_vehicle_value",
+                    "subject_profile": {
+                        "year": {"value": 2022, "evidence_status": "owner_reported_historical_unverified"},
+                        "trim": {"value": "Limited", "evidence_status": "owner_reported_historical_unverified"},
+                        "fuel": {"value": "Diesel", "evidence_status": "owner_reported_historical_unverified"},
+                        "engine": {"value": "6.7L Cummins", "evidence_status": "owner_reported_historical_unverified"},
+                        "drivetrain": {"value": "4wd", "evidence_status": "owner_reported_historical_unverified"},
+                        "current_odometer_km": {"value": 40000, "evidence_status": "owner_reported_historical_unverified"},
+                        "odometer_context": {"value": "personal", "evidence_status": "owner_reported_historical_unverified"},
+                    },
+                    "sale_goal": "monitor",
+                },
+                "subaru_forester": {
+                    "analysis_profile": "owned_vehicle_value",
+                    "subject_profile": {
+                        "year": {"value": 2021, "evidence_status": "owner_reported_historical_unverified"},
+                        "trim": {"value": "Touring", "evidence_status": "owner_reported_historical_unverified"},
+                        "fuel": {"value": "Gas", "evidence_status": "owner_reported_historical_unverified"},
+                        "engine": {"value": "2.5L", "evidence_status": "owner_reported_historical_unverified"},
+                        "drivetrain": {"value": "AWD", "evidence_status": "owner_reported_historical_unverified"},
+                        "current_odometer_km": {"value": 30000, "evidence_status": "owner_reported_historical_unverified"},
+                        "odometer_context": {"value": "personal", "evidence_status": "owner_reported_historical_unverified"},
+                    },
+                    "sale_goal": "monitor",
+                },
+                "honda_odyssey": {
+                    "analysis_profile": "family_friend_purchase",
+                    "preferences": {
+                        "budget_max_cad": {"value": 40000, "evidence_status": "friend_reported_unverified"},
+                        "min_year": {"value": 2018, "evidence_status": "friend_reported_unverified"},
+                        "max_year": {"value": 2023, "evidence_status": "friend_reported_unverified"},
+                        "max_mileage_km": {"value": 80000, "evidence_status": "friend_reported_unverified"},
+                        "minimum_seating": {"value": 7, "evidence_status": "friend_reported_unverified"},
+                        "cargo_requirements": {"value": [], "evidence_status": "friend_reported_unverified"},
+                        "max_distance_km": {"value": 500, "evidence_status": "friend_reported_unverified"},
+                        "accident_title_requirement": {"value": "clean", "evidence_status": "friend_reported_unverified"},
+                        "service_history_requirement": {"value": "available", "evidence_status": "friend_reported_unverified"},
+                        "acceptable_seller_types": {"value": [], "evidence_status": "friend_reported_unverified"},
+                        "availability_constraints": {"value": None, "evidence_status": "friend_input_required"},
+                    },
+                },
+                "kia_carnival": {
+                    "analysis_profile": "family_friend_purchase",
+                    "preferences": {
+                        "budget_max_cad": {"value": 45000, "evidence_status": "friend_reported_unverified"},
+                        "min_year": {"value": 2021, "evidence_status": "friend_reported_unverified"},
+                        "max_year": {"value": 2024, "evidence_status": "friend_reported_unverified"},
+                        "max_mileage_km": {"value": 60000, "evidence_status": "friend_reported_unverified"},
+                        "minimum_seating": {"value": 7, "evidence_status": "friend_reported_unverified"},
+                        "cargo_requirements": {"value": [], "evidence_status": "friend_reported_unverified"},
+                        "max_distance_km": {"value": 500, "evidence_status": "friend_reported_unverified"},
+                        "accident_title_requirement": {"value": "clean", "evidence_status": "friend_reported_unverified"},
+                        "service_history_requirement": {"value": "available", "evidence_status": "friend_reported_unverified"},
+                        "acceptable_seller_types": {"value": [], "evidence_status": "friend_reported_unverified"},
+                        "availability_constraints": {"value": None, "evidence_status": "friend_input_required"},
+                    },
+                },
+            },
+        }
+        inputs_path = self.root / "purpose_inputs.json"
+        inputs_path.write_text(json.dumps(inputs_data), encoding="utf-8")
+
+        # Kijiji status is missing/unhealthy for ram_3500
+        ram_kijiji_status_path = self.root / "data" / "ram_3500" / "run_status" / "kijiji_latest.json"
+        ram_kijiji_status_path.write_text(json.dumps({"schema_version": 8, "run_id": run_id, "execution_status": "failed"}), encoding="utf-8")
+
+        purpose_summary = build_purpose(
+            root=self.root,
+            config_path=ram_config_path,
+            run_id=run_id,
+            sources=["autotrader", "kijiji"],
+            inputs_path=inputs_path,
+        )
+
+        self.assertEqual(purpose_summary["record_count"], 1)
+        self.assertEqual(purpose_summary["sources"], ["autotrader"])
+        self.assertEqual(purpose_summary["scope"], "single_source")
 
 
 if __name__ == "__main__":
