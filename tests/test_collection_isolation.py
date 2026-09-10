@@ -631,11 +631,117 @@ class CollectionIsolationTests(unittest.TestCase):
         status_file.write_text(json.dumps({"schema_version": 8, "run_id": "wrong_run_id"}), encoding="utf-8")
 
         report = compare_health_reports(baseline=None, current=health, run_id=run_id)
-        isolate_anomalous_collections(root=self.root, report=report)
+        with self.assertRaisesRegex(ValueError, "Reliable current-run provenance missing or invalid"):
+            isolate_anomalous_collections(root=self.root, report=report)
 
         # Trusted archive remains untouched in data/ford_f150/autotrader/
         self.assertTrue(trusted_archive.exists())
         self.assertEqual(trusted_archive.read_text(encoding="utf-8"), "trusted_archive_data")
+
+    def test_missing_or_invalid_run_id_rejects_isolation(self):
+        """
+        Prove that missing or invalid run_id in report raises ValueError and refuses file isolation.
+        """
+        # Missing run_id
+        report_missing_id = {
+            "isolated_collections": [{"vehicle_key": "ford_f150", "source": "autotrader"}],
+        }
+        with self.assertRaisesRegex(ValueError, "Invalid or missing run_id"):
+            isolate_anomalous_collections(root=self.root, report=report_missing_id)
+
+        # Invalid run_id with path traversal
+        report_invalid_id = {
+            "run_id": "../invalid/path",
+            "isolated_collections": [{"vehicle_key": "ford_f150", "source": "autotrader"}],
+        }
+        with self.assertRaisesRegex(ValueError, "Invalid or missing run_id"):
+            isolate_anomalous_collections(root=self.root, report=report_invalid_id)
+
+    def test_repeated_invalid_run_id_leaves_existing_quarantine_untouched(self):
+        """
+        Prove that calling isolation with an invalid run_id leaves existing quarantined data untouched.
+        """
+        quarantine_dir = self.root / "data" / "ford_f150" / "quarantine" / "autotrader" / "run_valid"
+        quarantine_dir.mkdir(parents=True, exist_ok=True)
+        existing_file = quarantine_dir / "ford_f150_autotrader_run_valid.csv"
+        existing_file.write_text("existing_quarantine_content", encoding="utf-8")
+
+        invalid_report = {
+            "run_id": "../bad_id",
+            "isolated_collections": [{"vehicle_key": "ford_f150", "source": "autotrader"}],
+        }
+        with self.assertRaisesRegex(ValueError, "Invalid or missing run_id"):
+            isolate_anomalous_collections(root=self.root, report=invalid_report)
+
+        # Existing quarantine file remains unchanged
+        self.assertTrue(existing_file.exists())
+        self.assertEqual(existing_file.read_text(encoding="utf-8"), "existing_quarantine_content")
+
+    def test_rejected_collection_identifiers_fail_closed(self):
+        """
+        Prove that invalid vehicle_key or source in isolated_collections raises ValueError and fails closed.
+        """
+        report_bad_vehicle = {
+            "run_id": "valid_run_123",
+            "isolated_collections": [{"vehicle_key": "../ford_f150", "source": "autotrader"}],
+        }
+        with self.assertRaisesRegex(ValueError, "Rejected invalid collection identifier"):
+            isolate_anomalous_collections(root=self.root, report=report_bad_vehicle)
+
+        report_bad_source = {
+            "run_id": "valid_run_123",
+            "isolated_collections": [{"vehicle_key": "ford_f150", "source": "../autotrader"}],
+        }
+        with self.assertRaisesRegex(ValueError, "Rejected invalid collection identifier"):
+            isolate_anomalous_collections(root=self.root, report=report_bad_source)
+
+    def test_persisted_report_matches_actually_isolated_collections(self):
+        """
+        Prove that when workflow_anomalies build runs, the persisted report and Markdown
+        match the collections that were actually isolated.
+        """
+        run_id = "run_build_test_123"
+        from phase1_common import utc_now
+        run_start = utc_now()
+
+        current_health = {
+            "schema_version": 6,
+            "run_id": run_id,
+            "generated_at_utc": run_start,
+            "overall_status": "degraded",
+            "expected_source_runs": 1,
+            "healthy_source_runs": 0,
+            "unhealthy_source_runs": 1,
+            "sources": [self._source_entry("ford_f150", "autotrader", healthy=False, accepted=0, fetched=0, execution_status="failed")],
+        }
+
+        f150_status = self._source_entry("ford_f150", "autotrader", healthy=False, accepted=0, fetched=0, execution_status="failed")
+        f150_status["started_at_utc"] = run_start
+        f150_status["run_id"] = run_id
+
+        status_file = self.root / "data" / "ford_f150" / "run_status" / "autotrader_latest.json"
+        status_file.parent.mkdir(parents=True, exist_ok=True)
+        status_file.write_text(json.dumps(f150_status), encoding="utf-8")
+
+        latest_csv = self.root / "data" / "ford_f150" / "latest" / "ford_f150_autotrader_latest.csv"
+        latest_csv.parent.mkdir(parents=True, exist_ok=True)
+        latest_csv.write_text("data_to_be_isolated", encoding="utf-8")
+
+        health_file = self.root / "data" / "run_status" / "latest.json"
+        health_file.parent.mkdir(parents=True, exist_ok=True)
+        health_file.write_text(json.dumps(current_health), encoding="utf-8")
+
+        # Run workflow_anomalies.py build action via compare_health_reports & isolate_anomalous_collections
+        from workflow_anomalies import write_anomaly_report
+        report = compare_health_reports(baseline=None, current=current_health, run_id=run_id)
+        actually_isolated = isolate_anomalous_collections(root=self.root, report=report)
+        report["isolated_collections"] = actually_isolated
+        json_path, md_path = write_anomaly_report(root=self.root, report=report)
+
+        persisted_report = json.loads(json_path.read_text(encoding="utf-8"))
+        self.assertEqual(persisted_report["isolated_collections"], [{"vehicle_key": "ford_f150", "source": "autotrader"}])
+        markdown_text = md_path.read_text(encoding="utf-8")
+        self.assertIn("- Isolated collections: `ford_f150:autotrader`", markdown_text)
 
 
 if __name__ == "__main__":

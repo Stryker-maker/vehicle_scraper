@@ -589,49 +589,62 @@ def isolate_anomalous_collections(root: Path, report: dict[str, Any]) -> list[di
     root = root.resolve()
     report_run_id = str(report.get("run_id") or "").strip()
     if not report_run_id or not IDENTIFIER_PATTERN.match(report_run_id):
-        report_run_id = "unknown_run"
+        raise ValueError(f"Invalid or missing run_id in anomaly report: {report.get('run_id')!r}")
 
-    isolated = report.get("isolated_collections", [])
+    isolated = report.get("isolated_collections")
+    if not isinstance(isolated, list):
+        raise ValueError(f"isolated_collections must be a list: {isolated!r}")
+
     valid_isolated: list[dict[str, str]] = []
     for entry in isolated:
+        if not isinstance(entry, dict):
+            raise ValueError(f"Invalid entry in isolated_collections: {entry!r}")
         vk = str(entry.get("vehicle_key") or "").strip()
         src = str(entry.get("source") or "").strip()
         if not vk or not src or not IDENTIFIER_PATTERN.match(vk) or not IDENTIFIER_PATTERN.match(src):
-            continue
-        valid_isolated.append({"vehicle_key": vk, "source": src})
+            raise ValueError(f"Rejected invalid collection identifier: vehicle_key={vk!r}, source={src!r}")
 
         quarantine_dir = root / "data" / vk / "quarantine" / src / report_run_id
 
         # 1. Latest CSV output
         latest_csv = root / "data" / vk / "latest" / f"{vk}_{src}_latest.csv"
         if latest_csv.exists():
-            quarantine_dir.mkdir(parents=True, exist_ok=True)
-            dest = quarantine_dir / f"{vk}_{src}_latest_quarantined.csv"
-            latest_csv.replace(dest)
+            try:
+                quarantine_dir.mkdir(parents=True, exist_ok=True)
+                dest = quarantine_dir / f"{vk}_{src}_latest_quarantined.csv"
+                latest_csv.replace(dest)
+            except OSError as exc:
+                raise RuntimeError(f"Failed to quarantine latest CSV for {vk}:{src}: {exc}") from exc
 
         # 2. Historical timestamped source archive for the current run
         status_path = root / "data" / vk / "run_status" / f"{src}_latest.json"
         status_data = load_optional_json(status_path)
         has_valid_provenance = (
             isinstance(status_data, dict)
-            and status_data.get("run_id") == report.get("run_id")
+            and status_data.get("run_id") == report_run_id
             and isinstance(status_data.get("started_at_utc"), str)
             and _parse_iso_ns(status_data.get("started_at_utc")) is not None
         )
 
         if not has_valid_provenance:
-            print(f"[{vk}:{src}] Reliable current-run provenance missing or invalid; refusing historical archive movement.")
-            continue
+            raise ValueError(f"Reliable current-run provenance missing or invalid for {vk}:{src}")
 
         run_start_ns = _parse_iso_ns(status_data["started_at_utc"])
         source_dir = root / "data" / vk / src
         if source_dir.exists() and source_dir.is_dir():
             for archive_path in source_dir.glob(f"{vk}_{src}_*.csv"):
                 if archive_path.is_file():
-                    if archive_path.stat().st_mtime_ns >= run_start_ns - 2_000_000_000:
-                        quarantine_dir.mkdir(parents=True, exist_ok=True)
-                        dest = quarantine_dir / archive_path.name
-                        archive_path.replace(dest)
+                    try:
+                        if archive_path.stat().st_mtime_ns >= run_start_ns - 2_000_000_000:
+                            quarantine_dir.mkdir(parents=True, exist_ok=True)
+                            dest = quarantine_dir / archive_path.name
+                            archive_path.replace(dest)
+                    except FileNotFoundError:
+                        pass
+                    except OSError as exc:
+                        raise RuntimeError(f"Failed to quarantine archive {archive_path} for {vk}:{src}: {exc}") from exc
+
+        valid_isolated.append({"vehicle_key": vk, "source": src})
 
     return valid_isolated
 
@@ -650,8 +663,9 @@ def main(argv: list[str] | None = None) -> int:
             current=current,
             run_id=args.run_id,
         )
+        actually_isolated = isolate_anomalous_collections(root=root, report=report)
+        report["isolated_collections"] = actually_isolated
         paths = write_anomaly_report(root=root, report=report)
-        isolate_anomalous_collections(root=root, report=report)
         print(
             json.dumps(
                 {"report": report, "artifacts": [str(path) for path in paths]},
