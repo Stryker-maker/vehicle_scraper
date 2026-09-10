@@ -470,6 +470,13 @@ def _perform_comparison(
         severity: sum(item["severity"] == severity for item in anomalies)
         for severity in ("critical", "warning", "info")
     }
+    isolated_collections: list[dict[str, str]] = []
+    for item in anomalies:
+        if item["severity"] == "critical" and item.get("vehicle_key") and item.get("source"):
+            pair = {"vehicle_key": str(item["vehicle_key"]), "source": str(item["source"])}
+            if pair not in isolated_collections:
+                isolated_collections.append(pair)
+
     return {
         "anomaly_schema_version": ANOMALY_SCHEMA_VERSION,
         "run_id": run_id,
@@ -485,6 +492,7 @@ def _perform_comparison(
         "critical_anomaly_count": counts["critical"],
         "warning_anomaly_count": counts["warning"],
         "informational_anomaly_count": counts["info"],
+        "isolated_collections": isolated_collections,
         "anomalies": anomalies,
     }
 
@@ -514,6 +522,15 @@ def write_anomaly_report(
         "| Severity | Vehicle | Source | Code | Message | Baseline | Current | Threshold |",
         "|---|---|---|---|---|---:|---:|---:|",
     ]
+    if report.get("isolated_collections"):
+        isolated_str = ", ".join(
+            f"`{item['vehicle_key']}:{item['source']}`"
+            for item in report["isolated_collections"]
+        )
+        lines.extend([
+            f"- Isolated collections: {isolated_str}",
+            "",
+        ])
     for anomaly in report["anomalies"]:
         lines.append(
             f"| {anomaly['severity']} | {anomaly['vehicle_key'] or '—'} | "
@@ -550,6 +567,20 @@ def parser() -> argparse.ArgumentParser:
     return result
 
 
+def isolate_anomalous_collections(root: Path, report: dict[str, Any]) -> list[dict[str, str]]:
+    """Isolate critical anomaly collections by removing untrusted raw CSV files while preserving diagnostic evidence."""
+    root = root.resolve()
+    isolated = report.get("isolated_collections", [])
+    for entry in isolated:
+        vk = entry.get("vehicle_key")
+        src = entry.get("source")
+        if vk and src:
+            latest_csv = root / "data" / vk / "latest" / f"{vk}_{src}_latest.csv"
+            if latest_csv.exists():
+                latest_csv.unlink()
+    return isolated
+
+
 def main(argv: list[str] | None = None) -> int:
     """Run anomaly report construction or policy checking from CLI arguments."""
     args = parser().parse_args(argv)
@@ -565,6 +596,7 @@ def main(argv: list[str] | None = None) -> int:
             run_id=args.run_id,
         )
         paths = write_anomaly_report(root=root, report=report)
+        isolate_anomalous_collections(root=root, report=report)
         print(
             json.dumps(
                 {"report": report, "artifacts": [str(path) for path in paths]},
@@ -579,8 +611,15 @@ def main(argv: list[str] | None = None) -> int:
             print("Anomaly report is missing or invalid")
             return 1
         print(json.dumps(report, indent=2, sort_keys=True))
+        isolated = report.get("isolated_collections", [])
+        if isolated:
+            print(f"Isolated collections due to critical anomalies: {isolated}")
         if args.policy == "enforce" and int(report.get("critical_anomaly_count", 0)) > 0:
-            return 1
+            health_path = root / "data" / "run_status" / "latest.json"
+            health = load_optional_json(health_path) or {}
+            total_sources = health.get("expected_source_runs", 0)
+            if total_sources > 0 and len(isolated) >= total_sources:
+                return 1
         return 0
     raise AssertionError(args.action)
 

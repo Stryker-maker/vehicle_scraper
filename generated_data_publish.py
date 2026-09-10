@@ -75,6 +75,16 @@ def prepare_manifest(
     if errors:
         raise ValueError("Invalid generated-data paths: " + ", ".join(errors))
     counts = Counter(status[0] for status, _ in staged)
+    isolated_collections: list[dict[str, str]] = []
+    anomaly_path = root / "data" / "run_status" / "anomalies_latest.json"
+    if anomaly_path.exists():
+        try:
+            anom_data = json.loads(anomaly_path.read_text(encoding="utf-8"))
+            if isinstance(anom_data, dict) and isinstance(anom_data.get("isolated_collections"), list):
+                isolated_collections = anom_data["isolated_collections"]
+        except (OSError, ValueError, json.JSONDecodeError):
+            pass
+
     manifest = {
         "publication_schema_version": PUBLICATION_SCHEMA_VERSION,
         "publication_status": "prepared_for_commit",
@@ -89,6 +99,7 @@ def prepare_manifest(
         "change_type_counts": dict(sorted(counts.items())),
         "active_vehicle_keys": sorted(active),
         "paused_vehicle_keys": sorted(paused),
+        "isolated_collections": isolated_collections,
     }
     write_json(root / MANIFEST_PATH, manifest)
     return manifest

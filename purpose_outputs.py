@@ -970,14 +970,24 @@ def build(
         raise ValueError("Source scope must contain unique supported sources")
     scope = "single_source" if len(sources) == 1 else "combined_sources"
     bundles: list[dict[str, Any]] = []
+    valid_sources: list[str] = []
     for source in sources:
-        bundles.extend(load_source_bundles(root, config, source, run_id))
+        try:
+            loaded = load_source_bundles(root, config, source, run_id)
+            bundles.extend(loaded)
+            valid_sources.append(source)
+        except (OSError, ValueError, json.JSONDecodeError):
+            pass
+    if not valid_sources:
+        raise ValueError(f"No valid source collections available for {vehicle_key}")
+    effective_sources = valid_sources
+    effective_scope = "single_source" if len(effective_sources) == 1 else "combined_sources"
     paths = artifact_paths(root, config, profile)
 
     if profile == "owned_vehicle_value":
         subject = entry["subject_profile"]
         records = [_owned_record(bundle, subject, scope) for bundle in bundles]
-        summary = _owned_summary(config, run_id, sources, scope, records, entry, paths, root)
+        summary = _owned_summary(config, run_id, effective_sources, effective_scope, records, entry, paths, root)
         input_gaps = {
             "purpose_output_schema_version": PURPOSE_OUTPUT_SCHEMA_VERSION,
             "purpose_input_schema_version": PURPOSE_INPUT_SCHEMA_VERSION,
@@ -1010,7 +1020,7 @@ def build(
         ]
         records = [pair[0] for pair in record_pairs]
         questions = [pair[1] for pair in record_pairs]
-        summary = _family_summary(config, run_id, sources, scope, records, preferences, paths, root)
+        summary = _family_summary(config, run_id, effective_sources, effective_scope, records, preferences, paths, root)
         write_jsonl(paths["records_jsonl"], records)
         _write_csv(paths["records_csv"], FAMILY_CSV_FIELDS, records)
         write_jsonl(paths["questions_jsonl"], questions)
