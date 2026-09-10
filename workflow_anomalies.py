@@ -585,8 +585,12 @@ def _parse_iso_ns(iso_str: str | None) -> int | None:
 
 
 def isolate_anomalous_collections(root: Path, report: dict[str, Any]) -> list[dict[str, str]]:
-    """Isolate critical anomaly collections by moving current anomalous raw CSV outputs into quarantine while preserving historical archives and diagnostic evidence."""
+    """Isolate critical anomaly collections by moving current anomalous raw CSV outputs into run-specific quarantine while preserving historical archives and diagnostic evidence."""
     root = root.resolve()
+    report_run_id = str(report.get("run_id") or "").strip()
+    if not report_run_id or not IDENTIFIER_PATTERN.match(report_run_id):
+        report_run_id = "unknown_run"
+
     isolated = report.get("isolated_collections", [])
     valid_isolated: list[dict[str, str]] = []
     for entry in isolated:
@@ -596,32 +600,36 @@ def isolate_anomalous_collections(root: Path, report: dict[str, Any]) -> list[di
             continue
         valid_isolated.append({"vehicle_key": vk, "source": src})
 
-        status_path = root / "data" / vk / "run_status" / f"{src}_latest.json"
-        status_data = load_optional_json(status_path) or {}
-        started_at = status_data.get("started_at_utc") or report.get("generated_at_utc")
-        run_start_ns = _parse_iso_ns(started_at)
-        if run_start_ns is None:
-            if status_path.exists():
-                run_start_ns = status_path.stat().st_mtime_ns
-            else:
-                run_start_ns = 0
-
-        quarantine_dir = root / "data" / vk / "quarantine" / src
-        quarantine_dir.mkdir(parents=True, exist_ok=True)
+        quarantine_dir = root / "data" / vk / "quarantine" / src / report_run_id
 
         # 1. Latest CSV output
         latest_csv = root / "data" / vk / "latest" / f"{vk}_{src}_latest.csv"
         if latest_csv.exists():
+            quarantine_dir.mkdir(parents=True, exist_ok=True)
             dest = quarantine_dir / f"{vk}_{src}_latest_quarantined.csv"
             latest_csv.replace(dest)
 
-        # 2. Historical timestamped source archives created/modified in current run
+        # 2. Historical timestamped source archive for the current run
+        status_path = root / "data" / vk / "run_status" / f"{src}_latest.json"
+        status_data = load_optional_json(status_path)
+        has_valid_provenance = (
+            isinstance(status_data, dict)
+            and status_data.get("run_id") == report.get("run_id")
+            and isinstance(status_data.get("started_at_utc"), str)
+            and _parse_iso_ns(status_data.get("started_at_utc")) is not None
+        )
+
+        if not has_valid_provenance:
+            print(f"[{vk}:{src}] Reliable current-run provenance missing or invalid; refusing historical archive movement.")
+            continue
+
+        run_start_ns = _parse_iso_ns(status_data["started_at_utc"])
         source_dir = root / "data" / vk / src
         if source_dir.exists() and source_dir.is_dir():
             for archive_path in source_dir.glob(f"{vk}_{src}_*.csv"):
                 if archive_path.is_file():
-                    # Move only archives created/modified during current run (or if run_start_ns == 0)
-                    if run_start_ns == 0 or archive_path.stat().st_mtime_ns >= run_start_ns - 2_000_000_000:
+                    if archive_path.stat().st_mtime_ns >= run_start_ns - 2_000_000_000:
+                        quarantine_dir.mkdir(parents=True, exist_ok=True)
                         dest = quarantine_dir / archive_path.name
                         archive_path.replace(dest)
 

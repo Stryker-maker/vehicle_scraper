@@ -61,11 +61,13 @@ class CollectionIsolationTests(unittest.TestCase):
 
         # Construct current health report with 1 successful source (ford_f350 / autotrader)
         # and 1 anomalous/unhealthy source (ford_f150 / autotrader).
-        f350_autotrader = self._source_entry("ford_f350", "autotrader", healthy=True, accepted=25, fetched=100)
-        f150_autotrader = self._source_entry("ford_f150", "autotrader", healthy=False, accepted=0, fetched=0, execution_status="failed")
-
         from phase1_common import utc_now
         run_start = utc_now()
+
+        f350_autotrader = self._source_entry("ford_f350", "autotrader", healthy=True, accepted=25, fetched=100)
+        f350_autotrader["run_id"] = run_id
+        f150_autotrader = self._source_entry("ford_f150", "autotrader", healthy=False, accepted=0, fetched=0, execution_status="failed")
+        f150_autotrader["run_id"] = run_id
 
         current_health = {
             "schema_version": 6,
@@ -157,8 +159,8 @@ class CollectionIsolationTests(unittest.TestCase):
         # 2. Anomalous newly generated archive is excluded from trusted publication path
         self.assertFalse(f150_new_archive.exists())
 
-        # 3. Anomalous raw CSV data is preserved in quarantine
-        quarantine_dir = self.root / "data" / "ford_f150" / "quarantine" / "autotrader"
+        # 3. Anomalous raw CSV data is preserved in run-specific quarantine directory
+        quarantine_dir = self.root / "data" / "ford_f150" / "quarantine" / "autotrader" / run_id
         quarantined_files = [f.name for f in quarantine_dir.glob("*.csv")]
         self.assertIn("ford_f150_autotrader_2026-08-01_00-00-00.csv", quarantined_files)
         self.assertIn("ford_f150_autotrader_latest_quarantined.csv", quarantined_files)
@@ -547,6 +549,93 @@ class CollectionIsolationTests(unittest.TestCase):
         self.assertEqual(purpose_summary["record_count"], 1)
         self.assertEqual(purpose_summary["sources"], ["autotrader"])
         self.assertEqual(purpose_summary["scope"], "single_source")
+
+    def test_repeated_anomalous_runs_quarantine_separately(self):
+        """
+        Prove that two repeated anomalous runs produce two separately preserved quarantined raw datasets
+        without overwriting each other.
+        """
+        from phase1_common import utc_now
+        import os, time
+
+        for run_id in ("run_1", "run_2"):
+            run_start = utc_now()
+            health = {
+                "schema_version": 6,
+                "run_id": run_id,
+                "generated_at_utc": run_start,
+                "overall_status": "degraded",
+                "expected_source_runs": 1,
+                "healthy_source_runs": 0,
+                "unhealthy_source_runs": 1,
+                "sources": [self._source_entry("ford_f150", "autotrader", healthy=False, accepted=0, fetched=0, execution_status="failed")],
+            }
+            f150_status = self._source_entry("ford_f150", "autotrader", healthy=False, accepted=0, fetched=0, execution_status="failed")
+            f150_status["started_at_utc"] = run_start
+            f150_status["run_id"] = run_id
+
+            status_file = self.root / "data" / "ford_f150" / "run_status" / "autotrader_latest.json"
+            status_file.parent.mkdir(parents=True, exist_ok=True)
+            status_file.write_text(json.dumps(f150_status), encoding="utf-8")
+
+            latest_csv = self.root / "data" / "ford_f150" / "latest" / "ford_f150_autotrader_latest.csv"
+            archive_csv = self.root / "data" / "ford_f150" / "autotrader" / f"ford_f150_autotrader_{run_id}.csv"
+            latest_csv.parent.mkdir(parents=True, exist_ok=True)
+            archive_csv.parent.mkdir(parents=True, exist_ok=True)
+            latest_csv.write_text(f"content_latest_{run_id}", encoding="utf-8")
+            archive_csv.write_text(f"content_archive_{run_id}", encoding="utf-8")
+
+            report = compare_health_reports(baseline=None, current=health, run_id=run_id)
+            isolate_anomalous_collections(root=self.root, report=report)
+
+        q1 = self.root / "data" / "ford_f150" / "quarantine" / "autotrader" / "run_1"
+        q2 = self.root / "data" / "ford_f150" / "quarantine" / "autotrader" / "run_2"
+        self.assertTrue(q1.exists())
+        self.assertTrue(q2.exists())
+
+        q1_files = {f.name: f.read_text(encoding="utf-8") for f in q1.glob("*.csv")}
+        q2_files = {f.name: f.read_text(encoding="utf-8") for f in q2.glob("*.csv")}
+
+        self.assertIn("ford_f150_autotrader_run_1.csv", q1_files)
+        self.assertEqual(q1_files["ford_f150_autotrader_run_1.csv"], "content_archive_run_1")
+
+        self.assertIn("ford_f150_autotrader_run_2.csv", q2_files)
+        self.assertEqual(q2_files["ford_f150_autotrader_run_2.csv"], "content_archive_run_2")
+
+    def test_missing_provenance_refuses_archive_movement(self):
+        """
+        Prove that if current-run provenance is missing or invalid (e.g. status run_id mismatch or
+        missing started_at_utc), isolate_anomalous_collections refuses historical archive movement
+        and leaves existing trusted historical archives untouched.
+        """
+        run_id = "run_no_provenance"
+        health = {
+            "schema_version": 6,
+            "run_id": run_id,
+            "generated_at_utc": "2026-08-01T00:00:00Z",
+            "overall_status": "degraded",
+            "expected_source_runs": 1,
+            "healthy_source_runs": 0,
+            "unhealthy_source_runs": 1,
+            "sources": [self._source_entry("ford_f150", "autotrader", healthy=False, accepted=0, fetched=0, execution_status="failed")],
+        }
+
+        # Create trusted historical archive
+        trusted_archive = self.root / "data" / "ford_f150" / "autotrader" / "ford_f150_autotrader_2026-07-01_00-00-00.csv"
+        trusted_archive.parent.mkdir(parents=True, exist_ok=True)
+        trusted_archive.write_text("trusted_archive_data", encoding="utf-8")
+
+        # Status file lacks started_at_utc / has mismatched run_id
+        status_file = self.root / "data" / "ford_f150" / "run_status" / "autotrader_latest.json"
+        status_file.parent.mkdir(parents=True, exist_ok=True)
+        status_file.write_text(json.dumps({"schema_version": 8, "run_id": "wrong_run_id"}), encoding="utf-8")
+
+        report = compare_health_reports(baseline=None, current=health, run_id=run_id)
+        isolate_anomalous_collections(root=self.root, report=report)
+
+        # Trusted archive remains untouched in data/ford_f150/autotrader/
+        self.assertTrue(trusted_archive.exists())
+        self.assertEqual(trusted_archive.read_text(encoding="utf-8"), "trusted_archive_data")
 
 
 if __name__ == "__main__":
