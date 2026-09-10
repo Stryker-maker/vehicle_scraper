@@ -64,10 +64,13 @@ class CollectionIsolationTests(unittest.TestCase):
         f350_autotrader = self._source_entry("ford_f350", "autotrader", healthy=True, accepted=25, fetched=100)
         f150_autotrader = self._source_entry("ford_f150", "autotrader", healthy=False, accepted=0, fetched=0, execution_status="failed")
 
+        from phase1_common import utc_now
+        run_start = utc_now()
+
         current_health = {
             "schema_version": 6,
             "run_id": run_id,
-            "generated_at_utc": "2026-08-01T00:00:00Z",
+            "generated_at_utc": run_start,
             "overall_status": "degraded",
             "expected_source_runs": 2,
             "healthy_source_runs": 1,
@@ -90,25 +93,41 @@ class CollectionIsolationTests(unittest.TestCase):
         health_dir.mkdir(parents=True, exist_ok=True)
         (health_dir / "latest.json").write_text(json.dumps(current_health), encoding="utf-8")
 
-        # Mock CSV latest outputs and timestamped historical source archives on disk
+        # Mock CSV outputs on disk:
+        # For ford_f150 (anomalous in current run):
+        # - Two pre-existing trusted historical archives (older mtime)
+        # - One newly generated timestamped archive from current run (current mtime)
+        # - One latest CSV output
+        f150_old_archive_1 = self.root / "data" / "ford_f150" / "autotrader" / "ford_f150_autotrader_2026-07-01_00-00-00.csv"
+        f150_old_archive_2 = self.root / "data" / "ford_f150" / "autotrader" / "ford_f150_autotrader_2026-07-08_00-00-00.csv"
+        f150_new_archive = self.root / "data" / "ford_f150" / "autotrader" / "ford_f150_autotrader_2026-08-01_00-00-00.csv"
+        f150_latest_csv = self.root / "data" / "ford_f150" / "latest" / "ford_f150_autotrader_latest.csv"
+
+        # For ford_f350 (healthy):
         f350_latest_csv = self.root / "data" / "ford_f350" / "latest" / "ford_f350_autotrader_latest.csv"
         f350_archive_csv = self.root / "data" / "ford_f350" / "autotrader" / "ford_f350_autotrader_2026-08-01_00-00-00.csv"
-        f150_latest_csv = self.root / "data" / "ford_f150" / "latest" / "ford_f150_autotrader_latest.csv"
-        f150_archive_csv = self.root / "data" / "ford_f150" / "autotrader" / "ford_f150_autotrader_2026-08-01_00-00-00.csv"
 
-        f350_latest_csv.parent.mkdir(parents=True, exist_ok=True)
-        f350_archive_csv.parent.mkdir(parents=True, exist_ok=True)
-        f150_latest_csv.parent.mkdir(parents=True, exist_ok=True)
-        f150_archive_csv.parent.mkdir(parents=True, exist_ok=True)
+        for p in (f150_old_archive_1, f150_latest_csv, f350_latest_csv, f350_archive_csv):
+            p.parent.mkdir(parents=True, exist_ok=True)
+
+        f150_old_archive_1.write_text("year,make,model,price_cad\n2022,Ford,F-150,52000\n", encoding="utf-8")
+        f150_old_archive_2.write_text("year,make,model,price_cad\n2022,Ford,F-150,51000\n", encoding="utf-8")
+        f150_new_archive.write_text("year,make,model,price_cad\n2022,Ford,F-150,50000\n", encoding="utf-8")
+        f150_latest_csv.write_text("year,make,model,price_cad\n2022,Ford,F-150,50000\n", encoding="utf-8")
 
         f350_latest_csv.write_text("year,make,model,price_cad\n2023,Ford,F-350,75000\n", encoding="utf-8")
         f350_archive_csv.write_text("year,make,model,price_cad\n2023,Ford,F-350,75000\n", encoding="utf-8")
-        f150_latest_csv.write_text("year,make,model,price_cad\n2022,Ford,F-150,50000\n", encoding="utf-8")
-        f150_archive_csv.write_text("year,make,model,price_cad\n2022,Ford,F-150,50000\n", encoding="utf-8")
+
+        # Set older mtimes for pre-existing archives (e.g. 100 seconds before current run)
+        import os, time
+        now_ts = time.time()
+        os.utime(f150_old_archive_1, (now_ts - 100, now_ts - 100))
+        os.utime(f150_old_archive_2, (now_ts - 100, now_ts - 100))
 
         # Mock diagnostic evidence artifacts on disk for the anomalous source
         f150_status_file = self.root / "data" / "ford_f150" / "run_status" / "autotrader_latest.json"
         f150_status_file.parent.mkdir(parents=True, exist_ok=True)
+        f150_autotrader["started_at_utc"] = run_start
         f150_status_file.write_text(json.dumps(f150_autotrader), encoding="utf-8")
 
         # 1. Compare health reports to build anomaly report
@@ -130,15 +149,27 @@ class CollectionIsolationTests(unittest.TestCase):
         isolated = isolate_anomalous_collections(root=self.root, report=anomaly_report)
         self.assertEqual(len(isolated), 1)
 
-        # Requirement 4 & 5:
-        # Untrusted latest CSV and newly generated timestamped historical archive for anomalous collection are excluded/unlinked
+        # Prove:
+        # 1. Both pre-existing trusted archives remain in trusted path
+        self.assertTrue(f150_old_archive_1.exists())
+        self.assertTrue(f150_old_archive_2.exists())
+
+        # 2. Anomalous newly generated archive is excluded from trusted publication path
+        self.assertFalse(f150_new_archive.exists())
+
+        # 3. Anomalous raw CSV data is preserved in quarantine
+        quarantine_dir = self.root / "data" / "ford_f150" / "quarantine" / "autotrader"
+        quarantined_files = [f.name for f in quarantine_dir.glob("*.csv")]
+        self.assertIn("ford_f150_autotrader_2026-08-01_00-00-00.csv", quarantined_files)
+        self.assertIn("ford_f150_autotrader_latest_quarantined.csv", quarantined_files)
+
+        # 4. Anomalous latest trusted CSV is excluded from latest path
         self.assertFalse(f150_latest_csv.exists())
-        self.assertFalse(f150_archive_csv.exists())
-        # Diagnostic evidence for anomalous collection remains preserved on disk
+
+        # 5. Diagnostic/evidence artifacts remain preserved for investigation
         self.assertTrue(f150_status_file.exists())
 
-        # Requirement 2 & 3:
-        # Successful collection's latest CSV and historical archive remain intact and eligible for publication
+        # 6. Healthy collection's latest and historical data remain untouched
         self.assertTrue(f350_latest_csv.exists())
         self.assertTrue(f350_archive_csv.exists())
 

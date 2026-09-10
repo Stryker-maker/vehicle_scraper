@@ -566,11 +566,26 @@ def parser() -> argparse.ArgumentParser:
     return result
 
 
-IDENTIFIER_PATTERN = __import__("re").compile(r"^[a-z0-9_]+$")
+from datetime import datetime, timezone
+import re
+
+IDENTIFIER_PATTERN = re.compile(r"^[a-z0-9_]+$")
+
+
+def _parse_iso_ns(iso_str: str | None) -> int | None:
+    if not iso_str or not isinstance(iso_str, str):
+        return None
+    try:
+        dt = datetime.fromisoformat(iso_str.replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return int(dt.timestamp() * 1_000_000_000)
+    except Exception:
+        return None
 
 
 def isolate_anomalous_collections(root: Path, report: dict[str, Any]) -> list[dict[str, str]]:
-    """Isolate critical anomaly collections by removing untrusted CSV outputs while preserving diagnostic evidence."""
+    """Isolate critical anomaly collections by moving current anomalous raw CSV outputs into quarantine while preserving historical archives and diagnostic evidence."""
     root = root.resolve()
     isolated = report.get("isolated_collections", [])
     valid_isolated: list[dict[str, str]] = []
@@ -580,16 +595,36 @@ def isolate_anomalous_collections(root: Path, report: dict[str, Any]) -> list[di
         if not vk or not src or not IDENTIFIER_PATTERN.match(vk) or not IDENTIFIER_PATTERN.match(src):
             continue
         valid_isolated.append({"vehicle_key": vk, "source": src})
+
+        status_path = root / "data" / vk / "run_status" / f"{src}_latest.json"
+        status_data = load_optional_json(status_path) or {}
+        started_at = status_data.get("started_at_utc") or report.get("generated_at_utc")
+        run_start_ns = _parse_iso_ns(started_at)
+        if run_start_ns is None:
+            if status_path.exists():
+                run_start_ns = status_path.stat().st_mtime_ns
+            else:
+                run_start_ns = 0
+
+        quarantine_dir = root / "data" / vk / "quarantine" / src
+        quarantine_dir.mkdir(parents=True, exist_ok=True)
+
         # 1. Latest CSV output
         latest_csv = root / "data" / vk / "latest" / f"{vk}_{src}_latest.csv"
         if latest_csv.exists():
-            latest_csv.unlink()
-        # 2. Historical timestamped source archives under data/<vehicle_key>/<source>/
+            dest = quarantine_dir / f"{vk}_{src}_latest_quarantined.csv"
+            latest_csv.replace(dest)
+
+        # 2. Historical timestamped source archives created/modified in current run
         source_dir = root / "data" / vk / src
         if source_dir.exists() and source_dir.is_dir():
             for archive_path in source_dir.glob(f"{vk}_{src}_*.csv"):
                 if archive_path.is_file():
-                    archive_path.unlink()
+                    # Move only archives created/modified during current run (or if run_start_ns == 0)
+                    if run_start_ns == 0 or archive_path.stat().st_mtime_ns >= run_start_ns - 2_000_000_000:
+                        dest = quarantine_dir / archive_path.name
+                        archive_path.replace(dest)
+
     return valid_isolated
 
 
