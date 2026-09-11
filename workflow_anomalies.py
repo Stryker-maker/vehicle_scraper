@@ -470,6 +470,13 @@ def _perform_comparison(
         severity: sum(item["severity"] == severity for item in anomalies)
         for severity in ("critical", "warning", "info")
     }
+    isolated_collections: list[dict[str, str]] = []
+    for item in anomalies:
+        if item["severity"] == "critical" and item.get("vehicle_key") and item.get("source"):
+            pair = {"vehicle_key": str(item["vehicle_key"]), "source": str(item["source"])}
+            if pair not in isolated_collections:
+                isolated_collections.append(pair)
+
     return {
         "anomaly_schema_version": ANOMALY_SCHEMA_VERSION,
         "run_id": run_id,
@@ -485,6 +492,7 @@ def _perform_comparison(
         "critical_anomaly_count": counts["critical"],
         "warning_anomaly_count": counts["warning"],
         "informational_anomaly_count": counts["info"],
+        "isolated_collections": isolated_collections,
         "anomalies": anomalies,
     }
 
@@ -510,10 +518,18 @@ def write_anomaly_report(
         f"- Critical: {report['critical_anomaly_count']}",
         f"- Warnings: {report['warning_anomaly_count']}",
         f"- Informational: {report['informational_anomaly_count']}",
+    ]
+    if report.get("isolated_collections"):
+        isolated_str = ", ".join(
+            f"`{item['vehicle_key']}:{item['source']}`"
+            for item in report["isolated_collections"]
+        )
+        lines.append(f"- Isolated collections: {isolated_str}")
+    lines.extend([
         "",
         "| Severity | Vehicle | Source | Code | Message | Baseline | Current | Threshold |",
         "|---|---|---|---|---|---:|---:|---:|",
-    ]
+    ])
     for anomaly in report["anomalies"]:
         lines.append(
             f"| {anomaly['severity']} | {anomaly['vehicle_key'] or '—'} | "
@@ -550,6 +566,89 @@ def parser() -> argparse.ArgumentParser:
     return result
 
 
+from datetime import datetime, timezone
+import re
+
+IDENTIFIER_PATTERN = re.compile(r"^[a-z0-9_]+$")
+
+
+def _parse_iso_ns(iso_str: str | None) -> int | None:
+    if not iso_str or not isinstance(iso_str, str):
+        return None
+    try:
+        dt = datetime.fromisoformat(iso_str.replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return int(dt.timestamp() * 1_000_000_000)
+    except Exception:
+        return None
+
+
+def isolate_anomalous_collections(root: Path, report: dict[str, Any]) -> list[dict[str, str]]:
+    """Isolate critical anomaly collections by moving current anomalous raw CSV outputs into run-specific quarantine while preserving historical archives and diagnostic evidence."""
+    root = root.resolve()
+    report_run_id = str(report.get("run_id") or "").strip()
+    if not report_run_id or not IDENTIFIER_PATTERN.match(report_run_id):
+        raise ValueError(f"Invalid or missing run_id in anomaly report: {report.get('run_id')!r}")
+
+    isolated = report.get("isolated_collections")
+    if not isinstance(isolated, list):
+        raise ValueError(f"isolated_collections must be a list: {isolated!r}")
+
+    valid_isolated: list[dict[str, str]] = []
+    for entry in isolated:
+        if not isinstance(entry, dict):
+            raise ValueError(f"Invalid entry in isolated_collections: {entry!r}")
+        vk = str(entry.get("vehicle_key") or "").strip()
+        src = str(entry.get("source") or "").strip()
+        if not vk or not src or not IDENTIFIER_PATTERN.match(vk) or not IDENTIFIER_PATTERN.match(src):
+            raise ValueError(f"Rejected invalid collection identifier: vehicle_key={vk!r}, source={src!r}")
+
+        quarantine_dir = root / "data" / vk / "quarantine" / src / report_run_id
+
+        # 1. Latest CSV output
+        latest_csv = root / "data" / vk / "latest" / f"{vk}_{src}_latest.csv"
+        if latest_csv.exists():
+            try:
+                quarantine_dir.mkdir(parents=True, exist_ok=True)
+                dest = quarantine_dir / f"{vk}_{src}_latest_quarantined.csv"
+                latest_csv.replace(dest)
+            except OSError as exc:
+                raise RuntimeError(f"Failed to quarantine latest CSV for {vk}:{src}: {exc}") from exc
+
+        # 2. Historical timestamped source archive for the current run
+        status_path = root / "data" / vk / "run_status" / f"{src}_latest.json"
+        status_data = load_optional_json(status_path)
+        has_valid_provenance = (
+            isinstance(status_data, dict)
+            and status_data.get("run_id") == report_run_id
+            and isinstance(status_data.get("started_at_utc"), str)
+            and _parse_iso_ns(status_data.get("started_at_utc")) is not None
+        )
+
+        if not has_valid_provenance:
+            raise ValueError(f"Reliable current-run provenance missing or invalid for {vk}:{src}")
+
+        run_start_ns = _parse_iso_ns(status_data["started_at_utc"])
+        source_dir = root / "data" / vk / src
+        if source_dir.exists() and source_dir.is_dir():
+            for archive_path in source_dir.glob(f"{vk}_{src}_*.csv"):
+                if archive_path.is_file():
+                    try:
+                        if archive_path.stat().st_mtime_ns >= run_start_ns - 2_000_000_000:
+                            quarantine_dir.mkdir(parents=True, exist_ok=True)
+                            dest = quarantine_dir / archive_path.name
+                            archive_path.replace(dest)
+                    except FileNotFoundError:
+                        pass
+                    except OSError as exc:
+                        raise RuntimeError(f"Failed to quarantine archive {archive_path} for {vk}:{src}: {exc}") from exc
+
+        valid_isolated.append({"vehicle_key": vk, "source": src})
+
+    return valid_isolated
+
+
 def main(argv: list[str] | None = None) -> int:
     """Run anomaly report construction or policy checking from CLI arguments."""
     args = parser().parse_args(argv)
@@ -564,6 +663,8 @@ def main(argv: list[str] | None = None) -> int:
             current=current,
             run_id=args.run_id,
         )
+        actually_isolated = isolate_anomalous_collections(root=root, report=report)
+        report["isolated_collections"] = actually_isolated
         paths = write_anomaly_report(root=root, report=report)
         print(
             json.dumps(
@@ -579,8 +680,19 @@ def main(argv: list[str] | None = None) -> int:
             print("Anomaly report is missing or invalid")
             return 1
         print(json.dumps(report, indent=2, sort_keys=True))
+        isolated = report.get("isolated_collections", [])
+        if isolated:
+            print(f"Isolated collections due to critical anomalies: {isolated}")
         if args.policy == "enforce" and int(report.get("critical_anomaly_count", 0)) > 0:
-            return 1
+            health_path = root / "data" / "run_status" / "latest.json"
+            health = load_optional_json(health_path)
+            if not health or not isinstance(health.get("expected_source_runs"), int) or health.get("expected_source_runs") <= 0:
+                print("Health report missing or invalid expected_source_runs; failing closed.")
+                return 1
+            total_sources = health["expected_source_runs"]
+            if len(isolated) >= total_sources:
+                print(f"All expected collections ({total_sources}) are isolated; failing closed.")
+                return 1
         return 0
     raise AssertionError(args.action)
 

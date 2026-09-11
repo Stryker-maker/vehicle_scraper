@@ -650,15 +650,24 @@ def build(root: Path, config_path: Path, run_id: str, sources: Sequence[str] | N
     overrides = load_owner_overrides(override_file)
     override_bytes = override_file.read_bytes() if override_file.exists() else json.dumps(overrides, sort_keys=True).encode("utf-8")
     bundles: list[dict[str, Any]] = []
+    valid_sources: list[str] = []
     for source in selected:
-        bundles.extend(load_source_bundles(root, config, source, run_id))
-    market_rows = [_base(bundle, scope) for bundle in bundles]
+        try:
+            loaded = load_source_bundles(root, config, source, run_id)
+            bundles.extend(loaded)
+            valid_sources.append(source)
+        except (OSError, ValueError, json.JSONDecodeError):
+            pass
+    if not valid_sources:
+        raise ValueError("No valid source collections available for ford_f350")
+    effective_scope = "full_sources" if set(valid_sources) == set(SUPPORTED_SOURCES) else "single_source"
+    market_rows = [_base(bundle, effective_scope) for bundle in bundles]
     paths = artifact_paths(root, config)
     relative = {key: str(value.relative_to(root)) for key, value in paths.items()}
     listings: list[dict[str, Any]] = []
     questions: list[dict[str, Any]] = []
     for bundle in bundles:
-        listing, question_record = _listing(bundle, market_rows, overrides, relative, scope)
+        listing, question_record = _listing(bundle, market_rows, overrides, relative, effective_scope)
         listings.append(listing)
         questions.append(question_record)
     listings.sort(key=lambda value: (-int(value.get("year") or 0), int(value.get("price_cad") or 10**12), str(value.get("source")), str(value.get("canonical_listing_id"))))
@@ -670,7 +679,7 @@ def build(root: Path, config_path: Path, run_id: str, sources: Sequence[str] | N
         writer = csv.DictWriter(handle, fieldnames=CSV_FIELDS, extrasaction="ignore")
         writer.writeheader()
         writer.writerows(csv_row(value) for value in listings)
-    summary = market_summary(listings, run_id, scope, selected, hashlib.sha256(override_bytes).hexdigest())
+    summary = market_summary(listings, run_id, effective_scope, valid_sources, hashlib.sha256(override_bytes).hexdigest())
     summary["artifacts"] = relative
     write_json(paths["market_summary_json"], summary)
     write_summary_markdown(paths["market_summary_markdown"], summary)
