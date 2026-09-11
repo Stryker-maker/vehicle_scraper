@@ -1,0 +1,27 @@
+name: PR36 remediation PR trigger
+
+on:
+  pull_request:
+    types: [synchronize]
+
+permissions:
+  contents: write
+
+jobs:
+  remediate:
+    if: "github.head_ref == 'isolate-collection-anomalies-5104834176888402418' && hashFiles('.github/workflows/remediate-pr36.yml') != ''"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+
+      - name: Execute remediation runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          sed -n '/^          python <<'"'"'PY'"'"'$/,/^          PY$/p' .github/workflows/remediate-pr36.yml \
+            | sed '1d;$d;s/^          //' > /tmp/remediate_pr36.py
+          python /tmp/remediate_pr36.py
