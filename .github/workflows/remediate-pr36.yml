@@ -1,0 +1,93 @@
+name: PR36 remediation runner
+
+on:
+  push:
+    branches:
+      - isolate-collection-anomalies-5104834176888402418
+
+permissions:
+  contents: write
+
+jobs:
+  remediate:
+    if: "!contains(github.event.head_commit.message, 'PR36 remediation')"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout remediation branch
+        uses: actions/checkout@v4
+        with:
+          ref: isolate-collection-anomalies-5104834176888402418
+          fetch-depth: 0
+
+      - name: Apply remediation and run tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python <<'PY'
+          from pathlib import Path
+          import re
+
+          root = Path.cwd()
+
+          # 1. Replace collection isolation with a validate/plan phase followed by execution.
+          path = root / "workflow_anomalies.py"
+          text = path.read_text(encoding="utf-8")
+          start = text.index("def isolate_anomalous_collections(")
+          end = text.index("\ndef main(", start)
+          replacement = '''def _build_isolation_plan(\n    *, root: Path, report_run_id: str, isolated: list[Any]\n) -> list[tuple[Path, Path]]:\n    """Validate every collection and build all filesystem moves before executing any move."""\n    plan: list[tuple[Path, Path]] = []\n    planned_destinations: set[Path] = set()\n    for entry in isolated:\n        if not isinstance(entry, dict):\n            raise ValueError(f"Invalid entry in isolated_collections: {entry!r}")\n        vk = str(entry.get("vehicle_key") or "").strip()\n        src = str(entry.get("source") or "").strip()\n        if not vk or not src or not IDENTIFIER_PATTERN.match(vk) or not IDENTIFIER_PATTERN.match(src):\n            raise ValueError(\n                f"Rejected invalid collection identifier: vehicle_key={vk!r}, source={src!r}"\n            )\n\n        status_path = root / "data" / vk / "run_status" / f"{src}_latest.json"\n        status_data = load_optional_json(status_path)\n        started_at_utc = status_data.get("started_at_utc") if isinstance(status_data, dict) else None\n        run_start_ns = _parse_iso_ns(started_at_utc)\n        if (\n            not isinstance(status_data, dict)\n            or status_data.get("run_id") != report_run_id\n            or not isinstance(started_at_utc, str)\n            or run_start_ns is None\n        ):\n            raise ValueError(f"Reliable current-run provenance missing or invalid for {vk}:{src}")\n\n        quarantine_dir = root / "data" / vk / "quarantine" / src / report_run_id\n        latest_csv = root / "data" / vk / "latest" / f"{vk}_{src}_latest.csv"\n        if latest_csv.exists():\n            plan.append((latest_csv, quarantine_dir / f"{vk}_{src}_latest_quarantined.csv"))\n\n        source_dir = root / "data" / vk / src\n        if source_dir.exists():\n            if not source_dir.is_dir():\n                raise ValueError(f"Source archive path is not a directory for {vk}:{src}")\n            for archive_path in sorted(source_dir.glob(f"{vk}_{src}_*.csv")):\n                if archive_path.is_file() and archive_path.stat().st_mtime_ns >= run_start_ns - 2_000_000_000:\n                    plan.append((archive_path, quarantine_dir / archive_path.name))\n\n    for source_path, destination_path in plan:\n        if destination_path in planned_destinations:\n            raise ValueError(f"Duplicate quarantine destination planned: {destination_path}")\n        planned_destinations.add(destination_path)\n        if destination_path.exists():\n            raise ValueError(f"Quarantine destination already exists: {destination_path}")\n\n    return plan\n\n\ndef isolate_anomalous_collections(root: Path, report: dict[str, Any]) -> list[dict[str, str]]:\n    """Atomically validate then quarantine current-run CSV outputs for critical collections."""\n    root = root.resolve()\n    report_run_id = str(report.get("run_id") or "").strip()\n    if not report_run_id or not IDENTIFIER_PATTERN.match(report_run_id):\n        raise ValueError(f"Invalid or missing run_id in anomaly report: {report.get('run_id')!r}")\n\n    isolated = report.get("isolated_collections")\n    if not isinstance(isolated, list):\n        raise ValueError(f"isolated_collections must be a list: {isolated!r}")\n\n    valid_isolated = [\n        {\n            "vehicle_key": str(entry.get("vehicle_key") or "").strip(),\n            "source": str(entry.get("source") or "").strip(),\n        }\n        for entry in isolated\n        if isinstance(entry, dict)\n    ]\n    if len(valid_isolated) != len(isolated):\n        raise ValueError("Invalid entry in isolated_collections")\n\n    plan = _build_isolation_plan(root=root, report_run_id=report_run_id, isolated=isolated)\n    completed: list[tuple[Path, Path]] = []\n    try:\n        for source_path, destination_path in plan:\n            destination_path.parent.mkdir(parents=True, exist_ok=True)\n            source_path.replace(destination_path)\n            completed.append((source_path, destination_path))\n    except OSError as exc:\n        rollback_errors: list[str] = []\n        for source_path, destination_path in reversed(completed):\n            try:\n                destination_path.replace(source_path)\n            except OSError as rollback_exc:\n                rollback_errors.append(f"{destination_path}: {rollback_exc}")\n        detail = f"; rollback errors: {'; '.join(rollback_errors)}" if rollback_errors else ""\n        raise RuntimeError(f"Collection isolation execution failed: {exc}{detail}") from exc\n\n    return valid_isolated\n'''
+          path.write_text(text[:start] + replacement + text[end:], encoding="utf-8")
+
+          # 2. Make publication metadata fail closed when an anomaly report exists.
+          path = root / "generated_data_publish.py"
+          text = path.read_text(encoding="utf-8")
+          text = text.replace("import json\nimport subprocess", "import json\nimport re\nimport subprocess", 1)
+          old = '''    isolated_collections: list[dict[str, str]] = []\n    anomaly_path = root / "data" / "run_status" / "anomalies_latest.json"\n    if anomaly_path.exists():\n        try:\n            anom_data = json.loads(anomaly_path.read_text(encoding="utf-8"))\n            if isinstance(anom_data, dict) and isinstance(anom_data.get("isolated_collections"), list):\n                isolated_collections = anom_data["isolated_collections"]\n        except (OSError, ValueError, json.JSONDecodeError):\n            pass\n'''
+          new = '''    isolated_collections: list[dict[str, str]] = []\n    anomaly_path = root / "data" / "run_status" / "anomalies_latest.json"\n    if anomaly_path.exists():\n        try:\n            anom_data = json.loads(anomaly_path.read_text(encoding="utf-8"))\n        except (OSError, ValueError) as exc:\n            raise ValueError(f"Anomaly report exists but cannot be read or parsed: {anomaly_path}") from exc\n        if not isinstance(anom_data, dict):\n            raise ValueError("Anomaly report must be a JSON object")\n        isolated_value = anom_data.get("isolated_collections")\n        if not isinstance(isolated_value, list):\n            raise ValueError("Anomaly report isolated_collections must be a list")\n        for entry in isolated_value:\n            if not isinstance(entry, dict):\n                raise ValueError("Anomaly report contains an invalid isolated collection entry")\n            vehicle_key = entry.get("vehicle_key")\n            source = entry.get("source")\n            if (\n                not isinstance(vehicle_key, str)\n                or not isinstance(source, str)\n                or not re.fullmatch(r"[a-z0-9_]+", vehicle_key)\n                or not re.fullmatch(r"[a-z0-9_]+", source)\n            ):\n                raise ValueError("Anomaly report contains an invalid isolated collection identifier")\n            isolated_collections.append({"vehicle_key": vehicle_key, "source": source})\n'''
+          if old not in text:
+              raise SystemExit("Expected generated_data_publish anomaly block not found")
+          path.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          # 3. Fix effective scope propagation and overlapping exception clauses.
+          path = root / "purpose_outputs.py"
+          text = path.read_text(encoding="utf-8")
+          text = text.replace("except (OSError, ValueError, json.JSONDecodeError):", "except (OSError, ValueError):")
+          text = text.replace("records = [_owned_record(bundle, subject, scope) for bundle in bundles]", "records = [_owned_record(bundle, subject, effective_scope) for bundle in bundles]", 1)
+          text = text.replace("                scope,\n                paths[\"questions_jsonl\"].relative_to(root),", "                effective_scope,\n                paths[\"questions_jsonl\"].relative_to(root),", 1)
+          path.write_text(text, encoding="utf-8")
+
+          # 4. Clean the same redundant exception in buyer intelligence.
+          path = root / "f350_buyer_intelligence.py"
+          text = path.read_text(encoding="utf-8")
+          text = text.replace("except (OSError, ValueError, json.JSONDecodeError):", "except (OSError, ValueError):")
+          path.write_text(text, encoding="utf-8")
+
+          # 5. Add deterministic regression tests for atomic isolation and fail-closed publication.
+          path = root / "tests" / "test_collection_isolation.py"
+          text = path.read_text(encoding="utf-8")
+          marker = "\n\nif __name__ == \"__main__\":\n    unittest.main()"
+          additions = '''\n\n    def _write_current_collection(self, vehicle_key: str, source: str, run_id: str, run_start: str) -> tuple[Path, Path]:\n        status = self._source_entry(vehicle_key, source, healthy=True, accepted=1, fetched=1)\n        status["run_id"] = run_id\n        status["started_at_utc"] = run_start\n        status_path = self.root / "data" / vehicle_key / "run_status" / f"{source}_latest.json"\n        status_path.parent.mkdir(parents=True, exist_ok=True)\n        status_path.write_text(json.dumps(status), encoding="utf-8")\n        latest = self.root / "data" / vehicle_key / "latest" / f"{vehicle_key}_{source}_latest.csv"\n        latest.parent.mkdir(parents=True, exist_ok=True)\n        latest.write_text("data\\n", encoding="utf-8")\n        archive = self.root / "data" / vehicle_key / source / f"{vehicle_key}_{source}_current.csv"\n        archive.parent.mkdir(parents=True, exist_ok=True)\n        archive.write_text("data\\n", encoding="utf-8")\n        return latest, archive\n\n    def test_isolation_validates_all_collections_before_moving_any_file(self):\n        run_id = "atomic_validation_run"\n        from phase1_common import utc_now\n        run_start = utc_now()\n        first_latest, first_archive = self._write_current_collection("ford_f350", "autotrader", run_id, run_start)\n        bad_status = self.root / "data" / "ford_f150" / "run_status" / "autotrader_latest.json"\n        bad_status.parent.mkdir(parents=True, exist_ok=True)\n        bad_status.write_text(json.dumps({"run_id": "different_run", "started_at_utc": run_start}), encoding="utf-8")\n        bad_latest = self.root / "data" / "ford_f150" / "latest" / "ford_f150_autotrader_latest.csv"\n        bad_latest.parent.mkdir(parents=True, exist_ok=True)\n        bad_latest.write_text("bad\\n", encoding="utf-8")\n        report = {\n            "run_id": run_id,\n            "isolated_collections": [\n                {"vehicle_key": "ford_f350", "source": "autotrader"},\n                {"vehicle_key": "ford_f150", "source": "autotrader"},\n            ],\n        }\n        with self.assertRaisesRegex(ValueError, "Reliable current-run provenance"):\n            isolate_anomalous_collections(root=self.root, report=report)\n        self.assertTrue(first_latest.exists())\n        self.assertTrue(first_archive.exists())\n        self.assertTrue(bad_latest.exists())\n        self.assertFalse((self.root / "data" / "ford_f350" / "quarantine").exists())\n\n    def test_isolation_rejects_later_invalid_identifier_without_partial_quarantine(self):\n        run_id = "atomic_identifier_run"\n        from phase1_common import utc_now\n        run_start = utc_now()\n        first_latest, first_archive = self._write_current_collection("ford_f350", "autotrader", run_id, run_start)\n        report = {\n            "run_id": run_id,\n            "isolated_collections": [\n                {"vehicle_key": "ford_f350", "source": "autotrader"},\n                {"vehicle_key": "../ford_f150", "source": "autotrader"},\n            ],\n        }\n        with self.assertRaisesRegex(ValueError, "Rejected invalid collection identifier"):\n            isolate_anomalous_collections(root=self.root, report=report)\n        self.assertTrue(first_latest.exists())\n        self.assertTrue(first_archive.exists())\n        self.assertFalse((self.root / "data" / "ford_f350" / "quarantine").exists())\n\n    def test_valid_multi_collection_isolation_moves_all_planned_files(self):\n        run_id = "atomic_success_run"\n        from phase1_common import utc_now\n        run_start = utc_now()\n        first_latest, first_archive = self._write_current_collection("ford_f350", "autotrader", run_id, run_start)\n        second_latest, second_archive = self._write_current_collection("ford_f150", "autotrader", run_id, run_start)\n        report = {\n            "run_id": run_id,\n            "isolated_collections": [\n                {"vehicle_key": "ford_f350", "source": "autotrader"},\n                {"vehicle_key": "ford_f150", "source": "autotrader"},\n            ],\n        }\n        result = isolate_anomalous_collections(root=self.root, report=report)\n        self.assertEqual(result, report["isolated_collections"])\n        self.assertFalse(first_latest.exists())\n        self.assertFalse(first_archive.exists())\n        self.assertFalse(second_latest.exists())\n        self.assertFalse(second_archive.exists())\n        self.assertTrue((self.root / "data" / "ford_f350" / "quarantine" / "autotrader" / run_id / "ford_f350_autotrader_latest_quarantined.csv").exists())\n        self.assertTrue((self.root / "data" / "ford_f150" / "quarantine" / "autotrader" / run_id / "ford_f150_autotrader_latest_quarantined.csv").exists())\n'''
+          if marker not in text:
+              raise SystemExit("Collection isolation test marker not found")
+          text = text.replace(marker, additions + marker, 1)
+          path.write_text(text, encoding="utf-8")
+
+          path = root / "tests" / "test_workflow_hardening.py"
+          text = path.read_text(encoding="utf-8")
+          marker = "\n\nif __name__ == \"__main__\":\n    unittest.main()"
+          additions = '''\n\n    def test_malformed_anomaly_report_fails_closed(self):\n        data = self.root / "data/test_vehicle/latest/example.csv"\n        data.parent.mkdir(parents=True)\n        data.write_text("a,b\\n1,2\\n", encoding="utf-8")\n        subprocess.run(["git", "add", "data/"], cwd=self.root, check=True)\n        anomaly_path = self.root / "data/run_status/anomalies_latest.json"\n        anomaly_path.parent.mkdir(parents=True, exist_ok=True)\n        anomaly_path.write_text("{not-json", encoding="utf-8")\n        with self.assertRaisesRegex(ValueError, "cannot be read or parsed"):\n            prepare_manifest(root=self.root, registry_path=Path("vehicle_registry.json"), run_id="123", source_sha="a" * 40, event_name="workflow_dispatch", ref_name="ai/test")\n        self.assertFalse((self.root / MANIFEST_PATH).exists())\n\n    def test_invalid_isolated_collection_schema_fails_closed(self):\n        data = self.root / "data/test_vehicle/latest/example.csv"\n        data.parent.mkdir(parents=True)\n        data.write_text("a,b\\n1,2\\n", encoding="utf-8")\n        subprocess.run(["git", "add", "data/"], cwd=self.root, check=True)\n        anomaly_path = self.root / "data/run_status/anomalies_latest.json"\n        anomaly_path.parent.mkdir(parents=True, exist_ok=True)\n        anomaly_path.write_text(json.dumps({"isolated_collections": [{"vehicle_key": "../escape", "source": "autotrader"}]}), encoding="utf-8")\n        with self.assertRaisesRegex(ValueError, "invalid isolated collection identifier"):\n            prepare_manifest(root=self.root, registry_path=Path("vehicle_registry.json"), run_id="123", source_sha="a" * 40, event_name="workflow_dispatch", ref_name="ai/test")\n        self.assertFalse((self.root / MANIFEST_PATH).exists())\n'''
+          if marker not in text:
+              raise SystemExit("Publication test marker not found")
+          text = text.replace(marker, additions + marker, 1)
+          path.write_text(text, encoding="utf-8")
+          PY
+
+          python -m unittest discover -s tests -v
+          git diff --check
+          git status --short
+          git config user.name "Stryker-maker"
+          git config user.email "286449291+Stryker-maker@users.noreply.github.com"
+          git rm .github/workflows/remediate-pr36.yml
+          git add workflow_anomalies.py generated_data_publish.py purpose_outputs.py f350_buyer_intelligence.py tests/test_collection_isolation.py tests/test_workflow_hardening.py
+          git diff --cached --check
+          git commit -m "fix: complete PR36 anomaly isolation remediation" -m "PR36 remediation"
+          git push origin HEAD:isolate-collection-anomalies-5104834176888402418
