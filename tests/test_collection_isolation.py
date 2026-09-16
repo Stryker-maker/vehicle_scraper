@@ -54,6 +54,7 @@ class CollectionIsolationTests(unittest.TestCase):
         subprocess.run(["git", "init"], cwd=self.root, check=True, capture_output=True)
         subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=self.root, check=True)
         subprocess.run(["git", "config", "user.name", "Test"], cwd=self.root, check=True)
+        subprocess.run(["git", "config", "core.excludesfile", ""], cwd=self.root, check=True)
 
         registry = {
             "schema_version": 2,
@@ -362,6 +363,191 @@ class CollectionIsolationTests(unittest.TestCase):
                 event_name="schedule",
                 ref_name="main",
             )
+
+    def test_purpose_output_data_integrity_error_fails_closed(self):
+        """
+        Prove that a data integrity/validation error (e.g. accepted/identity count mismatch)
+        is NOT silently converted into an unavailable source, but instead fails closed by raising ValueError.
+        """
+        run_id = "run_integrity_err_123"
+        ram_config = {
+            "schema_version": 2,
+            "vehicle_key": "ram_3500",
+            "make": "Ram",
+            "model": "3500",
+            "criteria": {
+                "min_year": 2020,
+                "max_year": 2024,
+                "max_price_cad": 100000,
+                "fuel": "Diesel",
+                "engine": "6.7L Cummins",
+            },
+            "origin": {"home_city": "Calgary, AB", "home_coords": [51.0447, -114.0719], "max_distance_km": 1000},
+            "sources": {
+                "autotrader": {"make": "Ram", "model": "3500", "search_locations": ["Calgary, AB"]},
+                "kijiji": {"make": "Ram", "model": "3500", "search_locations": ["Calgary, AB"]},
+            },
+        }
+        ram_config_path = self.root / "config_ram3500.json"
+        ram_config_path.write_text(json.dumps(ram_config), encoding="utf-8")
+
+        # Create status marking success
+        ram_at_status = self._source_entry("ram_3500", "autotrader", healthy=True, accepted=2, fetched=2)
+        ram_at_status["schema_version"] = 8
+        ram_at_status["run_id"] = run_id
+        ram_at_status["output_updated_this_run"] = True
+        ram_at_status["schema_valid"] = True
+        ram_at_status["canonical_evidence_schema_version"] = 1
+        ram_at_status["identity_lifecycle_schema_version"] = 2
+        ram_at_status["identity_lifecycle_status"] = "updated"
+        ram_at_status["identity_observed_current_count"] = 2
+        ram_at_status["accepted_record_count"] = 2
+        ram_at_status["row_cap_disabled"] = True
+        ram_at_status["config_isolated"] = True
+        ram_at_status["canonical_evidence_artifacts"] = {"accepted": "data/ram_3500/evidence/autotrader/accepted.jsonl"}
+        ram_at_status["source_adapter_artifacts"] = {"records": "data/ram_3500/adapter_evidence/autotrader/records.jsonl"}
+
+        ram_status_path = self.root / "data" / "ram_3500" / "run_status" / "autotrader_latest.json"
+        ram_status_path.parent.mkdir(parents=True, exist_ok=True)
+        ram_status_path.write_text(json.dumps(ram_at_status), encoding="utf-8")
+
+        # Corrupt data integrity: 2 accepted records but 0 identity records
+        ram_accepted_path = self.root / "data" / "ram_3500" / "evidence" / "autotrader" / "accepted.jsonl"
+        ram_accepted_path.parent.mkdir(parents=True, exist_ok=True)
+        ram_accepted_path.write_text('{"record_stage": "accepted", "run_id": "run_integrity_err_123"}\n', encoding="utf-8")
+
+        ram_identity_path = self.root / "data" / "ram_3500" / "identity_lifecycle" / "autotrader" / "current_latest.jsonl"
+        ram_identity_path.parent.mkdir(parents=True, exist_ok=True)
+        ram_identity_path.write_text("", encoding="utf-8")
+
+        inputs_data = {
+            "schema_version": 1,
+            "vehicles": {
+                "ram_3500": {
+                    "analysis_profile": "owned_vehicle_value",
+                    "subject_profile": {
+                        "year": {"value": 2022, "evidence_status": "owner_reported_historical_unverified"},
+                        "trim": {"value": "Limited", "evidence_status": "owner_reported_historical_unverified"},
+                        "fuel": {"value": "Diesel", "evidence_status": "owner_reported_historical_unverified"},
+                        "engine": {"value": "6.7L Cummins", "evidence_status": "owner_reported_historical_unverified"},
+                        "drivetrain": {"value": "4wd", "evidence_status": "owner_reported_historical_unverified"},
+                        "current_odometer_km": {"value": 40000, "evidence_status": "owner_reported_historical_unverified"},
+                        "odometer_context": {"value": "personal", "evidence_status": "owner_reported_historical_unverified"},
+                    },
+                    "sale_goal": "monitor",
+                },
+                "subaru_forester": {
+                    "analysis_profile": "owned_vehicle_value",
+                    "subject_profile": {
+                        "year": {"value": 2021, "evidence_status": "owner_reported_historical_unverified"},
+                        "trim": {"value": "Touring", "evidence_status": "owner_reported_historical_unverified"},
+                        "fuel": {"value": "Gas", "evidence_status": "owner_reported_historical_unverified"},
+                        "engine": {"value": "2.5L", "evidence_status": "owner_reported_historical_unverified"},
+                        "drivetrain": {"value": "AWD", "evidence_status": "owner_reported_historical_unverified"},
+                        "current_odometer_km": {"value": 30000, "evidence_status": "owner_reported_historical_unverified"},
+                        "odometer_context": {"value": "personal", "evidence_status": "owner_reported_historical_unverified"},
+                    },
+                    "sale_goal": "monitor",
+                },
+                "honda_odyssey": {
+                    "analysis_profile": "family_friend_purchase",
+                    "preferences": {
+                        "budget_max_cad": {"value": 40000, "evidence_status": "friend_reported_unverified"},
+                        "min_year": {"value": 2018, "evidence_status": "friend_reported_unverified"},
+                        "max_year": {"value": 2023, "evidence_status": "friend_reported_unverified"},
+                        "max_mileage_km": {"value": 80000, "evidence_status": "friend_reported_unverified"},
+                        "minimum_seating": {"value": 7, "evidence_status": "friend_reported_unverified"},
+                        "cargo_requirements": {"value": [], "evidence_status": "friend_reported_unverified"},
+                        "max_distance_km": {"value": 500, "evidence_status": "friend_reported_unverified"},
+                        "accident_title_requirement": {"value": "clean", "evidence_status": "friend_reported_unverified"},
+                        "service_history_requirement": {"value": "available", "evidence_status": "friend_reported_unverified"},
+                        "acceptable_seller_types": {"value": [], "evidence_status": "friend_reported_unverified"},
+                        "availability_constraints": {"value": None, "evidence_status": "friend_input_required"},
+                    },
+                },
+                "kia_carnival": {
+                    "analysis_profile": "family_friend_purchase",
+                    "preferences": {
+                        "budget_max_cad": {"value": 45000, "evidence_status": "friend_reported_unverified"},
+                        "min_year": {"value": 2021, "evidence_status": "friend_reported_unverified"},
+                        "max_year": {"value": 2024, "evidence_status": "friend_reported_unverified"},
+                        "max_mileage_km": {"value": 60000, "evidence_status": "friend_reported_unverified"},
+                        "minimum_seating": {"value": 7, "evidence_status": "friend_reported_unverified"},
+                        "cargo_requirements": {"value": [], "evidence_status": "friend_reported_unverified"},
+                        "max_distance_km": {"value": 500, "evidence_status": "friend_reported_unverified"},
+                        "accident_title_requirement": {"value": "clean", "evidence_status": "friend_reported_unverified"},
+                        "service_history_requirement": {"value": "available", "evidence_status": "friend_reported_unverified"},
+                        "acceptable_seller_types": {"value": [], "evidence_status": "friend_reported_unverified"},
+                        "availability_constraints": {"value": None, "evidence_status": "friend_input_required"},
+                    },
+                },
+            },
+        }
+        inputs_path = self.root / "purpose_inputs.json"
+        inputs_path.write_text(json.dumps(inputs_data), encoding="utf-8")
+
+        # Must raise ValueError due to count mismatch, failing closed
+        with self.assertRaisesRegex(ValueError, "accepted/identity count mismatch"):
+            build_purpose(
+                root=self.root,
+                config_path=ram_config_path,
+                run_id=run_id,
+                sources=["autotrader"],
+                inputs_path=inputs_path,
+            )
+
+    def test_execution_time_isolation_failure_exercises_rollback_and_reports_unrecovered_paths(self):
+        """
+        Prove that when an execution-time move fails and rollback also encounters a path failure,
+        the original exception is preserved and unrecovered paths are identified in the error message.
+        """
+        run_id = "run_rollback_fail_123"
+        run_start = utc_now()
+
+        status = self._source_entry("ford_f150", "autotrader", healthy=False, accepted=0, fetched=0, execution_status="failed")
+        status["started_at_utc"] = run_start
+        status["run_id"] = run_id
+        status_file = self.root / "data" / "ford_f150" / "run_status" / "autotrader_latest.json"
+        status_file.parent.mkdir(parents=True, exist_ok=True)
+        status_file.write_text(json.dumps(status), encoding="utf-8")
+
+        latest = self.root / "data" / "ford_f150" / "latest" / "ford_f150_autotrader_latest.csv"
+        archive = self.root / "data" / "ford_f150" / "autotrader" / "ford_f150_autotrader_2026-08-01_00-00-00.csv"
+        latest.parent.mkdir(parents=True, exist_ok=True)
+        archive.parent.mkdir(parents=True, exist_ok=True)
+        latest.write_text("latest_content", encoding="utf-8")
+        archive.write_text("archive_content", encoding="utf-8")
+
+        report = {
+            "run_id": run_id,
+            "isolated_collections": [{"vehicle_key": "ford_f150", "source": "autotrader"}],
+        }
+
+        # Mock Path.replace to succeed on first move (latest), fail on second move (archive),
+        # and fail on rollback of first move to trigger unrecovered paths reporting.
+        original_replace = Path.replace
+        replace_call_count = [0]
+
+        def mock_replace(self, target):
+            replace_call_count[0] += 1
+            if replace_call_count[0] == 1:
+                # Move latest CSV successfully
+                return original_replace(self, target)
+            elif replace_call_count[0] == 2:
+                # Move archive CSV fails with OSError
+                raise OSError("Simulated execution move error")
+            else:
+                # Rollback move fails with OSError
+                raise OSError("Simulated rollback error")
+
+        from unittest.mock import patch
+        with patch.object(Path, "replace", new=mock_replace):
+            with self.assertRaises(RuntimeError) as ctx:
+                isolate_anomalous_collections(root=self.root, report=report)
+
+        err_msg = str(ctx.exception)
+        self.assertIn("Atomic anomaly isolation failed during file movement", err_msg)
+        self.assertIn("Rollback failed to restore paths", err_msg)
 
     def test_emitted_purpose_output_record_scope_matches_effective_scope_when_one_source_unavailable(self):
         """

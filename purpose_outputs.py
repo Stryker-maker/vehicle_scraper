@@ -265,20 +265,24 @@ def _raw_payloads(root: Path, status: dict[str, Any], source: str, run_id: str) 
     return result
 
 
+class SourceUnavailableError(ValueError):
+    """Raised when a source collection is missing or not current success for the requested run."""
+
+
 def load_source_bundles(root: Path, config: dict[str, Any], source: str, run_id: str) -> list[dict[str, Any]]:
     if source not in SUPPORTED_SOURCES:
         raise ValueError(f"Unsupported source: {source}")
     status_path = source_status_path(root, config, source)
     if not status_path.exists():
-        raise ValueError(f"{source}: source status missing")
+        raise SourceUnavailableError(f"{source}: source status missing")
     status = load_json(status_path)
     if status.get("schema_version") != SOURCE_STATUS_SCHEMA_VERSION or not status_is_current_success(status, run_id):
-        raise ValueError(f"{source}: source status is not current schema-v8 success")
+        raise SourceUnavailableError(f"{source}: source status is not current schema-v8 success")
     if status.get("identity_lifecycle_schema_version") != IDENTITY_LIFECYCLE_SCHEMA_VERSION:
         raise ValueError(f"{source}: identity lifecycle schema mismatch")
     accepted_path = status.get("canonical_evidence_artifacts", {}).get("accepted")
     if not accepted_path:
-        raise ValueError(f"{source}: accepted canonical artifact missing")
+        raise SourceUnavailableError(f"{source}: accepted canonical artifact missing")
     accepted = read_jsonl(root / str(accepted_path))
     identities = load_current_identity_records(root=root, config=config, source=source, run_id=run_id)
     if len(accepted) != int(status.get("accepted_record_count", -1)) or len(identities) != len(accepted):
@@ -976,7 +980,7 @@ def build(
             loaded = load_source_bundles(root, config, source, run_id)
             bundles.extend(loaded)
             valid_sources.append(source)
-        except (OSError, ValueError):
+        except SourceUnavailableError:
             pass
     if not valid_sources:
         raise ValueError(f"No valid source collections available for {vehicle_key}")

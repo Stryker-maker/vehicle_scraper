@@ -456,20 +456,24 @@ def _raw_payloads(root: Path, status: dict[str, Any], source: str, run_id: str) 
     return result
 
 
+class SourceUnavailableError(ValueError):
+    """Raised when a source collection is missing or not current success for the requested run."""
+
+
 def load_source_bundles(root: Path, config: dict[str, Any], source: str, run_id: str) -> list[dict[str, Any]]:
     if source not in SUPPORTED_SOURCES:
         raise ValueError(f"Unsupported source: {source}")
     status_path = source_status_path(root, config, source)
     if not status_path.exists():
-        raise ValueError(f"{source}: source status missing")
+        raise SourceUnavailableError(f"{source}: source status missing")
     status = load_json(status_path)
     if status.get("schema_version") != SOURCE_STATUS_SCHEMA_VERSION or not status_is_current_success(status, run_id):
-        raise ValueError(f"{source}: source status is not current schema-v8 success")
+        raise SourceUnavailableError(f"{source}: source status is not current schema-v8 success")
     if status.get("identity_lifecycle_schema_version") != IDENTITY_LIFECYCLE_SCHEMA_VERSION:
         raise ValueError(f"{source}: identity lifecycle schema mismatch")
     accepted_path = status.get("canonical_evidence_artifacts", {}).get("accepted")
     if not accepted_path:
-        raise ValueError(f"{source}: accepted canonical artifact missing")
+        raise SourceUnavailableError(f"{source}: accepted canonical artifact missing")
     accepted = read_jsonl(root / str(accepted_path))
     identities = load_current_identity_records(root=root, config=config, source=source, run_id=run_id)
     if len(accepted) != int(status.get("accepted_record_count", -1)) or len(identities) != len(accepted):
@@ -650,15 +654,24 @@ def build(root: Path, config_path: Path, run_id: str, sources: Sequence[str] | N
     overrides = load_owner_overrides(override_file)
     override_bytes = override_file.read_bytes() if override_file.exists() else json.dumps(overrides, sort_keys=True).encode("utf-8")
     bundles: list[dict[str, Any]] = []
+    valid_sources: list[str] = []
     for source in selected:
-        bundles.extend(load_source_bundles(root, config, source, run_id))
-    market_rows = [_base(bundle, scope) for bundle in bundles]
+        try:
+            loaded = load_source_bundles(root, config, source, run_id)
+            bundles.extend(loaded)
+            valid_sources.append(source)
+        except SourceUnavailableError:
+            pass
+    if not valid_sources:
+        raise ValueError("No valid source collections available for ford_f350")
+    effective_scope = "full_sources" if set(valid_sources) == set(SUPPORTED_SOURCES) else "single_source"
+    market_rows = [_base(bundle, effective_scope) for bundle in bundles]
     paths = artifact_paths(root, config)
     relative = {key: str(value.relative_to(root)) for key, value in paths.items()}
     listings: list[dict[str, Any]] = []
     questions: list[dict[str, Any]] = []
     for bundle in bundles:
-        listing, question_record = _listing(bundle, market_rows, overrides, relative, scope)
+        listing, question_record = _listing(bundle, market_rows, overrides, relative, effective_scope)
         listings.append(listing)
         questions.append(question_record)
     listings.sort(key=lambda value: (-int(value.get("year") or 0), int(value.get("price_cad") or 10**12), str(value.get("source")), str(value.get("canonical_listing_id"))))
@@ -670,7 +683,7 @@ def build(root: Path, config_path: Path, run_id: str, sources: Sequence[str] | N
         writer = csv.DictWriter(handle, fieldnames=CSV_FIELDS, extrasaction="ignore")
         writer.writeheader()
         writer.writerows(csv_row(value) for value in listings)
-    summary = market_summary(listings, run_id, scope, selected, hashlib.sha256(override_bytes).hexdigest())
+    summary = market_summary(listings, run_id, effective_scope, valid_sources, hashlib.sha256(override_bytes).hexdigest())
     summary["artifacts"] = relative
     write_json(paths["market_summary_json"], summary)
     write_summary_markdown(paths["market_summary_markdown"], summary)

@@ -650,13 +650,17 @@ def isolate_anomalous_collections(root: Path, report: dict[str, Any]) -> list[di
             src_path.replace(dst_path)
             completed_moves.append((src_path, dst_path))
     except OSError as exc:
+        unrecovered: list[str] = []
         for src_path, dst_path in reversed(completed_moves):
             if dst_path.exists():
                 try:
                     dst_path.replace(src_path)
                 except OSError:
-                    pass
-        raise RuntimeError(f"Atomic anomaly isolation failed during file movement: {exc}") from exc
+                    unrecovered.append(f"{dst_path} -> {src_path}")
+        msg = f"Atomic anomaly isolation failed during file movement: {exc}"
+        if unrecovered:
+            msg += f". Rollback failed to restore paths: {', '.join(unrecovered)}"
+        raise RuntimeError(msg) from exc
 
     return valid_isolated
 
