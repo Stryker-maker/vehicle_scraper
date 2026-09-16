@@ -580,7 +580,7 @@ def _parse_iso_ns(iso_str: str | None) -> int | None:
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=timezone.utc)
         return int(dt.timestamp() * 1_000_000_000)
-    except Exception:
+    except (ValueError, TypeError):
         return None
 
 
@@ -595,7 +595,10 @@ def isolate_anomalous_collections(root: Path, report: dict[str, Any]) -> list[di
     if not isinstance(isolated, list):
         raise ValueError(f"isolated_collections must be a list: {isolated!r}")
 
+    # Phase 1: Input & Provenance Validation / Planning
+    planned_moves: list[tuple[Path, Path]] = []
     valid_isolated: list[dict[str, str]] = []
+
     for entry in isolated:
         if not isinstance(entry, dict):
             raise ValueError(f"Invalid entry in isolated_collections: {entry!r}")
@@ -604,19 +607,6 @@ def isolate_anomalous_collections(root: Path, report: dict[str, Any]) -> list[di
         if not vk or not src or not IDENTIFIER_PATTERN.match(vk) or not IDENTIFIER_PATTERN.match(src):
             raise ValueError(f"Rejected invalid collection identifier: vehicle_key={vk!r}, source={src!r}")
 
-        quarantine_dir = root / "data" / vk / "quarantine" / src / report_run_id
-
-        # 1. Latest CSV output
-        latest_csv = root / "data" / vk / "latest" / f"{vk}_{src}_latest.csv"
-        if latest_csv.exists():
-            try:
-                quarantine_dir.mkdir(parents=True, exist_ok=True)
-                dest = quarantine_dir / f"{vk}_{src}_latest_quarantined.csv"
-                latest_csv.replace(dest)
-            except OSError as exc:
-                raise RuntimeError(f"Failed to quarantine latest CSV for {vk}:{src}: {exc}") from exc
-
-        # 2. Historical timestamped source archive for the current run
         status_path = root / "data" / vk / "run_status" / f"{src}_latest.json"
         status_data = load_optional_json(status_path)
         has_valid_provenance = (
@@ -629,22 +619,44 @@ def isolate_anomalous_collections(root: Path, report: dict[str, Any]) -> list[di
         if not has_valid_provenance:
             raise ValueError(f"Reliable current-run provenance missing or invalid for {vk}:{src}")
 
+        quarantine_dir = root / "data" / vk / "quarantine" / src / report_run_id
+
+        # 1. Latest CSV output
+        latest_csv = root / "data" / vk / "latest" / f"{vk}_{src}_latest.csv"
+        if latest_csv.exists():
+            dest = quarantine_dir / f"{vk}_{src}_latest_quarantined.csv"
+            planned_moves.append((latest_csv, dest))
+
+        # 2. Historical timestamped source archive for the current run
         run_start_ns = _parse_iso_ns(status_data["started_at_utc"])
+        if run_start_ns is None:
+            raise ValueError(f"Failed to parse started_at_utc for {vk}:{src}")
+
         source_dir = root / "data" / vk / src
         if source_dir.exists() and source_dir.is_dir():
             for archive_path in source_dir.glob(f"{vk}_{src}_*.csv"):
                 if archive_path.is_file():
-                    try:
-                        if archive_path.stat().st_mtime_ns >= run_start_ns - 2_000_000_000:
-                            quarantine_dir.mkdir(parents=True, exist_ok=True)
-                            dest = quarantine_dir / archive_path.name
-                            archive_path.replace(dest)
-                    except FileNotFoundError:
-                        pass
-                    except OSError as exc:
-                        raise RuntimeError(f"Failed to quarantine archive {archive_path} for {vk}:{src}: {exc}") from exc
+                    if archive_path.stat().st_mtime_ns >= run_start_ns - 2_000_000_000:
+                        dest = quarantine_dir / archive_path.name
+                        planned_moves.append((archive_path, dest))
 
         valid_isolated.append({"vehicle_key": vk, "source": src})
+
+    # Phase 2: Atomic Execution with Rollback
+    completed_moves: list[tuple[Path, Path]] = []
+    try:
+        for src_path, dst_path in planned_moves:
+            dst_path.parent.mkdir(parents=True, exist_ok=True)
+            src_path.replace(dst_path)
+            completed_moves.append((src_path, dst_path))
+    except OSError as exc:
+        for src_path, dst_path in reversed(completed_moves):
+            if dst_path.exists():
+                try:
+                    dst_path.replace(src_path)
+                except OSError:
+                    pass
+        raise RuntimeError(f"Atomic anomaly isolation failed during file movement: {exc}") from exc
 
     return valid_isolated
 

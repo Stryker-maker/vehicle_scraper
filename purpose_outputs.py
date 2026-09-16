@@ -976,7 +976,7 @@ def build(
             loaded = load_source_bundles(root, config, source, run_id)
             bundles.extend(loaded)
             valid_sources.append(source)
-        except (OSError, ValueError, json.JSONDecodeError):
+        except (OSError, ValueError):
             pass
     if not valid_sources:
         raise ValueError(f"No valid source collections available for {vehicle_key}")
@@ -986,7 +986,7 @@ def build(
 
     if profile == "owned_vehicle_value":
         subject = entry["subject_profile"]
-        records = [_owned_record(bundle, subject, scope) for bundle in bundles]
+        records = [_owned_record(bundle, subject, effective_scope) for bundle in bundles]
         summary = _owned_summary(config, run_id, effective_sources, effective_scope, records, entry, paths, root)
         input_gaps = {
             "purpose_output_schema_version": PURPOSE_OUTPUT_SCHEMA_VERSION,
@@ -1013,7 +1013,7 @@ def build(
             _family_record(
                 bundle,
                 preferences,
-                scope,
+                effective_scope,
                 paths["questions_jsonl"].relative_to(root),
             )
             for bundle in bundles

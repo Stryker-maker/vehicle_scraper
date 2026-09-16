@@ -1,3 +1,0 @@
-{
-  "postStartCommand": "codex app-server daemon start"
-}
