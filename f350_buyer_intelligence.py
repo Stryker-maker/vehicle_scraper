@@ -461,6 +461,7 @@ class SourceUnavailableError(ValueError):
 
 
 def load_source_bundles(root: Path, config: dict[str, Any], source: str, run_id: str) -> list[dict[str, Any]]:
+    """Load accepted evidence, identity lifecycle, and adapter payload bundles for a source run."""
     if source not in SUPPORTED_SOURCES:
         raise ValueError(f"Unsupported source: {source}")
     status_path = source_status_path(root, config, source)
@@ -641,6 +642,7 @@ def write_summary_markdown(path: Path, summary: dict[str, Any]) -> None:
 
 def build(root: Path, config_path: Path, run_id: str, sources: Sequence[str] | None = None,
           overrides_path: Path = Path("f350_owner_overrides.json")) -> dict[str, Any]:
+    """Build governed F-350 buyer intelligence market summary and investigation artifacts."""
     root = root.resolve()
     config_path = config_path if config_path.is_absolute() else root / config_path
     config = load_vehicle_config(config_path)

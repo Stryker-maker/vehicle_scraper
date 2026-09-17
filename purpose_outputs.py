@@ -270,6 +270,7 @@ class SourceUnavailableError(ValueError):
 
 
 def load_source_bundles(root: Path, config: dict[str, Any], source: str, run_id: str) -> list[dict[str, Any]]:
+    """Load accepted evidence, identity lifecycle, and adapter payload bundles for a source run."""
     if source not in SUPPORTED_SOURCES:
         raise ValueError(f"Unsupported source: {source}")
     status_path = source_status_path(root, config, source)
@@ -958,6 +959,7 @@ def build(
     sources: Sequence[str],
     inputs_path: Path = Path("purpose_inputs.json"),
 ) -> dict[str, Any]:
+    """Build governed secondary-purpose vehicle analysis outputs for a vehicle configuration."""
     root = root.resolve()
     config_path = config_path if config_path.is_absolute() else root / config_path
     inputs_path = inputs_path if inputs_path.is_absolute() else root / inputs_path

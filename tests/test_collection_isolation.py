@@ -13,14 +13,19 @@ from workflow_anomalies import compare_health_reports, isolate_anomalous_collect
 
 
 class CollectionIsolationTests(unittest.TestCase):
+    """Automated tests proving collection anomaly isolation, evidence preservation, and fail-closed behavior."""
+
     def setUp(self):
+        """Create isolated temporary directory for isolation test fixtures."""
         self.temp_dir = tempfile.TemporaryDirectory()
         self.root = Path(self.temp_dir.name)
 
     def tearDown(self):
+        """Clean up temporary test directory."""
         self.temp_dir.cleanup()
 
     def _source_entry(self, vehicle_key: str, source: str, healthy: bool, accepted: int, fetched: int, execution_status: str = "success"):
+        """Build structured health/status entry for collection isolation tests."""
         return {
             "vehicle_key": vehicle_key,
             "source": source,
@@ -51,6 +56,7 @@ class CollectionIsolationTests(unittest.TestCase):
         }
 
     def _setup_git_repo(self):
+        """Initialize temporary git repository for publication manifest verification tests."""
         subprocess.run(["git", "init"], cwd=self.root, check=True, capture_output=True)
         subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=self.root, check=True)
         subprocess.run(["git", "config", "user.name", "Test"], cwd=self.root, check=True)
@@ -529,6 +535,7 @@ class CollectionIsolationTests(unittest.TestCase):
         replace_call_count = [0]
 
         def mock_replace(self, target):
+            """Mock Path.replace to simulate execution and rollback path failures."""
             replace_call_count[0] += 1
             if replace_call_count[0] == 1:
                 # Move latest CSV successfully

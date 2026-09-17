@@ -573,6 +573,7 @@ IDENTIFIER_PATTERN = re.compile(r"^[a-z0-9_]+$")
 
 
 def _parse_iso_ns(iso_str: str | None) -> int | None:
+    """Parse an ISO 8601 timestamp string into nanoseconds since the Unix epoch."""
     if not iso_str or not isinstance(iso_str, str):
         return None
     try:

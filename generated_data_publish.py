@@ -59,6 +59,7 @@ def prepare_manifest(
     event_name: str,
     ref_name: str,
 ) -> dict[str, Any]:
+    """Prepare and validate publication manifest for staged generated-data paths."""
     root = root.resolve()
     active, paused = governed_keys(root, registry_path)
     staged = [
