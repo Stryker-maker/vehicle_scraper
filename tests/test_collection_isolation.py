@@ -24,7 +24,8 @@ class CollectionIsolationTests(unittest.TestCase):
         """Clean up temporary test directory."""
         self.temp_dir.cleanup()
 
-    def _source_entry(self, vehicle_key: str, source: str, healthy: bool, accepted: int, fetched: int, execution_status: str = "success"):
+    @staticmethod
+    def _source_entry(vehicle_key: str, source: str, healthy: bool, accepted: int, fetched: int, execution_status: str = "success"):
         """Build structured health/status entry for collection isolation tests."""
         return {
             "vehicle_key": vehicle_key,

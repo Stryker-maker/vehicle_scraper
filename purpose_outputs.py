@@ -974,7 +974,6 @@ def build(
         raise ValueError(f"{vehicle_key}: unsupported analysis profile")
     if len(sources) != len(set(sources)) or not sources or any(source not in SUPPORTED_SOURCES for source in sources):
         raise ValueError("Source scope must contain unique supported sources")
-    scope = "single_source" if len(sources) == 1 else "combined_sources"
     bundles: list[dict[str, Any]] = []
     valid_sources: list[str] = []
     for source in sources:

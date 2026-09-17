@@ -651,7 +651,6 @@ def build(root: Path, config_path: Path, run_id: str, sources: Sequence[str] | N
     selected = tuple(sources or SUPPORTED_SOURCES)
     if not selected or any(source not in SUPPORTED_SOURCES for source in selected) or len(selected) != len(set(selected)):
         raise ValueError("Buyer intelligence source plan is invalid")
-    scope = "full_sources" if set(selected) == set(SUPPORTED_SOURCES) else "single_source"
     override_file = overrides_path if overrides_path.is_absolute() else root / overrides_path
     overrides = load_owner_overrides(override_file)
     override_bytes = override_file.read_bytes() if override_file.exists() else json.dumps(overrides, sort_keys=True).encode("utf-8")

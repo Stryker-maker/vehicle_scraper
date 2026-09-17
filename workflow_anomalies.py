@@ -610,14 +610,15 @@ def isolate_anomalous_collections(root: Path, report: dict[str, Any]) -> list[di
 
         status_path = root / "data" / vk / "run_status" / f"{src}_latest.json"
         status_data = load_optional_json(status_path)
+        started_at = status_data.get("started_at_utc") if isinstance(status_data, dict) else None
         has_valid_provenance = (
             isinstance(status_data, dict)
             and status_data.get("run_id") == report_run_id
-            and isinstance(status_data.get("started_at_utc"), str)
-            and _parse_iso_ns(status_data.get("started_at_utc")) is not None
+            and isinstance(started_at, str)
+            and _parse_iso_ns(started_at) is not None
         )
 
-        if not has_valid_provenance:
+        if not has_valid_provenance or not isinstance(status_data, dict) or not isinstance(started_at, str):
             raise ValueError(f"Reliable current-run provenance missing or invalid for {vk}:{src}")
 
         quarantine_dir = root / "data" / vk / "quarantine" / src / report_run_id
@@ -629,7 +630,7 @@ def isolate_anomalous_collections(root: Path, report: dict[str, Any]) -> list[di
             planned_moves.append((latest_csv, dest))
 
         # 2. Historical timestamped source archive for the current run
-        run_start_ns = _parse_iso_ns(status_data["started_at_utc"])
+        run_start_ns = _parse_iso_ns(started_at)
         if run_start_ns is None:
             raise ValueError(f"Failed to parse started_at_utc for {vk}:{src}")
 
