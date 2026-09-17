@@ -473,7 +473,7 @@ def load_source_bundles(root: Path, config: dict[str, Any], source: str, run_id:
         raise ValueError(f"{source}: identity lifecycle schema mismatch")
     accepted_path = status.get("canonical_evidence_artifacts", {}).get("accepted")
     if not accepted_path:
-        raise SourceUnavailableError(f"{source}: accepted canonical artifact missing")
+        raise ValueError(f"{source}: accepted canonical artifact missing")
     accepted = read_jsonl(root / str(accepted_path))
     identities = load_current_identity_records(root=root, config=config, source=source, run_id=run_id)
     if len(accepted) != int(status.get("accepted_record_count", -1)) or len(identities) != len(accepted):
@@ -687,7 +687,7 @@ def build(root: Path, config_path: Path, run_id: str, sources: Sequence[str] | N
     summary["artifacts"] = relative
     write_json(paths["market_summary_json"], summary)
     write_summary_markdown(paths["market_summary_markdown"], summary)
-    print(f"[ford_f350:buyer_intelligence] scope={scope} | listings={len(listings)} | sources={','.join(selected)}")
+    print(f"[ford_f350:buyer_intelligence] scope={effective_scope} | listings={len(listings)} | sources={','.join(valid_sources)}")
     return summary
 
 

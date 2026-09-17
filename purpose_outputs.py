@@ -282,7 +282,7 @@ def load_source_bundles(root: Path, config: dict[str, Any], source: str, run_id:
         raise ValueError(f"{source}: identity lifecycle schema mismatch")
     accepted_path = status.get("canonical_evidence_artifacts", {}).get("accepted")
     if not accepted_path:
-        raise SourceUnavailableError(f"{source}: accepted canonical artifact missing")
+        raise ValueError(f"{source}: accepted canonical artifact missing")
     accepted = read_jsonl(root / str(accepted_path))
     identities = load_current_identity_records(root=root, config=config, source=source, run_id=run_id)
     if len(accepted) != int(status.get("accepted_record_count", -1)) or len(identities) != len(accepted):

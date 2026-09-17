@@ -541,6 +541,8 @@ class CollectionIsolationTests(unittest.TestCase):
                 raise OSError("Simulated rollback error")
 
         from unittest.mock import patch
+        quarantine_latest = self.root / "data" / "ford_f150" / "quarantine" / "autotrader" / run_id / "ford_f150_autotrader_latest_quarantined.csv"
+
         with patch.object(Path, "replace", new=mock_replace):
             with self.assertRaises(RuntimeError) as ctx:
                 isolate_anomalous_collections(root=self.root, report=report)
@@ -548,6 +550,8 @@ class CollectionIsolationTests(unittest.TestCase):
         err_msg = str(ctx.exception)
         self.assertIn("Atomic anomaly isolation failed during file movement", err_msg)
         self.assertIn("Rollback failed to restore paths", err_msg)
+        self.assertIn(str(quarantine_latest), err_msg)
+        self.assertIn(str(latest), err_msg)
 
     def test_emitted_purpose_output_record_scope_matches_effective_scope_when_one_source_unavailable(self):
         """
