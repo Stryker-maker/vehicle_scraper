@@ -182,6 +182,7 @@ class CollectionIsolationTests(unittest.TestCase):
         f150_status_file = self.root / "data" / "ford_f150" / "run_status" / "autotrader_latest.json"
         f150_status_file.parent.mkdir(parents=True, exist_ok=True)
         f150_autotrader["started_at_utc"] = run_start
+        f150_autotrader["archive_output"] = "data/ford_f150/autotrader/ford_f150_autotrader_2026-08-01_00-00-00.csv"
         f150_status_file.write_text(json.dumps(f150_autotrader), encoding="utf-8")
 
         anomaly_report = compare_health_reports(
@@ -325,6 +326,7 @@ class CollectionIsolationTests(unittest.TestCase):
             status = self._source_entry(vk, src, healthy=False, accepted=0, fetched=0, execution_status="failed")
             status["started_at_utc"] = run_start
             status["run_id"] = run_id
+            status["archive_output"] = f"data/{vk}/{src}/{vk}_{src}_2026-08-01_00-00-00.csv"
             status_file = self.root / "data" / vk / "run_status" / f"{src}_latest.json"
             status_file.parent.mkdir(parents=True, exist_ok=True)
             status_file.write_text(json.dumps(status), encoding="utf-8")
@@ -557,6 +559,7 @@ class CollectionIsolationTests(unittest.TestCase):
         status = self._source_entry("ford_f150", "autotrader", healthy=False, accepted=0, fetched=0, execution_status="failed")
         status["started_at_utc"] = run_start
         status["run_id"] = run_id
+        status["archive_output"] = "data/ford_f150/autotrader/ford_f150_autotrader_2026-08-01_00-00-00.csv"
         status_file = self.root / "data" / "ford_f150" / "run_status" / "autotrader_latest.json"
         status_file.parent.mkdir(parents=True, exist_ok=True)
         status_file.write_text(json.dumps(status), encoding="utf-8")
@@ -789,6 +792,7 @@ class CollectionIsolationTests(unittest.TestCase):
         status_1 = self._source_entry(vk, src, healthy=False, accepted=0, fetched=0, execution_status="failed")
         status_1["started_at_utc"] = run_start_1
         status_1["run_id"] = run_id_1
+        status_1["archive_output"] = f"data/{vk}/{src}/{vk}_{src}_2026-08-01_00-00-00.csv"
         status_file = self.root / "data" / vk / "run_status" / f"{src}_latest.json"
         status_file.parent.mkdir(parents=True, exist_ok=True)
         status_file.write_text(json.dumps(status_1), encoding="utf-8")
@@ -820,6 +824,7 @@ class CollectionIsolationTests(unittest.TestCase):
         status_2 = self._source_entry(vk, src, healthy=False, accepted=0, fetched=0, execution_status="failed")
         status_2["started_at_utc"] = run_start_2
         status_2["run_id"] = run_id_2
+        status_2["archive_output"] = f"data/{vk}/{src}/{vk}_{src}_2026-08-02_00-00-00.csv"
         status_file.write_text(json.dumps(status_2), encoding="utf-8")
 
         archive_csv_2 = self.root / "data" / vk / src / f"{vk}_{src}_2026-08-02_00-00-00.csv"
@@ -844,6 +849,139 @@ class CollectionIsolationTests(unittest.TestCase):
         q1_files_after = {f.name: f.read_text(encoding="utf-8") for f in q1_dir.glob("*.csv")}
         self.assertEqual(q1_files_after[f"{vk}_{src}_latest_quarantined.csv"], "run1_latest_data")
         self.assertEqual(q1_files_after[f"{vk}_{src}_2026-08-01_00-00-00.csv"], "run1_archive_data")
+
+    def test_explicit_current_archive_provenance_preserves_older_archive_with_recent_mtime(self):
+        """
+        Prove that isolation relies on explicit status['archive_output'] provenance rather than mtime,
+        preserving an older archive file even if its mtime is recent.
+        """
+        vk = "ford_f150"
+        src = "autotrader"
+        run_id = "run_prov_mtime_123"
+        run_start = utc_now()
+
+        status = self._source_entry(vk, src, healthy=False, accepted=0, fetched=0, execution_status="failed")
+        status["started_at_utc"] = run_start
+        status["run_id"] = run_id
+        current_archive_rel = f"data/{vk}/{src}/{vk}_{src}_2026-08-01_00-00-00.csv"
+        status["archive_output"] = current_archive_rel
+
+        status_file = self.root / "data" / vk / "run_status" / f"{src}_latest.json"
+        status_file.parent.mkdir(parents=True, exist_ok=True)
+        status_file.write_text(json.dumps(status), encoding="utf-8")
+
+        older_archive = self.root / "data" / vk / src / f"{vk}_{src}_2026-07-01_00-00-00.csv"
+        current_archive = self.root / current_archive_rel
+        latest_csv = self.root / "data" / vk / "latest" / f"{vk}_{src}_latest.csv"
+
+        for p in (older_archive, current_archive, latest_csv):
+            p.parent.mkdir(parents=True, exist_ok=True)
+
+        older_archive.write_text("older_archive_content", encoding="utf-8")
+        current_archive.write_text("current_archive_content", encoding="utf-8")
+        latest_csv.write_text("latest_content", encoding="utf-8")
+
+        # Set older_archive mtime to NOW (a misleading recent mtime)
+        now_ts = time.time()
+        os.utime(older_archive, (now_ts, now_ts))
+
+        report = {
+            "run_id": run_id,
+            "isolated_collections": [{"vehicle_key": vk, "source": src}],
+        }
+
+        isolated = isolate_anomalous_collections(root=self.root, report=report)
+        self.assertEqual(len(isolated), 1)
+
+        # Older archive with recent mtime MUST remain preserved in its original location
+        self.assertTrue(older_archive.exists())
+        self.assertEqual(older_archive.read_text(encoding="utf-8"), "older_archive_content")
+
+        # Current archive and latest CSV MUST be quarantined
+        self.assertFalse(current_archive.exists())
+        self.assertFalse(latest_csv.exists())
+        q_dir = self.root / "data" / vk / "quarantine" / src / run_id
+        self.assertTrue((q_dir / current_archive.name).exists())
+        self.assertTrue((q_dir / f"{vk}_{src}_latest_quarantined.csv").exists())
+
+    def test_multi_collection_isolation_atomicity_first_valid_second_invalid_provenance_zero_mutation(self):
+        """
+        Prove that when isolating multiple collections, if a later collection fails provenance validation,
+        Phase 1 validation catches the error BEFORE any file moves, leaving the filesystem 100% untouched.
+        """
+        run_id = "run_atomicity_123"
+        run_start = utc_now()
+
+        # Collection 1: valid ford_f350
+        status_f350 = self._source_entry("ford_f350", "autotrader", healthy=False, accepted=0, fetched=0, execution_status="failed")
+        status_f350["started_at_utc"] = run_start
+        status_f350["run_id"] = run_id
+        status_f350["archive_output"] = "data/ford_f350/autotrader/ford_f350_autotrader_2026-08-01_00-00-00.csv"
+        status_f350_path = self.root / "data" / "ford_f350" / "run_status" / "autotrader_latest.json"
+        status_f350_path.parent.mkdir(parents=True, exist_ok=True)
+        status_f350_path.write_text(json.dumps(status_f350), encoding="utf-8")
+
+        f350_latest = self.root / "data" / "ford_f350" / "latest" / "ford_f350_autotrader_latest.csv"
+        f350_latest.parent.mkdir(parents=True, exist_ok=True)
+        f350_latest.write_text("f350_latest_data", encoding="utf-8")
+
+        # Collection 2: invalid ford_f150 (missing started_at_utc / run_id mismatch)
+        status_f150_path = self.root / "data" / "ford_f150" / "run_status" / "autotrader_latest.json"
+        status_f150_path.parent.mkdir(parents=True, exist_ok=True)
+        status_f150_path.write_text(json.dumps({"schema_version": 8, "run_id": "wrong_run_id"}), encoding="utf-8")
+
+        f150_latest = self.root / "data" / "ford_f150" / "latest" / "ford_f150_autotrader_latest.csv"
+        f150_latest.parent.mkdir(parents=True, exist_ok=True)
+        f150_latest.write_text("f150_latest_data", encoding="utf-8")
+
+        report = {
+            "run_id": run_id,
+            "isolated_collections": [
+                {"vehicle_key": "ford_f350", "source": "autotrader"},
+                {"vehicle_key": "ford_f150", "source": "autotrader"},
+            ],
+        }
+
+        with self.assertRaisesRegex(ValueError, "Reliable current-run provenance missing or invalid"):
+            isolate_anomalous_collections(root=self.root, report=report)
+
+        # ZERO filesystem mutations: both latest files MUST remain in place!
+        self.assertTrue(f350_latest.exists())
+        self.assertTrue(f150_latest.exists())
+        self.assertEqual(f350_latest.read_text(encoding="utf-8"), "f350_latest_data")
+        self.assertEqual(f150_latest.read_text(encoding="utf-8"), "f150_latest_data")
+
+    def test_valid_provenance_with_no_output_files_omitted_from_isolated_collections(self):
+        """
+        Prove that a collection with valid provenance but no latest CSV and no archive CSV
+        is omitted from isolated_collections and receives a no_isolation_outputs_present diagnostic.
+        """
+        vk = "ford_f150"
+        src = "autotrader"
+        run_id = "run_no_files_123"
+        run_start = utc_now()
+
+        status = self._source_entry(vk, src, healthy=False, accepted=0, fetched=0, execution_status="failed")
+        status["started_at_utc"] = run_start
+        status["run_id"] = run_id
+        status_file = self.root / "data" / vk / "run_status" / f"{src}_latest.json"
+        status_file.parent.mkdir(parents=True, exist_ok=True)
+        status_file.write_text(json.dumps(status), encoding="utf-8")
+
+        report = {
+            "run_id": run_id,
+            "isolated_collections": [{"vehicle_key": vk, "source": src}],
+        }
+
+        isolated = isolate_anomalous_collections(root=self.root, report=report)
+
+        # Empty move plan MUST NOT claim successful isolation
+        self.assertEqual(isolated, [])
+        self.assertEqual(report["isolated_collections"], [])
+
+        no_output_anomalies = [a for a in report["anomalies"] if a.get("code") == "no_isolation_outputs_present"]
+        self.assertEqual(len(no_output_anomalies), 1)
+        self.assertEqual(no_output_anomalies[0]["vehicle_key"], vk)
 
 
 if __name__ == "__main__":

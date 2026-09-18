@@ -586,19 +586,22 @@ def _parse_iso_ns(iso_str: str | None) -> int | None:
 
 
 def _plan_archive_moves(
-    source_dir: Path, vk: str, src: str, run_start_ns: int, quarantine_dir: Path
+    root: Path, status_data: dict[str, Any], vk: str, src: str, quarantine_dir: Path
 ) -> list[tuple[Path, Path]]:
-    """Plan quarantine moves for current-run historical timestamped CSV archives."""
+    """Plan quarantine moves for the explicit current-run timestamped CSV archive."""
     moves: list[tuple[Path, Path]] = []
-    if source_dir.exists() and source_dir.is_dir():
-        for archive_path in source_dir.glob(f"{vk}_{src}_*.csv"):
-            if archive_path.is_file() and archive_path.stat().st_mtime_ns >= run_start_ns - 2_000_000_000:
-                moves.append((archive_path, quarantine_dir / archive_path.name))
+    rel_archive = status_data.get("archive_output")
+    if isinstance(rel_archive, str) and rel_archive.strip():
+        archive_path = root / rel_archive.strip()
+        if archive_path.exists() and archive_path.is_file():
+            moves.append((archive_path, quarantine_dir / archive_path.name))
     return moves
 
 
-def _validate_collection_provenance(root: Path, vk: str, src: str, report_run_id: str) -> str:
-    """Validate status existence and run provenance for a collection, returning started_at_utc."""
+def _validate_collection_provenance(
+    root: Path, vk: str, src: str, report_run_id: str
+) -> dict[str, Any]:
+    """Validate status existence and run provenance for a collection, returning status_data dict."""
     status_path = root / "data" / vk / "run_status" / f"{src}_latest.json"
     status_data = load_optional_json(status_path)
     started_at = status_data.get("started_at_utc") if isinstance(status_data, dict) else None
@@ -608,9 +611,9 @@ def _validate_collection_provenance(root: Path, vk: str, src: str, report_run_id
         and isinstance(started_at, str)
         and _parse_iso_ns(started_at) is not None
     )
-    if not has_valid_provenance or not isinstance(started_at, str):
+    if not has_valid_provenance or not isinstance(status_data, dict):
         raise ValueError(f"Reliable current-run provenance missing or invalid for {vk}:{src}")
-    return started_at
+    return status_data
 
 
 def _plan_collection_moves(
@@ -624,7 +627,7 @@ def _plan_collection_moves(
     if not vk or not src or not IDENTIFIER_PATTERN.match(vk) or not IDENTIFIER_PATTERN.match(src):
         raise ValueError(f"Rejected invalid collection identifier: vehicle_key={vk!r}, source={src!r}")
 
-    started_at = _validate_collection_provenance(root, vk, src, report_run_id)
+    status_data = _validate_collection_provenance(root, vk, src, report_run_id)
     quarantine_dir = root / "data" / vk / "quarantine" / src / report_run_id
     planned_moves: list[tuple[Path, Path]] = []
 
@@ -633,13 +636,9 @@ def _plan_collection_moves(
     if latest_csv.exists():
         planned_moves.append((latest_csv, quarantine_dir / f"{vk}_{src}_latest_quarantined.csv"))
 
-    # 2. Historical timestamped source archive for the current run
-    run_start_ns = _parse_iso_ns(started_at)
-    if run_start_ns is None:
-        raise ValueError(f"Failed to parse started_at_utc for {vk}:{src}")
-
+    # 2. Historical timestamped source archive explicitly recorded for the current run
     planned_moves.extend(
-        _plan_archive_moves(root / "data" / vk / src, vk, src, run_start_ns, quarantine_dir)
+        _plan_archive_moves(root, status_data, vk, src, quarantine_dir)
     )
 
     return {"vehicle_key": vk, "source": src}, planned_moves
@@ -683,29 +682,6 @@ def _recalculate_report_counts(report: dict[str, Any]) -> None:
         report["anomaly_status"] = "warning"
 
 
-def _isolate_single_collection(
-    root: Path, entry: Any, report_run_id: str
-) -> tuple[dict[str, str] | None, Exception | None, dict[str, Any] | None]:
-    """Attempt isolation for a single collection entry, returning pair, error, or diagnostic."""
-    vk = str(entry.get("vehicle_key") or "").strip() if isinstance(entry, dict) else ""
-    src = str(entry.get("source") or "").strip() if isinstance(entry, dict) else ""
-    try:
-        collection_pair, moves = _plan_collection_moves(root, entry, report_run_id)
-        _execute_isolation_moves(moves)
-        return collection_pair, None, None
-    except (ValueError, RuntimeError) as exc:
-        diagnostic = _anomaly(
-            severity="critical",
-            code="collection_isolation_failed",
-            vehicle_key=vk,
-            source=src,
-            message=f"Collection isolation failed: {exc}",
-            current="failed",
-            threshold="isolated",
-        )
-        return None, exc, diagnostic
-
-
 def isolate_anomalous_collections(root: Path, report: dict[str, Any]) -> list[dict[str, str]]:
     """Isolate critical anomaly collections by moving current anomalous raw CSV outputs into run-specific quarantine while preserving historical archives and diagnostic evidence."""
     root = root.resolve()
@@ -717,24 +693,75 @@ def isolate_anomalous_collections(root: Path, report: dict[str, Any]) -> list[di
     if not isinstance(isolated, list):
         raise ValueError(f"isolated_collections must be a list: {isolated!r}")
 
-    completed_collections: list[dict[str, str]] = []
-    first_error: Exception | None = None
+    # Phase 1: Validate and plan ALL requested collections with zero filesystem mutations
+    planned_entries: list[tuple[dict[str, str], list[tuple[Path, Path]]]] = []
+    combined_planned_moves: list[tuple[Path, Path]] = []
+    validation_error: Exception | None = None
 
     for entry in isolated:
-        collection_pair, exc, diagnostic = _isolate_single_collection(root, entry, report_run_id)
-        if collection_pair is not None:
-            completed_collections.append(collection_pair)
-        if diagnostic is not None:
-            report.setdefault("anomalies", []).append(diagnostic)
-        if exc is not None and first_error is None:
-            first_error = exc
+        vk = str(entry.get("vehicle_key") or "").strip() if isinstance(entry, dict) else ""
+        src = str(entry.get("source") or "").strip() if isinstance(entry, dict) else ""
+        try:
+            pair, moves = _plan_collection_moves(root, entry, report_run_id)
+            if not moves:
+                report.setdefault("anomalies", []).append(
+                    _anomaly(
+                        severity="info",
+                        code="no_isolation_outputs_present",
+                        vehicle_key=vk,
+                        source=src,
+                        message=f"No output files found to quarantine for collection {vk}:{src}",
+                        current="no_outputs",
+                        threshold="files_present",
+                    )
+                )
+            else:
+                planned_entries.append((pair, moves))
+                combined_planned_moves.extend(moves)
+        except (ValueError, RuntimeError) as exc:
+            report.setdefault("anomalies", []).append(
+                _anomaly(
+                    severity="critical",
+                    code="collection_isolation_failed",
+                    vehicle_key=vk,
+                    source=src,
+                    message=f"Collection isolation failed: {exc}",
+                    current="failed",
+                    threshold="isolated",
+                )
+            )
+            if validation_error is None:
+                validation_error = exc
+
+    if validation_error is not None:
+        report["isolated_collections"] = []
+        _recalculate_report_counts(report)
+        raise validation_error
+
+    # Phase 2: Execute all planned moves under a single combined rollback boundary
+    completed_collections: list[dict[str, str]] = []
+    try:
+        _execute_isolation_moves(combined_planned_moves)
+        completed_collections = [pair for pair, moves in planned_entries if moves]
+    except (ValueError, RuntimeError) as exc:
+        for pair, _ in planned_entries:
+            report.setdefault("anomalies", []).append(
+                _anomaly(
+                    severity="critical",
+                    code="collection_isolation_failed",
+                    vehicle_key=pair["vehicle_key"],
+                    source=pair["source"],
+                    message=f"Collection isolation failed: {exc}",
+                    current="failed",
+                    threshold="isolated",
+                )
+            )
+        report["isolated_collections"] = []
+        _recalculate_report_counts(report)
+        raise exc
 
     report["isolated_collections"] = completed_collections
     _recalculate_report_counts(report)
-
-    if first_error is not None:
-        raise first_error
-
     return completed_collections
 
 
