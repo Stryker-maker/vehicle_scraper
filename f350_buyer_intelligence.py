@@ -460,8 +460,8 @@ class SourceUnavailableError(ValueError):
     """Raised when a source collection is missing or not current success for the requested run."""
 
 
-def load_source_bundles(root: Path, config: dict[str, Any], source: str, run_id: str) -> list[dict[str, Any]]:
-    """Load accepted evidence, identity lifecycle, and adapter payload bundles for a source run."""
+def _load_and_validate_source_status(root: Path, config: dict[str, Any], source: str, run_id: str) -> dict[str, Any]:
+    """Validate status existence, schema, and current success state for a source run."""
     if source not in SUPPORTED_SOURCES:
         raise ValueError(f"Unsupported source: {source}")
     status_path = source_status_path(root, config, source)
@@ -472,6 +472,12 @@ def load_source_bundles(root: Path, config: dict[str, Any], source: str, run_id:
         raise SourceUnavailableError(f"{source}: source status is not current schema-v8 success")
     if status.get("identity_lifecycle_schema_version") != IDENTITY_LIFECYCLE_SCHEMA_VERSION:
         raise ValueError(f"{source}: identity lifecycle schema mismatch")
+    return status
+
+
+def load_source_bundles(root: Path, config: dict[str, Any], source: str, run_id: str) -> list[dict[str, Any]]:
+    """Load accepted evidence, identity lifecycle, and adapter payload bundles for a source run."""
+    status = _load_and_validate_source_status(root, config, source, run_id)
     accepted_path = status.get("canonical_evidence_artifacts", {}).get("accepted")
     if not accepted_path:
         raise ValueError(f"{source}: accepted canonical artifact missing")
@@ -622,6 +628,24 @@ def market_summary(listings: Sequence[dict[str, Any]], run_id: str, scope: str, 
                 "five-year mileage projection uses the owner's 5000-8000 km annual-use scenario"]}
 
 
+def _collect_available_f350_source_bundles(
+    root: Path, config: dict[str, Any], selected: Sequence[str], run_id: str
+) -> tuple[list[dict[str, Any]], list[str]]:
+    """Collect valid source bundles and sources, handling missing/failed runs gracefully."""
+    bundles: list[dict[str, Any]] = []
+    valid_sources: list[str] = []
+    for source in selected:
+        try:
+            loaded = load_source_bundles(root, config, source, run_id)
+            bundles.extend(loaded)
+            valid_sources.append(source)
+        except SourceUnavailableError:
+            pass
+    if not valid_sources:
+        raise ValueError("No valid source collections available for ford_f350")
+    return bundles, valid_sources
+
+
 def write_summary_markdown(path: Path, summary: dict[str, Any]) -> None:
     lines = ["# F-350 Buyer Intelligence", "", f"- Run ID: `{summary['run_id']}`", f"- Scope: `{summary['scope']}`",
              f"- Sources: {', '.join(summary['sources'])}", f"- Current accepted listing claims: {summary['listing_claim_count']}",
@@ -654,17 +678,7 @@ def build(root: Path, config_path: Path, run_id: str, sources: Sequence[str] | N
     override_file = overrides_path if overrides_path.is_absolute() else root / overrides_path
     overrides = load_owner_overrides(override_file)
     override_bytes = override_file.read_bytes() if override_file.exists() else json.dumps(overrides, sort_keys=True).encode("utf-8")
-    bundles: list[dict[str, Any]] = []
-    valid_sources: list[str] = []
-    for source in selected:
-        try:
-            loaded = load_source_bundles(root, config, source, run_id)
-            bundles.extend(loaded)
-            valid_sources.append(source)
-        except SourceUnavailableError:
-            pass
-    if not valid_sources:
-        raise ValueError("No valid source collections available for ford_f350")
+    bundles, valid_sources = _collect_available_f350_source_bundles(root, config, selected, run_id)
     effective_scope = "full_sources" if set(valid_sources) == set(SUPPORTED_SOURCES) else "single_source"
     market_rows = [_base(bundle, effective_scope) for bundle in bundles]
     paths = artifact_paths(root, config)

@@ -50,6 +50,38 @@ def governed_keys(root: Path, registry_path: Path) -> tuple[list[str], list[str]
     return active, paused
 
 
+def _extract_isolated_collections(root: Path) -> list[dict[str, str]]:
+    """Extract and validate isolated collection identifiers from anomalies_latest.json if present."""
+    isolated_collections: list[dict[str, str]] = []
+    anomaly_path = root / "data" / "run_status" / "anomalies_latest.json"
+    if not anomaly_path.exists():
+        return isolated_collections
+
+    try:
+        anom_data = json.loads(anomaly_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise ValueError(f"Unreadable or malformed anomaly report: {exc}") from exc
+
+    if not isinstance(anom_data, dict) or anom_data.get("anomaly_schema_version") != 1:
+        raise ValueError("Invalid anomaly report schema in anomalies_latest.json")
+
+    isolated = anom_data.get("isolated_collections")
+    if not isinstance(isolated, list):
+        raise ValueError("isolated_collections must be a list in anomalies_latest.json")
+
+    pattern = __import__("re").compile(r"^[a-z0-9_]+$")
+    for item in isolated:
+        if not isinstance(item, dict):
+            raise ValueError(f"Invalid entry in isolated_collections: {item!r}")
+        vk = str(item.get("vehicle_key") or "").strip()
+        src = str(item.get("source") or "").strip()
+        if not vk or not src or not pattern.match(vk) or not pattern.match(src):
+            raise ValueError(f"Invalid collection identifier in isolated_collections: {item!r}")
+        isolated_collections.append({"vehicle_key": vk, "source": src})
+
+    return isolated_collections
+
+
 def prepare_manifest(
     *,
     root: Path,
@@ -76,30 +108,7 @@ def prepare_manifest(
     if errors:
         raise ValueError("Invalid generated-data paths: " + ", ".join(errors))
     counts = Counter(status[0] for status, _ in staged)
-    isolated_collections: list[dict[str, str]] = []
-    anomaly_path = root / "data" / "run_status" / "anomalies_latest.json"
-    if anomaly_path.exists():
-        try:
-            anom_data = json.loads(anomaly_path.read_text(encoding="utf-8"))
-        except (OSError, ValueError) as exc:
-            raise ValueError(f"Unreadable or malformed anomaly report: {exc}") from exc
-
-        if not isinstance(anom_data, dict) or anom_data.get("anomaly_schema_version") != 1:
-            raise ValueError("Invalid anomaly report schema in anomalies_latest.json")
-
-        isolated = anom_data.get("isolated_collections")
-        if not isinstance(isolated, list):
-            raise ValueError("isolated_collections must be a list in anomalies_latest.json")
-
-        pattern = __import__("re").compile(r"^[a-z0-9_]+$")
-        for item in isolated:
-            if not isinstance(item, dict):
-                raise ValueError(f"Invalid entry in isolated_collections: {item!r}")
-            vk = str(item.get("vehicle_key") or "").strip()
-            src = str(item.get("source") or "").strip()
-            if not vk or not src or not pattern.match(vk) or not pattern.match(src):
-                raise ValueError(f"Invalid collection identifier in isolated_collections: {item!r}")
-            isolated_collections.append({"vehicle_key": vk, "source": src})
+    isolated_collections = _extract_isolated_collections(root)
 
     manifest = {
         "publication_schema_version": PUBLICATION_SCHEMA_VERSION,

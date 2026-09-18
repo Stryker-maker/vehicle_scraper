@@ -585,66 +585,64 @@ def _parse_iso_ns(iso_str: str | None) -> int | None:
         return None
 
 
-def isolate_anomalous_collections(root: Path, report: dict[str, Any]) -> list[dict[str, str]]:
-    """Isolate critical anomaly collections by moving current anomalous raw CSV outputs into run-specific quarantine while preserving historical archives and diagnostic evidence."""
-    root = root.resolve()
-    report_run_id = str(report.get("run_id") or "").strip()
-    if not report_run_id or not IDENTIFIER_PATTERN.match(report_run_id):
-        raise ValueError(f"Invalid or missing run_id in anomaly report: {report.get('run_id')!r}")
+def _plan_archive_moves(
+    source_dir: Path, vk: str, src: str, run_start_ns: int, quarantine_dir: Path
+) -> list[tuple[Path, Path]]:
+    """Plan quarantine moves for current-run historical timestamped CSV archives."""
+    moves: list[tuple[Path, Path]] = []
+    if source_dir.exists() and source_dir.is_dir():
+        for archive_path in source_dir.glob(f"{vk}_{src}_*.csv"):
+            if archive_path.is_file() and archive_path.stat().st_mtime_ns >= run_start_ns - 2_000_000_000:
+                moves.append((archive_path, quarantine_dir / archive_path.name))
+    return moves
 
-    isolated = report.get("isolated_collections")
-    if not isinstance(isolated, list):
-        raise ValueError(f"isolated_collections must be a list: {isolated!r}")
 
-    # Phase 1: Input & Provenance Validation / Planning
+def _plan_collection_moves(
+    root: Path, entry: Any, report_run_id: str
+) -> tuple[dict[str, str], list[tuple[Path, Path]]]:
+    """Validate entry provenance and plan file quarantine moves for one collection."""
+    if not isinstance(entry, dict):
+        raise ValueError(f"Invalid entry in isolated_collections: {entry!r}")
+    vk = str(entry.get("vehicle_key") or "").strip()
+    src = str(entry.get("source") or "").strip()
+    if not vk or not src or not IDENTIFIER_PATTERN.match(vk) or not IDENTIFIER_PATTERN.match(src):
+        raise ValueError(f"Rejected invalid collection identifier: vehicle_key={vk!r}, source={src!r}")
+
+    status_path = root / "data" / vk / "run_status" / f"{src}_latest.json"
+    status_data = load_optional_json(status_path)
+    started_at = status_data.get("started_at_utc") if isinstance(status_data, dict) else None
+    has_valid_provenance = (
+        isinstance(status_data, dict)
+        and status_data.get("run_id") == report_run_id
+        and isinstance(started_at, str)
+        and _parse_iso_ns(started_at) is not None
+    )
+
+    if not has_valid_provenance or not isinstance(status_data, dict) or not isinstance(started_at, str):
+        raise ValueError(f"Reliable current-run provenance missing or invalid for {vk}:{src}")
+
+    quarantine_dir = root / "data" / vk / "quarantine" / src / report_run_id
     planned_moves: list[tuple[Path, Path]] = []
-    valid_isolated: list[dict[str, str]] = []
 
-    for entry in isolated:
-        if not isinstance(entry, dict):
-            raise ValueError(f"Invalid entry in isolated_collections: {entry!r}")
-        vk = str(entry.get("vehicle_key") or "").strip()
-        src = str(entry.get("source") or "").strip()
-        if not vk or not src or not IDENTIFIER_PATTERN.match(vk) or not IDENTIFIER_PATTERN.match(src):
-            raise ValueError(f"Rejected invalid collection identifier: vehicle_key={vk!r}, source={src!r}")
+    # 1. Latest CSV output
+    latest_csv = root / "data" / vk / "latest" / f"{vk}_{src}_latest.csv"
+    if latest_csv.exists():
+        planned_moves.append((latest_csv, quarantine_dir / f"{vk}_{src}_latest_quarantined.csv"))
 
-        status_path = root / "data" / vk / "run_status" / f"{src}_latest.json"
-        status_data = load_optional_json(status_path)
-        started_at = status_data.get("started_at_utc") if isinstance(status_data, dict) else None
-        has_valid_provenance = (
-            isinstance(status_data, dict)
-            and status_data.get("run_id") == report_run_id
-            and isinstance(started_at, str)
-            and _parse_iso_ns(started_at) is not None
-        )
+    # 2. Historical timestamped source archive for the current run
+    run_start_ns = _parse_iso_ns(started_at)
+    if run_start_ns is None:
+        raise ValueError(f"Failed to parse started_at_utc for {vk}:{src}")
 
-        if not has_valid_provenance or not isinstance(status_data, dict) or not isinstance(started_at, str):
-            raise ValueError(f"Reliable current-run provenance missing or invalid for {vk}:{src}")
+    planned_moves.extend(
+        _plan_archive_moves(root / "data" / vk / src, vk, src, run_start_ns, quarantine_dir)
+    )
 
-        quarantine_dir = root / "data" / vk / "quarantine" / src / report_run_id
+    return {"vehicle_key": vk, "source": src}, planned_moves
 
-        # 1. Latest CSV output
-        latest_csv = root / "data" / vk / "latest" / f"{vk}_{src}_latest.csv"
-        if latest_csv.exists():
-            dest = quarantine_dir / f"{vk}_{src}_latest_quarantined.csv"
-            planned_moves.append((latest_csv, dest))
 
-        # 2. Historical timestamped source archive for the current run
-        run_start_ns = _parse_iso_ns(started_at)
-        if run_start_ns is None:
-            raise ValueError(f"Failed to parse started_at_utc for {vk}:{src}")
-
-        source_dir = root / "data" / vk / src
-        if source_dir.exists() and source_dir.is_dir():
-            for archive_path in source_dir.glob(f"{vk}_{src}_*.csv"):
-                if archive_path.is_file():
-                    if archive_path.stat().st_mtime_ns >= run_start_ns - 2_000_000_000:
-                        dest = quarantine_dir / archive_path.name
-                        planned_moves.append((archive_path, dest))
-
-        valid_isolated.append({"vehicle_key": vk, "source": src})
-
-    # Phase 2: Atomic Execution with Rollback
+def _execute_isolation_moves(planned_moves: list[tuple[Path, Path]]) -> None:
+    """Execute planned isolation file moves atomically, rolling back completed moves on error."""
     completed_moves: list[tuple[Path, Path]] = []
     try:
         for src_path, dst_path in planned_moves:
@@ -663,6 +661,28 @@ def isolate_anomalous_collections(root: Path, report: dict[str, Any]) -> list[di
         if unrecovered:
             msg += f". Rollback failed to restore paths: {', '.join(unrecovered)}"
         raise RuntimeError(msg) from exc
+
+
+def isolate_anomalous_collections(root: Path, report: dict[str, Any]) -> list[dict[str, str]]:
+    """Isolate critical anomaly collections by moving current anomalous raw CSV outputs into run-specific quarantine while preserving historical archives and diagnostic evidence."""
+    root = root.resolve()
+    report_run_id = str(report.get("run_id") or "").strip()
+    if not report_run_id or not IDENTIFIER_PATTERN.match(report_run_id):
+        raise ValueError(f"Invalid or missing run_id in anomaly report: {report.get('run_id')!r}")
+
+    isolated = report.get("isolated_collections")
+    if not isinstance(isolated, list):
+        raise ValueError(f"isolated_collections must be a list: {isolated!r}")
+
+    planned_moves: list[tuple[Path, Path]] = []
+    valid_isolated: list[dict[str, str]] = []
+
+    for entry in isolated:
+        collection_pair, moves = _plan_collection_moves(root, entry, report_run_id)
+        valid_isolated.append(collection_pair)
+        planned_moves.extend(moves)
+
+    _execute_isolation_moves(planned_moves)
 
     return valid_isolated
 

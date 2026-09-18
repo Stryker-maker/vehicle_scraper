@@ -269,8 +269,8 @@ class SourceUnavailableError(ValueError):
     """Raised when a source collection is missing or not current success for the requested run."""
 
 
-def load_source_bundles(root: Path, config: dict[str, Any], source: str, run_id: str) -> list[dict[str, Any]]:
-    """Load accepted evidence, identity lifecycle, and adapter payload bundles for a source run."""
+def _load_and_validate_source_status(root: Path, config: dict[str, Any], source: str, run_id: str) -> dict[str, Any]:
+    """Validate status existence, schema, and current success state for a source run."""
     if source not in SUPPORTED_SOURCES:
         raise ValueError(f"Unsupported source: {source}")
     status_path = source_status_path(root, config, source)
@@ -281,6 +281,12 @@ def load_source_bundles(root: Path, config: dict[str, Any], source: str, run_id:
         raise SourceUnavailableError(f"{source}: source status is not current schema-v8 success")
     if status.get("identity_lifecycle_schema_version") != IDENTITY_LIFECYCLE_SCHEMA_VERSION:
         raise ValueError(f"{source}: identity lifecycle schema mismatch")
+    return status
+
+
+def load_source_bundles(root: Path, config: dict[str, Any], source: str, run_id: str) -> list[dict[str, Any]]:
+    """Load accepted evidence, identity lifecycle, and adapter payload bundles for a source run."""
+    status = _load_and_validate_source_status(root, config, source, run_id)
     accepted_path = status.get("canonical_evidence_artifacts", {}).get("accepted")
     if not accepted_path:
         raise ValueError(f"{source}: accepted canonical artifact missing")
@@ -934,6 +940,24 @@ def _owned_markdown(summary: dict[str, Any]) -> str:
     )
 
 
+def _collect_available_purpose_source_bundles(
+    root: Path, config: dict[str, Any], sources: Sequence[str], vehicle_key: str, run_id: str
+) -> tuple[list[dict[str, Any]], list[str]]:
+    """Collect valid source bundles and sources, handling missing/failed runs gracefully."""
+    bundles: list[dict[str, Any]] = []
+    valid_sources: list[str] = []
+    for source in sources:
+        try:
+            loaded = load_source_bundles(root, config, source, run_id)
+            bundles.extend(loaded)
+            valid_sources.append(source)
+        except SourceUnavailableError:
+            pass
+    if not valid_sources:
+        raise ValueError(f"No valid source collections available for {vehicle_key}")
+    return bundles, valid_sources
+
+
 def _family_markdown(summary: dict[str, Any]) -> str:
     return "\n".join(
         [
@@ -974,17 +998,7 @@ def build(
         raise ValueError(f"{vehicle_key}: unsupported analysis profile")
     if len(sources) != len(set(sources)) or not sources or any(source not in SUPPORTED_SOURCES for source in sources):
         raise ValueError("Source scope must contain unique supported sources")
-    bundles: list[dict[str, Any]] = []
-    valid_sources: list[str] = []
-    for source in sources:
-        try:
-            loaded = load_source_bundles(root, config, source, run_id)
-            bundles.extend(loaded)
-            valid_sources.append(source)
-        except SourceUnavailableError:
-            pass
-    if not valid_sources:
-        raise ValueError(f"No valid source collections available for {vehicle_key}")
+    bundles, valid_sources = _collect_available_purpose_source_bundles(root, config, sources, vehicle_key, run_id)
     effective_sources = valid_sources
     effective_scope = "single_source" if len(effective_sources) == 1 else "combined_sources"
     paths = artifact_paths(root, config, profile)
