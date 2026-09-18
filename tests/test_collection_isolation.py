@@ -551,9 +551,8 @@ class CollectionIsolationTests(unittest.TestCase):
         from unittest.mock import patch
         quarantine_latest = self.root / "data" / "ford_f150" / "quarantine" / "autotrader" / run_id / "ford_f150_autotrader_latest_quarantined.csv"
 
-        with patch.object(Path, "replace", new=mock_replace):
-            with self.assertRaises(RuntimeError) as ctx:
-                isolate_anomalous_collections(root=self.root, report=report)
+        with patch.object(Path, "replace", new=mock_replace), self.assertRaises(RuntimeError) as ctx:
+            isolate_anomalous_collections(root=self.root, report=report)
 
         err_msg = str(ctx.exception)
         self.assertIn("Atomic anomaly isolation failed during file movement", err_msg)
