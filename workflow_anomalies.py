@@ -683,6 +683,29 @@ def _recalculate_report_counts(report: dict[str, Any]) -> None:
         report["anomaly_status"] = "warning"
 
 
+def _isolate_single_collection(
+    root: Path, entry: Any, report_run_id: str
+) -> tuple[dict[str, str] | None, Exception | None, dict[str, Any] | None]:
+    """Attempt isolation for a single collection entry, returning pair, error, or diagnostic."""
+    vk = str(entry.get("vehicle_key") or "").strip() if isinstance(entry, dict) else ""
+    src = str(entry.get("source") or "").strip() if isinstance(entry, dict) else ""
+    try:
+        collection_pair, moves = _plan_collection_moves(root, entry, report_run_id)
+        _execute_isolation_moves(moves)
+        return collection_pair, None, None
+    except (ValueError, RuntimeError) as exc:
+        diagnostic = _anomaly(
+            severity="critical",
+            code="collection_isolation_failed",
+            vehicle_key=vk,
+            source=src,
+            message=f"Collection isolation failed: {exc}",
+            current="failed",
+            threshold="isolated",
+        )
+        return None, exc, diagnostic
+
+
 def isolate_anomalous_collections(root: Path, report: dict[str, Any]) -> list[dict[str, str]]:
     """Isolate critical anomaly collections by moving current anomalous raw CSV outputs into run-specific quarantine while preserving historical archives and diagnostic evidence."""
     root = root.resolve()
@@ -698,26 +721,13 @@ def isolate_anomalous_collections(root: Path, report: dict[str, Any]) -> list[di
     first_error: Exception | None = None
 
     for entry in isolated:
-        vk = str(entry.get("vehicle_key") or "").strip() if isinstance(entry, dict) else ""
-        src = str(entry.get("source") or "").strip() if isinstance(entry, dict) else ""
-        try:
-            collection_pair, moves = _plan_collection_moves(root, entry, report_run_id)
-            _execute_isolation_moves(moves)
+        collection_pair, exc, diagnostic = _isolate_single_collection(root, entry, report_run_id)
+        if collection_pair is not None:
             completed_collections.append(collection_pair)
-        except (ValueError, RuntimeError) as exc:
-            report.setdefault("anomalies", []).append(
-                _anomaly(
-                    severity="critical",
-                    code="collection_isolation_failed",
-                    vehicle_key=vk,
-                    source=src,
-                    message=f"Collection isolation failed: {exc}",
-                    current="failed",
-                    threshold="isolated",
-                )
-            )
-            if first_error is None:
-                first_error = exc
+        if diagnostic is not None:
+            report.setdefault("anomalies", []).append(diagnostic)
+        if exc is not None and first_error is None:
+            first_error = exc
 
     report["isolated_collections"] = completed_collections
     _recalculate_report_counts(report)
@@ -728,59 +738,69 @@ def isolate_anomalous_collections(root: Path, report: dict[str, Any]) -> list[di
     return completed_collections
 
 
+def _run_build_action(root: Path, args: argparse.Namespace) -> int:
+    """Execute build subcommand: compare health, isolate anomalies, write report, fail closed on isolation error."""
+    baseline = load_optional_json(Path(args.baseline))
+    current = load_optional_json(Path(args.current))
+    if current is None:
+        raise SystemExit("Current health report is missing or invalid")
+    report = compare_health_reports(
+        baseline=baseline,
+        current=current,
+        run_id=args.run_id,
+    )
+    isolation_exc: Exception | None = None
+    try:
+        actually_isolated = isolate_anomalous_collections(root=root, report=report)
+    except (ValueError, RuntimeError) as exc:
+        isolation_exc = exc
+        actually_isolated = report.get("isolated_collections", [])
+
+    report["isolated_collections"] = actually_isolated
+    paths = write_anomaly_report(root=root, report=report)
+    print(
+        json.dumps(
+            {"report": report, "artifacts": [str(path) for path in paths]},
+            indent=2,
+            sort_keys=True,
+        )
+    )
+    if isolation_exc is not None:
+        raise isolation_exc
+    return 0
+
+
+def _run_check_action(root: Path, args: argparse.Namespace) -> int:
+    """Execute check subcommand: validate anomaly report and enforce policy against isolated collections."""
+    report = load_optional_json(Path(args.report))
+    if report is None or report.get("anomaly_schema_version") != ANOMALY_SCHEMA_VERSION:
+        print("Anomaly report is missing or invalid")
+        return 1
+    print(json.dumps(report, indent=2, sort_keys=True))
+    isolated = report.get("isolated_collections", [])
+    if isolated:
+        print(f"Isolated collections due to critical anomalies: {isolated}")
+    if args.policy == "enforce" and int(report.get("critical_anomaly_count", 0)) > 0:
+        health_path = root / "data" / "run_status" / "latest.json"
+        health = load_optional_json(health_path)
+        expected_sources = health.get("expected_source_runs") if isinstance(health, dict) else None
+        if not isinstance(expected_sources, int) or expected_sources <= 0:
+            print("Health report missing or invalid expected_source_runs; failing closed.")
+            return 1
+        if len(isolated) >= expected_sources:
+            print(f"All expected collections ({expected_sources}) are isolated; failing closed.")
+            return 1
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     """Run anomaly report construction or policy checking from CLI arguments."""
     args = parser().parse_args(argv)
     root = Path.cwd()
     if args.action == "build":
-        baseline = load_optional_json(Path(args.baseline))
-        current = load_optional_json(Path(args.current))
-        if current is None:
-            raise SystemExit("Current health report is missing or invalid")
-        report = compare_health_reports(
-            baseline=baseline,
-            current=current,
-            run_id=args.run_id,
-        )
-        isolation_exc: Exception | None = None
-        try:
-            actually_isolated = isolate_anomalous_collections(root=root, report=report)
-        except (ValueError, RuntimeError) as exc:
-            isolation_exc = exc
-            actually_isolated = report.get("isolated_collections", [])
-
-        report["isolated_collections"] = actually_isolated
-        paths = write_anomaly_report(root=root, report=report)
-        print(
-            json.dumps(
-                {"report": report, "artifacts": [str(path) for path in paths]},
-                indent=2,
-                sort_keys=True,
-            )
-        )
-        if isolation_exc is not None:
-            raise isolation_exc
-        return 0
+        return _run_build_action(root, args)
     if args.action == "check":
-        report = load_optional_json(Path(args.report))
-        if report is None or report.get("anomaly_schema_version") != ANOMALY_SCHEMA_VERSION:
-            print("Anomaly report is missing or invalid")
-            return 1
-        print(json.dumps(report, indent=2, sort_keys=True))
-        isolated = report.get("isolated_collections", [])
-        if isolated:
-            print(f"Isolated collections due to critical anomalies: {isolated}")
-        if args.policy == "enforce" and int(report.get("critical_anomaly_count", 0)) > 0:
-            health_path = root / "data" / "run_status" / "latest.json"
-            health = load_optional_json(health_path)
-            expected_sources = health.get("expected_source_runs") if isinstance(health, dict) else None
-            if not isinstance(expected_sources, int) or expected_sources <= 0:
-                print("Health report missing or invalid expected_source_runs; failing closed.")
-                return 1
-            if len(isolated) >= expected_sources:
-                print(f"All expected collections ({expected_sources}) are isolated; failing closed.")
-                return 1
-        return 0
+        return _run_check_action(root, args)
     raise AssertionError(args.action)
 
 
