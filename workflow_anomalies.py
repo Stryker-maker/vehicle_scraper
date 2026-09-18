@@ -667,6 +667,22 @@ def _execute_isolation_moves(planned_moves: list[tuple[Path, Path]]) -> None:
         raise RuntimeError(msg) from exc
 
 
+def _recalculate_report_counts(report: dict[str, Any]) -> None:
+    """Recalculate anomaly severity counts and status after updating report anomalies."""
+    anomalies = report.get("anomalies", [])
+    counts = {
+        severity: sum(item.get("severity") == severity for item in anomalies)
+        for severity in ("critical", "warning", "info")
+    }
+    report["critical_anomaly_count"] = counts["critical"]
+    report["warning_anomaly_count"] = counts["warning"]
+    report["informational_anomaly_count"] = counts["info"]
+    if counts["critical"] > 0:
+        report["anomaly_status"] = "critical"
+    elif counts["warning"] > 0 and report.get("anomaly_status") != "critical":
+        report["anomaly_status"] = "warning"
+
+
 def isolate_anomalous_collections(root: Path, report: dict[str, Any]) -> list[dict[str, str]]:
     """Isolate critical anomaly collections by moving current anomalous raw CSV outputs into run-specific quarantine while preserving historical archives and diagnostic evidence."""
     root = root.resolve()
@@ -678,17 +694,38 @@ def isolate_anomalous_collections(root: Path, report: dict[str, Any]) -> list[di
     if not isinstance(isolated, list):
         raise ValueError(f"isolated_collections must be a list: {isolated!r}")
 
-    planned_moves: list[tuple[Path, Path]] = []
-    valid_isolated: list[dict[str, str]] = []
+    completed_collections: list[dict[str, str]] = []
+    first_error: Exception | None = None
 
     for entry in isolated:
-        collection_pair, moves = _plan_collection_moves(root, entry, report_run_id)
-        valid_isolated.append(collection_pair)
-        planned_moves.extend(moves)
+        vk = str(entry.get("vehicle_key") or "").strip() if isinstance(entry, dict) else ""
+        src = str(entry.get("source") or "").strip() if isinstance(entry, dict) else ""
+        try:
+            collection_pair, moves = _plan_collection_moves(root, entry, report_run_id)
+            _execute_isolation_moves(moves)
+            completed_collections.append(collection_pair)
+        except (ValueError, RuntimeError) as exc:
+            report.setdefault("anomalies", []).append(
+                _anomaly(
+                    severity="critical",
+                    code="collection_isolation_failed",
+                    vehicle_key=vk,
+                    source=src,
+                    message=f"Collection isolation failed: {exc}",
+                    current="failed",
+                    threshold="isolated",
+                )
+            )
+            if first_error is None:
+                first_error = exc
 
-    _execute_isolation_moves(planned_moves)
+    report["isolated_collections"] = completed_collections
+    _recalculate_report_counts(report)
 
-    return valid_isolated
+    if first_error is not None:
+        raise first_error
+
+    return completed_collections
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -705,7 +742,13 @@ def main(argv: list[str] | None = None) -> int:
             current=current,
             run_id=args.run_id,
         )
-        actually_isolated = isolate_anomalous_collections(root=root, report=report)
+        isolation_exc: Exception | None = None
+        try:
+            actually_isolated = isolate_anomalous_collections(root=root, report=report)
+        except (ValueError, RuntimeError) as exc:
+            isolation_exc = exc
+            actually_isolated = report.get("isolated_collections", [])
+
         report["isolated_collections"] = actually_isolated
         paths = write_anomaly_report(root=root, report=report)
         print(
@@ -715,6 +758,8 @@ def main(argv: list[str] | None = None) -> int:
                 sort_keys=True,
             )
         )
+        if isolation_exc is not None:
+            raise isolation_exc
         return 0
     if args.action == "check":
         report = load_optional_json(Path(args.report))

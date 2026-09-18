@@ -248,6 +248,12 @@ class CollectionIsolationTests(unittest.TestCase):
         run_id = "run_invalid_prov_123"
         report = {
             "run_id": run_id,
+            "baseline_status": "unavailable",
+            "anomaly_status": "critical",
+            "critical_anomaly_count": 1,
+            "warning_anomaly_count": 0,
+            "informational_anomaly_count": 0,
+            "anomalies": [],
             "isolated_collections": [{"vehicle_key": "ford_f150", "source": "autotrader"}],
         }
 
@@ -264,6 +270,17 @@ class CollectionIsolationTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "Reliable current-run provenance missing or invalid"):
             isolate_anomalous_collections(root=self.root, report=report)
+
+        self.assertEqual(report["isolated_collections"], [])
+        isolation_anomalies = [a for a in report["anomalies"] if a.get("code") == "collection_isolation_failed"]
+        self.assertEqual(len(isolation_anomalies), 1)
+        self.assertEqual(isolation_anomalies[0]["vehicle_key"], "ford_f150")
+
+        from workflow_anomalies import write_anomaly_report
+        write_anomaly_report(root=self.root, report=report)
+        persisted = json.loads((self.root / "data" / "run_status" / "anomalies_latest.json").read_text(encoding="utf-8"))
+        self.assertEqual(persisted["isolated_collections"], [])
+        self.assertIn("collection_isolation_failed", [a["code"] for a in persisted["anomalies"]])
 
         self.assertTrue(f150_latest.exists())
         self.assertTrue(f150_archive.exists())
