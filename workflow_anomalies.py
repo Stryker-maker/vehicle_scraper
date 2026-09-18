@@ -586,7 +586,7 @@ def _parse_iso_ns(iso_str: str | None) -> int | None:
 
 
 def _plan_archive_moves(
-    root: Path, status_data: dict[str, Any], vk: str, src: str, quarantine_dir: Path
+    root: Path, status_data: dict[str, Any], quarantine_dir: Path
 ) -> list[tuple[Path, Path]]:
     """Plan quarantine moves for the explicit current-run timestamped CSV archive."""
     moves: list[tuple[Path, Path]] = []
@@ -638,7 +638,7 @@ def _plan_collection_moves(
 
     # 2. Historical timestamped source archive explicitly recorded for the current run
     planned_moves.extend(
-        _plan_archive_moves(root, status_data, vk, src, quarantine_dir)
+        _plan_archive_moves(root, status_data, quarantine_dir)
     )
 
     return {"vehicle_key": vk, "source": src}, planned_moves

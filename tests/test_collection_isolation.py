@@ -288,25 +288,46 @@ class CollectionIsolationTests(unittest.TestCase):
         self.assertEqual(f150_latest.read_text(encoding="utf-8"), "latest_data")
         self.assertEqual(f150_archive.read_text(encoding="utf-8"), "archive_data")
 
-    def test_valid_collection_followed_by_invalid_identifier_zero_filesystem_mutations(self):
+    def test_multi_collection_isolation_atomicity_valid_collection_and_invalid_identifier_zero_filesystem_mutations(self):
         """
-        Prove that an invalid collection identifier raises ValueError and produces zero filesystem mutations.
+        Prove that when isolating multiple collections (valid Collection A + Collection B with invalid identifier),
+        Phase 1 validation rejects the invalid identifier BEFORE any file moves, leaving Collection A untouched.
         """
         run_id = "run_invalid_id_123"
+        run_start = utc_now()
+
+        # Collection A: valid ford_f350
+        status_f350 = self._source_entry("ford_f350", "autotrader", healthy=False, accepted=0, fetched=0, execution_status="failed")
+        status_f350["started_at_utc"] = run_start
+        status_f350["run_id"] = run_id
+        status_f350["archive_output"] = "data/ford_f350/autotrader/ford_f350_autotrader_2026-08-01_00-00-00.csv"
+        status_f350_path = self.root / "data" / "ford_f350" / "run_status" / "autotrader_latest.json"
+        status_f350_path.parent.mkdir(parents=True, exist_ok=True)
+        status_f350_path.write_text(json.dumps(status_f350), encoding="utf-8")
+
+        f350_latest = self.root / "data" / "ford_f350" / "latest" / "ford_f350_autotrader_latest.csv"
+        f350_archive = self.root / "data" / "ford_f350" / "autotrader" / "ford_f350_autotrader_2026-08-01_00-00-00.csv"
+        f350_latest.parent.mkdir(parents=True, exist_ok=True)
+        f350_archive.parent.mkdir(parents=True, exist_ok=True)
+        f350_latest.write_text("f350_latest_data", encoding="utf-8")
+        f350_archive.write_text("f350_archive_data", encoding="utf-8")
+
         report = {
             "run_id": run_id,
-            "isolated_collections": [{"vehicle_key": "../invalid_vehicle", "source": "autotrader"}],
+            "isolated_collections": [
+                {"vehicle_key": "ford_f350", "source": "autotrader"},
+                {"vehicle_key": "../invalid_vehicle", "source": "autotrader"},
+            ],
         }
-
-        f150_latest = self.root / "data" / "ford_f150" / "latest" / "ford_f150_autotrader_latest.csv"
-        f150_latest.parent.mkdir(parents=True, exist_ok=True)
-        f150_latest.write_text("latest_data", encoding="utf-8")
 
         with self.assertRaisesRegex(ValueError, "Rejected invalid collection identifier"):
             isolate_anomalous_collections(root=self.root, report=report)
 
-        self.assertTrue(f150_latest.exists())
-        self.assertEqual(f150_latest.read_text(encoding="utf-8"), "latest_data")
+        # ZERO filesystem mutations: Collection A files MUST remain 100% in place!
+        self.assertTrue(f350_latest.exists())
+        self.assertTrue(f350_archive.exists())
+        self.assertEqual(f350_latest.read_text(encoding="utf-8"), "f350_latest_data")
+        self.assertEqual(f350_archive.read_text(encoding="utf-8"), "f350_archive_data")
 
     def test_valid_multi_collection_isolation_moves_all_intended_files(self):
         """
