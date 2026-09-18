@@ -775,6 +775,76 @@ class CollectionIsolationTests(unittest.TestCase):
         self.assertEqual(len(records), 1)
         self.assertEqual(records[0]["scope"], "single_source")
 
+    def test_repeated_isolation_runs_preserve_both_quarantine_evidence_sets(self):
+        """
+        Prove that two separate anomaly-isolation runs for the same collection
+        preserve both run-specific quarantine evidence sets without overwriting or destroying each other.
+        """
+        vk = "ford_f150"
+        src = "autotrader"
+
+        # Run 1
+        run_id_1 = "run_repeated_101"
+        run_start_1 = utc_now()
+        status_1 = self._source_entry(vk, src, healthy=False, accepted=0, fetched=0, execution_status="failed")
+        status_1["started_at_utc"] = run_start_1
+        status_1["run_id"] = run_id_1
+        status_file = self.root / "data" / vk / "run_status" / f"{src}_latest.json"
+        status_file.parent.mkdir(parents=True, exist_ok=True)
+        status_file.write_text(json.dumps(status_1), encoding="utf-8")
+
+        latest_csv = self.root / "data" / vk / "latest" / f"{vk}_{src}_latest.csv"
+        archive_csv_1 = self.root / "data" / vk / src / f"{vk}_{src}_2026-08-01_00-00-00.csv"
+        latest_csv.parent.mkdir(parents=True, exist_ok=True)
+        archive_csv_1.parent.mkdir(parents=True, exist_ok=True)
+        latest_csv.write_text("run1_latest_data", encoding="utf-8")
+        archive_csv_1.write_text("run1_archive_data", encoding="utf-8")
+
+        report_1 = {
+            "run_id": run_id_1,
+            "isolated_collections": [{"vehicle_key": vk, "source": src}],
+        }
+        isolated_1 = isolate_anomalous_collections(root=self.root, report=report_1)
+        self.assertEqual(len(isolated_1), 1)
+
+        q1_dir = self.root / "data" / vk / "quarantine" / src / run_id_1
+        q1_files = {f.name: f.read_text(encoding="utf-8") for f in q1_dir.glob("*.csv")}
+        self.assertIn(f"{vk}_{src}_latest_quarantined.csv", q1_files)
+        self.assertEqual(q1_files[f"{vk}_{src}_latest_quarantined.csv"], "run1_latest_data")
+        self.assertIn(f"{vk}_{src}_2026-08-01_00-00-00.csv", q1_files)
+        self.assertEqual(q1_files[f"{vk}_{src}_2026-08-01_00-00-00.csv"], "run1_archive_data")
+
+        # Run 2
+        run_id_2 = "run_repeated_102"
+        run_start_2 = utc_now()
+        status_2 = self._source_entry(vk, src, healthy=False, accepted=0, fetched=0, execution_status="failed")
+        status_2["started_at_utc"] = run_start_2
+        status_2["run_id"] = run_id_2
+        status_file.write_text(json.dumps(status_2), encoding="utf-8")
+
+        archive_csv_2 = self.root / "data" / vk / src / f"{vk}_{src}_2026-08-02_00-00-00.csv"
+        latest_csv.write_text("run2_latest_data", encoding="utf-8")
+        archive_csv_2.write_text("run2_archive_data", encoding="utf-8")
+
+        report_2 = {
+            "run_id": run_id_2,
+            "isolated_collections": [{"vehicle_key": vk, "source": src}],
+        }
+        isolated_2 = isolate_anomalous_collections(root=self.root, report=report_2)
+        self.assertEqual(len(isolated_2), 1)
+
+        q2_dir = self.root / "data" / vk / "quarantine" / src / run_id_2
+        q2_files = {f.name: f.read_text(encoding="utf-8") for f in q2_dir.glob("*.csv")}
+        self.assertIn(f"{vk}_{src}_latest_quarantined.csv", q2_files)
+        self.assertEqual(q2_files[f"{vk}_{src}_latest_quarantined.csv"], "run2_latest_data")
+        self.assertIn(f"{vk}_{src}_2026-08-02_00-00-00.csv", q2_files)
+        self.assertEqual(q2_files[f"{vk}_{src}_2026-08-02_00-00-00.csv"], "run2_archive_data")
+
+        # Verify run 1 evidence remains untouched in its separate quarantine directory
+        q1_files_after = {f.name: f.read_text(encoding="utf-8") for f in q1_dir.glob("*.csv")}
+        self.assertEqual(q1_files_after[f"{vk}_{src}_latest_quarantined.csv"], "run1_latest_data")
+        self.assertEqual(q1_files_after[f"{vk}_{src}_2026-08-01_00-00-00.csv"], "run1_archive_data")
+
 
 if __name__ == "__main__":
     unittest.main()
