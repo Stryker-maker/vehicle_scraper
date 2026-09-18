@@ -1004,48 +1004,76 @@ def build(
     paths = artifact_paths(root, config, profile)
 
     if profile == "owned_vehicle_value":
-        subject = entry["subject_profile"]
-        records = [_owned_record(bundle, subject, effective_scope) for bundle in bundles]
-        summary = _owned_summary(config, run_id, effective_sources, effective_scope, records, entry, paths, root)
-        input_gaps = {
-            "purpose_output_schema_version": PURPOSE_OUTPUT_SCHEMA_VERSION,
-            "purpose_input_schema_version": PURPOSE_INPUT_SCHEMA_VERSION,
-            "run_id": run_id,
-            "vehicle_key": vehicle_key,
-            "analysis_profile": profile,
-            "subject_profile_missing_fields": summary["subject_profile_missing_fields"],
-            "required_owner_actions": [
-                {"field": field_name, "action": f"Record current owner input for {field_name}."}
-                for field_name in summary["subject_profile_missing_fields"]
-            ],
-            "meaning": "missing_owner_inputs_limit_personalized_subject_context",
-        }
-        write_jsonl(paths["records_jsonl"], records)
-        _write_csv(paths["records_csv"], OWNED_CSV_FIELDS, records)
-        write_json(paths["input_gaps"], input_gaps)
-        write_json(paths["summary_json"], summary)
-        paths["summary_markdown"].parent.mkdir(parents=True, exist_ok=True)
-        paths["summary_markdown"].write_text(_owned_markdown(summary), encoding="utf-8")
-    else:
-        preferences = entry["preferences"]
-        record_pairs = [
-            _family_record(
-                bundle,
-                preferences,
-                effective_scope,
-                paths["questions_jsonl"].relative_to(root),
-            )
-            for bundle in bundles
-        ]
-        records = [pair[0] for pair in record_pairs]
-        questions = [pair[1] for pair in record_pairs]
-        summary = _family_summary(config, run_id, effective_sources, effective_scope, records, preferences, paths, root)
-        write_jsonl(paths["records_jsonl"], records)
-        _write_csv(paths["records_csv"], FAMILY_CSV_FIELDS, records)
-        write_jsonl(paths["questions_jsonl"], questions)
-        write_json(paths["summary_json"], summary)
-        paths["summary_markdown"].parent.mkdir(parents=True, exist_ok=True)
-        paths["summary_markdown"].write_text(_family_markdown(summary), encoding="utf-8")
+        return _build_owned_purpose_outputs(config, run_id, effective_sources, effective_scope, bundles, entry, paths, root)
+    return _build_family_purpose_outputs(config, run_id, effective_sources, effective_scope, bundles, entry, paths, root)
+
+
+def _build_owned_purpose_outputs(
+    config: dict[str, Any],
+    run_id: str,
+    effective_sources: list[str],
+    effective_scope: str,
+    bundles: list[dict[str, Any]],
+    entry: dict[str, Any],
+    paths: dict[str, Path],
+    root: Path,
+) -> dict[str, Any]:
+    """Build and write artifacts for owned vehicle value monitor profile."""
+    subject = entry["subject_profile"]
+    records = [_owned_record(bundle, subject, effective_scope) for bundle in bundles]
+    summary = _owned_summary(config, run_id, effective_sources, effective_scope, records, entry, paths, root)
+    input_gaps = {
+        "purpose_output_schema_version": PURPOSE_OUTPUT_SCHEMA_VERSION,
+        "purpose_input_schema_version": PURPOSE_INPUT_SCHEMA_VERSION,
+        "run_id": run_id,
+        "vehicle_key": config["vehicle_key"],
+        "analysis_profile": "owned_vehicle_value",
+        "subject_profile_missing_fields": summary["subject_profile_missing_fields"],
+        "required_owner_actions": [
+            {"field": field_name, "action": f"Record current owner input for {field_name}."}
+            for field_name in summary["subject_profile_missing_fields"]
+        ],
+        "meaning": "missing_owner_inputs_limit_personalized_subject_context",
+    }
+    write_jsonl(paths["records_jsonl"], records)
+    _write_csv(paths["records_csv"], OWNED_CSV_FIELDS, records)
+    write_json(paths["input_gaps"], input_gaps)
+    write_json(paths["summary_json"], summary)
+    paths["summary_markdown"].parent.mkdir(parents=True, exist_ok=True)
+    paths["summary_markdown"].write_text(_owned_markdown(summary), encoding="utf-8")
+    return summary
+
+
+def _build_family_purpose_outputs(
+    config: dict[str, Any],
+    run_id: str,
+    effective_sources: list[str],
+    effective_scope: str,
+    bundles: list[dict[str, Any]],
+    entry: dict[str, Any],
+    paths: dict[str, Path],
+    root: Path,
+) -> dict[str, Any]:
+    """Build and write artifacts for family friend purchase candidate profile."""
+    preferences = entry["preferences"]
+    record_pairs = [
+        _family_record(
+            bundle,
+            preferences,
+            effective_scope,
+            paths["questions_jsonl"].relative_to(root),
+        )
+        for bundle in bundles
+    ]
+    records = [pair[0] for pair in record_pairs]
+    questions = [pair[1] for pair in record_pairs]
+    summary = _family_summary(config, run_id, effective_sources, effective_scope, records, preferences, paths, root)
+    write_jsonl(paths["records_jsonl"], records)
+    _write_csv(paths["records_csv"], FAMILY_CSV_FIELDS, records)
+    write_jsonl(paths["questions_jsonl"], questions)
+    write_json(paths["summary_json"], summary)
+    paths["summary_markdown"].parent.mkdir(parents=True, exist_ok=True)
+    paths["summary_markdown"].write_text(_family_markdown(summary), encoding="utf-8")
     return summary
 
 

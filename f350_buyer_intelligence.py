@@ -664,6 +664,25 @@ def write_summary_markdown(path: Path, summary: dict[str, Any]) -> None:
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def _generate_f350_investigation_outputs(
+    bundles: list[dict[str, Any]],
+    market_rows: Sequence[dict[str, Any]],
+    overrides: dict[str, Any],
+    relative: dict[str, str],
+    effective_scope: str,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Generate and sort rich investigation listings and seller question records."""
+    listings: list[dict[str, Any]] = []
+    questions: list[dict[str, Any]] = []
+    for bundle in bundles:
+        listing, question_record = _listing(bundle, market_rows, overrides, relative, effective_scope)
+        listings.append(listing)
+        questions.append(question_record)
+    listings.sort(key=lambda value: (-int(value.get("year") or 0), int(value.get("price_cad") or 10**12), str(value.get("source")), str(value.get("canonical_listing_id"))))
+    questions.sort(key=lambda value: (str(value.get("source")), str(value.get("canonical_listing_id"))))
+    return listings, questions
+
+
 def build(root: Path, config_path: Path, run_id: str, sources: Sequence[str] | None = None,
           overrides_path: Path = Path("f350_owner_overrides.json")) -> dict[str, Any]:
     """Build governed F-350 buyer intelligence market summary and investigation artifacts."""
@@ -683,14 +702,7 @@ def build(root: Path, config_path: Path, run_id: str, sources: Sequence[str] | N
     market_rows = [_base(bundle, effective_scope) for bundle in bundles]
     paths = artifact_paths(root, config)
     relative = {key: str(value.relative_to(root)) for key, value in paths.items()}
-    listings: list[dict[str, Any]] = []
-    questions: list[dict[str, Any]] = []
-    for bundle in bundles:
-        listing, question_record = _listing(bundle, market_rows, overrides, relative, effective_scope)
-        listings.append(listing)
-        questions.append(question_record)
-    listings.sort(key=lambda value: (-int(value.get("year") or 0), int(value.get("price_cad") or 10**12), str(value.get("source")), str(value.get("canonical_listing_id"))))
-    questions.sort(key=lambda value: (str(value.get("source")), str(value.get("canonical_listing_id"))))
+    listings, questions = _generate_f350_investigation_outputs(bundles, market_rows, overrides, relative, effective_scope)
     write_jsonl(paths["investigation_jsonl"], listings)
     write_jsonl(paths["seller_questions"], questions)
     paths["investigation_csv"].parent.mkdir(parents=True, exist_ok=True)

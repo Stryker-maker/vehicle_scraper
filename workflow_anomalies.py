@@ -597,6 +597,22 @@ def _plan_archive_moves(
     return moves
 
 
+def _validate_collection_provenance(root: Path, vk: str, src: str, report_run_id: str) -> str:
+    """Validate status existence and run provenance for a collection, returning started_at_utc."""
+    status_path = root / "data" / vk / "run_status" / f"{src}_latest.json"
+    status_data = load_optional_json(status_path)
+    started_at = status_data.get("started_at_utc") if isinstance(status_data, dict) else None
+    has_valid_provenance = (
+        isinstance(status_data, dict)
+        and status_data.get("run_id") == report_run_id
+        and isinstance(started_at, str)
+        and _parse_iso_ns(started_at) is not None
+    )
+    if not has_valid_provenance or not isinstance(started_at, str):
+        raise ValueError(f"Reliable current-run provenance missing or invalid for {vk}:{src}")
+    return started_at
+
+
 def _plan_collection_moves(
     root: Path, entry: Any, report_run_id: str
 ) -> tuple[dict[str, str], list[tuple[Path, Path]]]:
@@ -608,19 +624,7 @@ def _plan_collection_moves(
     if not vk or not src or not IDENTIFIER_PATTERN.match(vk) or not IDENTIFIER_PATTERN.match(src):
         raise ValueError(f"Rejected invalid collection identifier: vehicle_key={vk!r}, source={src!r}")
 
-    status_path = root / "data" / vk / "run_status" / f"{src}_latest.json"
-    status_data = load_optional_json(status_path)
-    started_at = status_data.get("started_at_utc") if isinstance(status_data, dict) else None
-    has_valid_provenance = (
-        isinstance(status_data, dict)
-        and status_data.get("run_id") == report_run_id
-        and isinstance(started_at, str)
-        and _parse_iso_ns(started_at) is not None
-    )
-
-    if not has_valid_provenance or not isinstance(status_data, dict) or not isinstance(started_at, str):
-        raise ValueError(f"Reliable current-run provenance missing or invalid for {vk}:{src}")
-
+    started_at = _validate_collection_provenance(root, vk, src, report_run_id)
     quarantine_dir = root / "data" / vk / "quarantine" / src / report_run_id
     planned_moves: list[tuple[Path, Path]] = []
 
@@ -724,12 +728,12 @@ def main(argv: list[str] | None = None) -> int:
         if args.policy == "enforce" and int(report.get("critical_anomaly_count", 0)) > 0:
             health_path = root / "data" / "run_status" / "latest.json"
             health = load_optional_json(health_path)
-            if not health or not isinstance(health.get("expected_source_runs"), int) or health.get("expected_source_runs") <= 0:
+            expected_sources = health.get("expected_source_runs") if isinstance(health, dict) else None
+            if not isinstance(expected_sources, int) or expected_sources <= 0:
                 print("Health report missing or invalid expected_source_runs; failing closed.")
                 return 1
-            total_sources = health["expected_source_runs"]
-            if len(isolated) >= total_sources:
-                print(f"All expected collections ({total_sources}) are isolated; failing closed.")
+            if len(isolated) >= expected_sources:
+                print(f"All expected collections ({expected_sources}) are isolated; failing closed.")
                 return 1
         return 0
     raise AssertionError(args.action)

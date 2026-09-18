@@ -50,12 +50,30 @@ def governed_keys(root: Path, registry_path: Path) -> tuple[list[str], list[str]
     return active, paused
 
 
+def _parse_isolated_items(isolated: Any) -> list[dict[str, str]]:
+    """Validate and parse list of isolated collection entries."""
+    if not isinstance(isolated, list):
+        raise ValueError("isolated_collections must be a list in anomalies_latest.json")
+
+    pattern = __import__("re").compile(r"^[a-z0-9_]+$")
+    parsed: list[dict[str, str]] = []
+    for item in isolated:
+        if not isinstance(item, dict):
+            raise ValueError(f"Invalid entry in isolated_collections: {item!r}")
+        vk = str(item.get("vehicle_key") or "").strip()
+        src = str(item.get("source") or "").strip()
+        if not vk or not src or not pattern.match(vk) or not pattern.match(src):
+            raise ValueError(f"Invalid collection identifier in isolated_collections: {item!r}")
+        parsed.append({"vehicle_key": vk, "source": src})
+
+    return parsed
+
+
 def _extract_isolated_collections(root: Path) -> list[dict[str, str]]:
     """Extract and validate isolated collection identifiers from anomalies_latest.json if present."""
-    isolated_collections: list[dict[str, str]] = []
     anomaly_path = root / "data" / "run_status" / "anomalies_latest.json"
     if not anomaly_path.exists():
-        return isolated_collections
+        return []
 
     try:
         anom_data = json.loads(anomaly_path.read_text(encoding="utf-8"))
@@ -65,21 +83,7 @@ def _extract_isolated_collections(root: Path) -> list[dict[str, str]]:
     if not isinstance(anom_data, dict) or anom_data.get("anomaly_schema_version") != 1:
         raise ValueError("Invalid anomaly report schema in anomalies_latest.json")
 
-    isolated = anom_data.get("isolated_collections")
-    if not isinstance(isolated, list):
-        raise ValueError("isolated_collections must be a list in anomalies_latest.json")
-
-    pattern = __import__("re").compile(r"^[a-z0-9_]+$")
-    for item in isolated:
-        if not isinstance(item, dict):
-            raise ValueError(f"Invalid entry in isolated_collections: {item!r}")
-        vk = str(item.get("vehicle_key") or "").strip()
-        src = str(item.get("source") or "").strip()
-        if not vk or not src or not pattern.match(vk) or not pattern.match(src):
-            raise ValueError(f"Invalid collection identifier in isolated_collections: {item!r}")
-        isolated_collections.append({"vehicle_key": vk, "source": src})
-
-    return isolated_collections
+    return _parse_isolated_items(anom_data.get("isolated_collections"))
 
 
 def prepare_manifest(
