@@ -357,6 +357,7 @@ class CollectionIsolationTests(unittest.TestCase):
         anomaly_path.parent.mkdir(parents=True, exist_ok=True)
         bad_report = {
             "anomaly_schema_version": 1,
+            "run_id": "run_test",
             "isolated_collections": [{"vehicle_key": "../bad", "source": "autotrader"}],
         }
         anomaly_path.write_text(json.dumps(bad_report), encoding="utf-8")
@@ -366,6 +367,31 @@ class CollectionIsolationTests(unittest.TestCase):
                 root=self.root,
                 registry_path=Path("vehicle_registry.json"),
                 run_id="run_test",
+                source_sha="a" * 40,
+                event_name="schedule",
+                ref_name="main",
+            )
+
+    def test_publication_manifest_fails_closed_when_anomaly_report_run_id_mismatches(self):
+        """
+        Prove that a valid anomaly report whose run_id differs from the publication run_id
+        causes prepare_manifest() to fail closed.
+        """
+        self._setup_git_repo()
+        anomaly_path = self.root / "data" / "run_status" / "anomalies_latest.json"
+        anomaly_path.parent.mkdir(parents=True, exist_ok=True)
+        mismatched_report = {
+            "anomaly_schema_version": 1,
+            "run_id": "stale_run_id_999",
+            "isolated_collections": [],
+        }
+        anomaly_path.write_text(json.dumps(mismatched_report), encoding="utf-8")
+
+        with self.assertRaisesRegex(ValueError, "Anomaly report run_id mismatch"):
+            prepare_manifest(
+                root=self.root,
+                registry_path=Path("vehicle_registry.json"),
+                run_id="current_run_id_123",
                 source_sha="a" * 40,
                 event_name="schedule",
                 ref_name="main",

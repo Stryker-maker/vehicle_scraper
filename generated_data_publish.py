@@ -69,7 +69,7 @@ def _parse_isolated_items(isolated: Any) -> list[dict[str, str]]:
     return parsed
 
 
-def _extract_isolated_collections(root: Path) -> list[dict[str, str]]:
+def _extract_isolated_collections(root: Path, run_id: str) -> list[dict[str, str]]:
     """Extract and validate isolated collection identifiers from anomalies_latest.json if present."""
     anomaly_path = root / "data" / "run_status" / "anomalies_latest.json"
     if not anomaly_path.exists():
@@ -82,6 +82,12 @@ def _extract_isolated_collections(root: Path) -> list[dict[str, str]]:
 
     if not isinstance(anom_data, dict) or anom_data.get("anomaly_schema_version") != 1:
         raise ValueError("Invalid anomaly report schema in anomalies_latest.json")
+
+    report_run_id = str(anom_data.get("run_id") or "").strip()
+    if report_run_id != run_id:
+        raise ValueError(
+            f"Anomaly report run_id mismatch: expected {run_id!r}, found {report_run_id!r}"
+        )
 
     return _parse_isolated_items(anom_data.get("isolated_collections"))
 
@@ -112,7 +118,7 @@ def prepare_manifest(
     if errors:
         raise ValueError("Invalid generated-data paths: " + ", ".join(errors))
     counts = Counter(status[0] for status, _ in staged)
-    isolated_collections = _extract_isolated_collections(root)
+    isolated_collections = _extract_isolated_collections(root, run_id)
 
     manifest = {
         "publication_schema_version": PUBLICATION_SCHEMA_VERSION,
