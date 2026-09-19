@@ -682,18 +682,10 @@ def _recalculate_report_counts(report: dict[str, Any]) -> None:
         report["anomaly_status"] = "warning"
 
 
-def isolate_anomalous_collections(root: Path, report: dict[str, Any]) -> list[dict[str, str]]:
-    """Isolate critical anomaly collections by moving current anomalous raw CSV outputs into run-specific quarantine while preserving historical archives and diagnostic evidence."""
-    root = root.resolve()
-    report_run_id = str(report.get("run_id") or "").strip()
-    if not report_run_id or not IDENTIFIER_PATTERN.match(report_run_id):
-        raise ValueError(f"Invalid or missing run_id in anomaly report: {report.get('run_id')!r}")
-
-    isolated = report.get("isolated_collections")
-    if not isinstance(isolated, list):
-        raise ValueError(f"isolated_collections must be a list: {isolated!r}")
-
-    # Phase 1: Validate and plan ALL requested collections with zero filesystem mutations
+def _plan_phase1_isolation(
+    root: Path, isolated: list[Any], report_run_id: str, report: dict[str, Any]
+) -> tuple[list[tuple[dict[str, str], list[tuple[Path, Path]]]], list[tuple[Path, Path]]]:
+    """Phase 1: Validate and plan all collection moves without filesystem mutations."""
     planned_entries: list[tuple[dict[str, str], list[tuple[Path, Path]]]] = []
     combined_planned_moves: list[tuple[Path, Path]] = []
     validation_error: Exception | None = None
@@ -738,8 +730,26 @@ def isolate_anomalous_collections(root: Path, report: dict[str, Any]) -> list[di
         _recalculate_report_counts(report)
         raise validation_error
 
+    return planned_entries, combined_planned_moves
+
+
+def isolate_anomalous_collections(root: Path, report: dict[str, Any]) -> list[dict[str, str]]:
+    """Isolate critical anomaly collections by moving current anomalous raw CSV outputs into run-specific quarantine while preserving historical archives and diagnostic evidence."""
+    root = root.resolve()
+    report_run_id = str(report.get("run_id") or "").strip()
+    if not report_run_id or not IDENTIFIER_PATTERN.match(report_run_id):
+        raise ValueError(f"Invalid or missing run_id in anomaly report: {report.get('run_id')!r}")
+
+    isolated = report.get("isolated_collections")
+    if not isinstance(isolated, list):
+        raise ValueError(f"isolated_collections must be a list: {isolated!r}")
+
+    # Phase 1: Validate and plan ALL requested collections with zero filesystem mutations
+    planned_entries, combined_planned_moves = _plan_phase1_isolation(
+        root, isolated, report_run_id, report
+    )
+
     # Phase 2: Execute all planned moves under a single combined rollback boundary
-    completed_collections: list[dict[str, str]] = []
     try:
         _execute_isolation_moves(combined_planned_moves)
         completed_collections = [pair for pair, moves in planned_entries if moves]
