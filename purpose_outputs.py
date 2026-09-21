@@ -277,8 +277,12 @@ def _load_and_validate_source_status(root: Path, config: dict[str, Any], source:
     if not status_path.exists():
         raise SourceUnavailableError(f"{source}: source status missing")
     status = load_json(status_path)
-    if status.get("schema_version") != SOURCE_STATUS_SCHEMA_VERSION or not status_is_current_success(status, run_id):
-        raise SourceUnavailableError(f"{source}: source status is not current schema-v8 success")
+    if not isinstance(status, dict):
+        raise ValueError(f"{source}: source status is not a JSON object")
+    if status.get("schema_version") != SOURCE_STATUS_SCHEMA_VERSION:
+        raise ValueError(f"{source}: status schema_version mismatch ({status.get('schema_version')!r}), expected schema-v8 success")
+    if not status_is_current_success(status, run_id):
+        raise SourceUnavailableError(f"{source}: source status is not current-run success")
     if status.get("identity_lifecycle_schema_version") != IDENTITY_LIFECYCLE_SCHEMA_VERSION:
         raise ValueError(f"{source}: identity lifecycle schema mismatch")
     return status

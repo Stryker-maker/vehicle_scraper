@@ -586,13 +586,20 @@ def _parse_iso_ns(iso_str: str | None) -> int | None:
 
 
 def _plan_archive_moves(
-    root: Path, status_data: dict[str, Any], quarantine_dir: Path
+    root: Path, status_data: dict[str, Any], vk: str, src: str, quarantine_dir: Path
 ) -> list[tuple[Path, Path]]:
-    """Plan quarantine moves for the explicit current-run timestamped CSV archive."""
+    """Plan quarantine moves for the explicit current-run timestamped CSV archive with containment check."""
     moves: list[tuple[Path, Path]] = []
     rel_archive = status_data.get("archive_output")
     if isinstance(rel_archive, str) and rel_archive.strip():
-        archive_path = root / rel_archive.strip()
+        expected_dir = (root / "data" / vk / src).resolve()
+        archive_path = (root / rel_archive.strip()).resolve()
+        try:
+            archive_path.relative_to(expected_dir)
+        except ValueError as exc:
+            raise ValueError(
+                f"Archive path {rel_archive!r} escapes collection directory for {vk}:{src}"
+            ) from exc
         if archive_path.exists() and archive_path.is_file():
             moves.append((archive_path, quarantine_dir / archive_path.name))
     return moves
@@ -638,7 +645,7 @@ def _plan_collection_moves(
 
     # 2. Historical timestamped source archive explicitly recorded for the current run
     planned_moves.extend(
-        _plan_archive_moves(root, status_data, quarantine_dir)
+        _plan_archive_moves(root, status_data, vk, src, quarantine_dir)
     )
 
     return {"vehicle_key": vk, "source": src}, planned_moves
@@ -807,6 +814,29 @@ def _run_build_action(root: Path, args: argparse.Namespace) -> int:
     return 0
 
 
+def _validate_isolated_collections(isolated: Any) -> list[dict[str, str]]:
+    """Validate isolated_collections list structure, entries, and check for duplicates."""
+    if not isinstance(isolated, list):
+        raise ValueError(f"isolated_collections must be a list, got {type(isolated).__name__}")
+    validated: list[dict[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    for entry in isolated:
+        if not isinstance(entry, dict):
+            raise ValueError(f"Invalid entry in isolated_collections: {entry!r}")
+        vk = str(entry.get("vehicle_key") or "").strip()
+        src = str(entry.get("source") or "").strip()
+        if not vk or not src or not IDENTIFIER_PATTERN.match(vk) or not IDENTIFIER_PATTERN.match(src):
+            raise ValueError(
+                f"Invalid collection identifier in isolated_collections: vehicle_key={vk!r}, source={src!r}"
+            )
+        pair = (vk, src)
+        if pair in seen:
+            raise ValueError(f"Duplicate collection identity in isolated_collections: {vk}:{src}")
+        seen.add(pair)
+        validated.append({"vehicle_key": vk, "source": src})
+    return validated
+
+
 def _run_check_action(root: Path, args: argparse.Namespace) -> int:
     """Execute check subcommand: validate anomaly report and enforce policy against isolated collections."""
     report = load_optional_json(Path(args.report))
@@ -814,7 +844,12 @@ def _run_check_action(root: Path, args: argparse.Namespace) -> int:
         print("Anomaly report is missing or invalid")
         return 1
     print(json.dumps(report, indent=2, sort_keys=True))
-    isolated = report.get("isolated_collections", [])
+    try:
+        isolated = _validate_isolated_collections(report.get("isolated_collections", []))
+    except ValueError as exc:
+        print(f"Invalid isolated_collections in report: {exc}; failing closed.")
+        return 1
+
     if isolated:
         print(f"Isolated collections due to critical anomalies: {isolated}")
     if args.policy == "enforce" and int(report.get("critical_anomaly_count", 0)) > 0:

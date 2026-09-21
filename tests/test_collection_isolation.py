@@ -28,6 +28,8 @@ class CollectionIsolationTests(unittest.TestCase):
     def _source_entry(vehicle_key: str, source: str, healthy: bool, accepted: int, fetched: int, execution_status: str = "success"):
         """Build structured health/status entry for collection isolation tests."""
         return {
+            "schema_version": 8,
+            "identity_lifecycle_schema_version": 2,
             "vehicle_key": vehicle_key,
             "source": source,
             "healthy": healthy,
@@ -1003,6 +1005,113 @@ class CollectionIsolationTests(unittest.TestCase):
         no_output_anomalies = [a for a in report["anomalies"] if a.get("code") == "no_isolation_outputs_present"]
         self.assertEqual(len(no_output_anomalies), 1)
         self.assertEqual(no_output_anomalies[0]["vehicle_key"], vk)
+
+    def test_archive_path_escaping_collection_directory_raises_value_error_and_prevents_moves(self):
+        """
+        Prove that an archive_output path attempting to escape the collection directory
+        (e.g. traversal ../../outside.csv) raises ValueError and moves zero files.
+        """
+        vk = "ford_f150"
+        src = "autotrader"
+        run_id = "run_escape_123"
+        run_start = utc_now()
+
+        outside_file = self.root / "data" / "outside_secret.csv"
+        outside_file.parent.mkdir(parents=True, exist_ok=True)
+        outside_file.write_text("secret_content", encoding="utf-8")
+
+        status = self._source_entry(vk, src, healthy=False, accepted=0, fetched=0, execution_status="failed")
+        status["started_at_utc"] = run_start
+        status["run_id"] = run_id
+        status["archive_output"] = "data/outside_secret.csv"
+
+        status_file = self.root / "data" / vk / "run_status" / f"{src}_latest.json"
+        status_file.parent.mkdir(parents=True, exist_ok=True)
+        status_file.write_text(json.dumps(status), encoding="utf-8")
+
+        f150_latest = self.root / "data" / vk / "latest" / f"{vk}_{src}_latest.csv"
+        f150_latest.parent.mkdir(parents=True, exist_ok=True)
+        f150_latest.write_text("f150_latest_content", encoding="utf-8")
+
+        report = {
+            "run_id": run_id,
+            "isolated_collections": [{"vehicle_key": vk, "source": src}],
+        }
+
+        with self.assertRaisesRegex(ValueError, "escapes collection directory"):
+            isolate_anomalous_collections(root=self.root, report=report)
+
+        # File containment check MUST prevent any file moves!
+        self.assertTrue(outside_file.exists())
+        self.assertEqual(outside_file.read_text(encoding="utf-8"), "secret_content")
+        self.assertTrue(f150_latest.exists())
+        self.assertEqual(f150_latest.read_text(encoding="utf-8"), "f150_latest_content")
+
+    def test_check_action_rejects_malformed_and_duplicate_isolated_collections(self):
+        """
+        Prove that _run_check_action rejects malformed isolated_collections and duplicate entries,
+        failing closed (returning exit code 1).
+        """
+        from workflow_anomalies import _run_check_action
+        import argparse
+
+        report_file = self.root / "anomalies_test.json"
+        report_file.write_text(
+            json.dumps({
+                "anomaly_schema_version": 1,
+                "isolated_collections": [
+                    {"vehicle_key": "ford_f150", "source": "autotrader"},
+                    {"vehicle_key": "ford_f150", "source": "autotrader"},
+                ],
+            }),
+            encoding="utf-8",
+        )
+        args = argparse.Namespace(report=str(report_file), policy="report_only")
+        exit_code = _run_check_action(self.root, args)
+        self.assertEqual(exit_code, 1)
+
+    def test_source_status_schema_version_mismatch_raises_value_error(self):
+        """
+        Prove that a source status JSON with an invalid schema_version raises ValueError (integrity error).
+        """
+        from f350_buyer_intelligence import SourceUnavailableError, _load_and_validate_source_status
+
+        vk = "ford_f350"
+        src = "autotrader"
+        run_id = "run_schema_mismatch_123"
+
+        config = {"vehicle_key": vk, "sources": {src: {}}}
+        status = self._source_entry(vk, src, healthy=True, accepted=5, fetched=5)
+        status["schema_version"] = 99  # Corrupt / invalid schema version
+        status["run_id"] = run_id
+
+        status_file = self.root / "data" / vk / "run_status" / f"{src}_latest.json"
+        status_file.parent.mkdir(parents=True, exist_ok=True)
+        status_file.write_text(json.dumps(status), encoding="utf-8")
+
+        with self.assertRaisesRegex(ValueError, "status schema_version mismatch"):
+            _load_and_validate_source_status(self.root, config, src, run_id)
+
+    def test_valid_but_non_success_source_status_raises_source_unavailable_error(self):
+        """
+        Prove that a source status JSON that is non-success / degraded raises SourceUnavailableError.
+        """
+        from f350_buyer_intelligence import SourceUnavailableError, _load_and_validate_source_status
+
+        vk = "ford_f350"
+        src = "autotrader"
+        run_id = "run_degraded_123"
+
+        config = {"vehicle_key": vk, "sources": {src: {}}}
+        status = self._source_entry(vk, src, healthy=False, accepted=0, fetched=0, execution_status="failed")
+        status["run_id"] = run_id
+
+        status_file = self.root / "data" / vk / "run_status" / f"{src}_latest.json"
+        status_file.parent.mkdir(parents=True, exist_ok=True)
+        status_file.write_text(json.dumps(status), encoding="utf-8")
+
+        with self.assertRaises(SourceUnavailableError):
+            _load_and_validate_source_status(self.root, config, src, run_id)
 
 
 if __name__ == "__main__":
