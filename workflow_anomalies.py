@@ -689,6 +689,43 @@ def _recalculate_report_counts(report: dict[str, Any]) -> None:
         report["anomaly_status"] = "warning"
 
 
+def _plan_single_entry_isolation(
+    root: Path, entry: Any, report_run_id: str, report: dict[str, Any]
+) -> tuple[tuple[dict[str, str], list[tuple[Path, Path]]] | None, Exception | None]:
+    """Plan quarantine moves for a single entry during Phase 1 validation."""
+    vk = str(entry.get("vehicle_key") or "").strip() if isinstance(entry, dict) else ""
+    src = str(entry.get("source") or "").strip() if isinstance(entry, dict) else ""
+    try:
+        pair, moves = _plan_collection_moves(root, entry, report_run_id)
+        if not moves:
+            report.setdefault("anomalies", []).append(
+                _anomaly(
+                    severity="info",
+                    code="no_isolation_outputs_present",
+                    vehicle_key=vk,
+                    source=src,
+                    message=f"No output files found to quarantine for collection {vk}:{src}",
+                    current="no_outputs",
+                    threshold="files_present",
+                )
+            )
+            return None, None
+        return (pair, moves), None
+    except (ValueError, RuntimeError) as exc:
+        report.setdefault("anomalies", []).append(
+            _anomaly(
+                severity="critical",
+                code="collection_isolation_failed",
+                vehicle_key=vk,
+                source=src,
+                message=f"Collection isolation failed: {exc}",
+                current="failed",
+                threshold="isolated",
+            )
+        )
+        return None, exc
+
+
 def _plan_phase1_isolation(
     root: Path, isolated: list[Any], report_run_id: str, report: dict[str, Any]
 ) -> tuple[list[tuple[dict[str, str], list[tuple[Path, Path]]]], list[tuple[Path, Path]]]:
@@ -698,39 +735,13 @@ def _plan_phase1_isolation(
     validation_error: Exception | None = None
 
     for entry in isolated:
-        vk = str(entry.get("vehicle_key") or "").strip() if isinstance(entry, dict) else ""
-        src = str(entry.get("source") or "").strip() if isinstance(entry, dict) else ""
-        try:
-            pair, moves = _plan_collection_moves(root, entry, report_run_id)
-            if not moves:
-                report.setdefault("anomalies", []).append(
-                    _anomaly(
-                        severity="info",
-                        code="no_isolation_outputs_present",
-                        vehicle_key=vk,
-                        source=src,
-                        message=f"No output files found to quarantine for collection {vk}:{src}",
-                        current="no_outputs",
-                        threshold="files_present",
-                    )
-                )
-            else:
-                planned_entries.append((pair, moves))
-                combined_planned_moves.extend(moves)
-        except (ValueError, RuntimeError) as exc:
-            report.setdefault("anomalies", []).append(
-                _anomaly(
-                    severity="critical",
-                    code="collection_isolation_failed",
-                    vehicle_key=vk,
-                    source=src,
-                    message=f"Collection isolation failed: {exc}",
-                    current="failed",
-                    threshold="isolated",
-                )
-            )
-            if validation_error is None:
-                validation_error = exc
+        planned, exc = _plan_single_entry_isolation(root, entry, report_run_id, report)
+        if exc is not None and validation_error is None:
+            validation_error = exc
+        if planned is not None:
+            pair, moves = planned
+            planned_entries.append((pair, moves))
+            combined_planned_moves.extend(moves)
 
     if validation_error is not None:
         report["isolated_collections"] = []
