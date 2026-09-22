@@ -221,8 +221,6 @@ class CollectionIsolationTests(unittest.TestCase):
 
         self._setup_git_repo()
         subprocess.run(["git", "add", "data/"], cwd=self.root, check=True)
-
-        subprocess.run(["git", "add", "data/"], cwd=self.root, check=True)
         manifest = prepare_manifest(
             root=self.root,
             registry_path=Path("vehicle_registry.json"),
@@ -1140,7 +1138,7 @@ class CollectionIsolationTests(unittest.TestCase):
         f350_latest.write_text("f350_data", encoding="utf-8")
 
         subprocess.run(["git", "add", "data/"], cwd=self.root, check=True)
-        manifest = prepare_manifest(
+        prepare_manifest(
             root=self.root,
             registry_path=Path("vehicle_registry.json"),
             run_id=run_id,
