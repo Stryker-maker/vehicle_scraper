@@ -51,12 +51,13 @@ def governed_keys(root: Path, registry_path: Path) -> tuple[list[str], list[str]
 
 
 def _parse_isolated_items(isolated: Any) -> list[dict[str, str]]:
-    """Validate and parse list of isolated collection entries."""
+    """Validate and parse list of isolated collection entries, checking for duplicates."""
     if not isinstance(isolated, list):
-        raise ValueError("isolated_collections must be a list in anomalies_latest.json")
+        raise ValueError("isolated_collections must be a list")
 
     pattern = __import__("re").compile(r"^[a-z0-9_]+$")
     parsed: list[dict[str, str]] = []
+    seen: set[tuple[str, str]] = set()
     for item in isolated:
         if not isinstance(item, dict):
             raise ValueError(f"Invalid entry in isolated_collections: {item!r}")
@@ -64,6 +65,10 @@ def _parse_isolated_items(isolated: Any) -> list[dict[str, str]]:
         src = str(item.get("source") or "").strip()
         if not vk or not src or not pattern.match(vk) or not pattern.match(src):
             raise ValueError(f"Invalid collection identifier in isolated_collections: {item!r}")
+        pair = (vk, src)
+        if pair in seen:
+            raise ValueError(f"Duplicate collection identity in isolated_collections: {vk}:{src}")
+        seen.add(pair)
         parsed.append({"vehicle_key": vk, "source": src})
 
     return parsed
@@ -148,8 +153,24 @@ def verify_staged_manifest(
     if not manifest_path.exists():
         raise ValueError("Publication manifest is missing")
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    if manifest.get("publication_schema_version") != PUBLICATION_SCHEMA_VERSION:
+    if not isinstance(manifest, dict) or manifest.get("publication_schema_version") != PUBLICATION_SCHEMA_VERSION:
         raise ValueError("Publication manifest schema mismatch")
+
+    manifest_run_id = str(manifest.get("run_id") or "").strip()
+    if not manifest_run_id:
+        raise ValueError("Publication manifest missing run_id")
+
+    # Validate isolated_collections in the staged manifest itself
+    staged_isolated = _parse_isolated_items(manifest.get("isolated_collections"))
+
+    # Extract and validate expected isolated_collections from same-run anomaly report
+    expected_isolated = _extract_isolated_collections(root, manifest_run_id)
+
+    if staged_isolated != expected_isolated:
+        raise ValueError(
+            "Staged publication manifest isolated_collections metadata mismatch with same-run anomaly report"
+        )
+
     active, paused = governed_keys(root, registry_path)
     staged = staged_name_status(root)
     staged_paths = sorted(path for _, path in staged)
@@ -173,6 +194,7 @@ def verify_staged_manifest(
         "staged_path_count": len(staged_paths),
         "published_path_count": len(expected),
         "manifest_path": MANIFEST_PATH.as_posix(),
+        "isolated_collections": staged_isolated,
     }
 
 

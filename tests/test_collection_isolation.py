@@ -222,6 +222,7 @@ class CollectionIsolationTests(unittest.TestCase):
         self._setup_git_repo()
         subprocess.run(["git", "add", "data/"], cwd=self.root, check=True)
 
+        subprocess.run(["git", "add", "data/"], cwd=self.root, check=True)
         manifest = prepare_manifest(
             root=self.root,
             registry_path=Path("vehicle_registry.json"),
@@ -1112,6 +1113,155 @@ class CollectionIsolationTests(unittest.TestCase):
 
         with self.assertRaises(SourceUnavailableError):
             _load_and_validate_source_status(self.root, config, src, run_id)
+
+    def test_verify_staged_manifest_valid_matching_isolation_metadata_passes(self):
+        """
+        Prove that verify_staged_manifest passes when staged manifest and same-run anomaly report
+        have matching isolated_collections metadata.
+        """
+        from generated_data_publish import verify_staged_manifest
+
+        self._setup_git_repo()
+        run_id = "run_verify_match_123"
+
+        # Write anomaly report
+        anomaly_path = self.root / "data" / "run_status" / "anomalies_latest.json"
+        anomaly_path.parent.mkdir(parents=True, exist_ok=True)
+        report = {
+            "anomaly_schema_version": 1,
+            "run_id": run_id,
+            "isolated_collections": [{"vehicle_key": "ford_f150", "source": "autotrader"}],
+        }
+        anomaly_path.write_text(json.dumps(report), encoding="utf-8")
+
+        # Create valid published data for ford_f350
+        f350_latest = self.root / "data" / "ford_f350" / "latest" / "ford_f350_autotrader_latest.csv"
+        f350_latest.parent.mkdir(parents=True, exist_ok=True)
+        f350_latest.write_text("f350_data", encoding="utf-8")
+
+        subprocess.run(["git", "add", "data/"], cwd=self.root, check=True)
+        manifest = prepare_manifest(
+            root=self.root,
+            registry_path=Path("vehicle_registry.json"),
+            run_id=run_id,
+            source_sha="a" * 40,
+            event_name="schedule",
+            ref_name="main",
+        )
+
+        subprocess.run(["git", "add", "data/"], cwd=self.root, check=True)
+
+        res = verify_staged_manifest(root=self.root, registry_path=Path("vehicle_registry.json"))
+        self.assertEqual(res["verification_status"], "pass")
+        self.assertEqual(res["isolated_collections"], [{"vehicle_key": "ford_f150", "source": "autotrader"}])
+
+    def test_verify_staged_manifest_mismatched_isolation_metadata_fails_closed(self):
+        """
+        Prove that verify_staged_manifest fails closed if staged manifest isolated_collections
+        differs from the same-run anomaly report.
+        """
+        from generated_data_publish import MANIFEST_PATH, verify_staged_manifest
+
+        self._setup_git_repo()
+        run_id = "run_verify_mismatch_123"
+
+        # Anomaly report has NO isolated collections
+        anomaly_path = self.root / "data" / "run_status" / "anomalies_latest.json"
+        anomaly_path.parent.mkdir(parents=True, exist_ok=True)
+        anomaly_path.write_text(
+            json.dumps({"anomaly_schema_version": 1, "run_id": run_id, "isolated_collections": []}),
+            encoding="utf-8",
+        )
+
+        f350_latest = self.root / "data" / "ford_f350" / "latest" / "ford_f350_autotrader_latest.csv"
+        f350_latest.parent.mkdir(parents=True, exist_ok=True)
+        f350_latest.write_text("f350_data", encoding="utf-8")
+
+        subprocess.run(["git", "add", "data/"], cwd=self.root, check=True)
+        manifest = prepare_manifest(
+            root=self.root,
+            registry_path=Path("vehicle_registry.json"),
+            run_id=run_id,
+            source_sha="a" * 40,
+            event_name="schedule",
+            ref_name="main",
+        )
+
+        # Tamper with manifest to inject mismatched isolated_collections
+        manifest["isolated_collections"] = [{"vehicle_key": "ford_f150", "source": "autotrader"}]
+        manifest_path = self.root / MANIFEST_PATH
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+        subprocess.run(["git", "add", "data/"], cwd=self.root, check=True)
+
+        with self.assertRaisesRegex(ValueError, "isolated_collections metadata mismatch"):
+            verify_staged_manifest(root=self.root, registry_path=Path("vehicle_registry.json"))
+
+    def test_verify_staged_manifest_malformed_isolation_metadata_fails_closed(self):
+        """
+        Prove that verify_staged_manifest fails closed if staged manifest contains malformed isolated_collections.
+        """
+        from generated_data_publish import MANIFEST_PATH, verify_staged_manifest
+
+        self._setup_git_repo()
+        run_id = "run_verify_malformed_123"
+
+        f350_latest = self.root / "data" / "ford_f350" / "latest" / "ford_f350_autotrader_latest.csv"
+        f350_latest.parent.mkdir(parents=True, exist_ok=True)
+        f350_latest.write_text("f350_data", encoding="utf-8")
+
+        subprocess.run(["git", "add", "data/"], cwd=self.root, check=True)
+        manifest = prepare_manifest(
+            root=self.root,
+            registry_path=Path("vehicle_registry.json"),
+            run_id=run_id,
+            source_sha="a" * 40,
+            event_name="schedule",
+            ref_name="main",
+        )
+
+        manifest["isolated_collections"] = "not_a_list"
+        manifest_path = self.root / MANIFEST_PATH
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+        subprocess.run(["git", "add", "data/"], cwd=self.root, check=True)
+
+        with self.assertRaisesRegex(ValueError, "isolated_collections must be a list"):
+            verify_staged_manifest(root=self.root, registry_path=Path("vehicle_registry.json"))
+
+    def test_verify_staged_manifest_duplicate_isolation_identities_fails_closed(self):
+        """
+        Prove that verify_staged_manifest fails closed if staged manifest contains duplicate isolated_collections.
+        """
+        from generated_data_publish import MANIFEST_PATH, verify_staged_manifest
+
+        self._setup_git_repo()
+        run_id = "run_verify_dup_123"
+
+        f350_latest = self.root / "data" / "ford_f350" / "latest" / "ford_f350_autotrader_latest.csv"
+        f350_latest.parent.mkdir(parents=True, exist_ok=True)
+        f350_latest.write_text("f350_data", encoding="utf-8")
+
+        manifest = prepare_manifest(
+            root=self.root,
+            registry_path=Path("vehicle_registry.json"),
+            run_id=run_id,
+            source_sha="a" * 40,
+            event_name="schedule",
+            ref_name="main",
+        )
+
+        manifest["isolated_collections"] = [
+            {"vehicle_key": "ford_f150", "source": "autotrader"},
+            {"vehicle_key": "ford_f150", "source": "autotrader"},
+        ]
+        manifest_path = self.root / MANIFEST_PATH
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+        subprocess.run(["git", "add", "data/"], cwd=self.root, check=True)
+
+        with self.assertRaisesRegex(ValueError, "Duplicate collection identity in isolated_collections"):
+            verify_staged_manifest(root=self.root, registry_path=Path("vehicle_registry.json"))
 
 
 if __name__ == "__main__":
