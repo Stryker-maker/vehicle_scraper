@@ -121,6 +121,8 @@ report = {
     "artifacts": {"requests": str(request_path.relative_to(root)),
         "records": str(records_path.relative_to(root)),
         "reconciliation": str(reconciliation_path.relative_to(root))},
+    "archive_output": f"data/{key}/autotrader/{key}_autotrader_2026-08-01_12-00-00.csv",
+    "latest_output": f"data/{key}/latest/{key}_autotrader_latest.csv",
 }
 reconciliation_path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
 ''',
@@ -149,6 +151,14 @@ reconciliation_path.write_text(json.dumps(report, indent=2) + "\n", encoding="ut
         self.assertEqual(status["fetched_record_count"], 1)
         self.assertEqual(status["accepted_record_count"], 1)
         self.assertEqual(status["evidence_reconciliation_status"], "reconciled")
+        self.assertEqual(
+            status["archive_output"],
+            "data/test_vehicle/autotrader/test_vehicle_autotrader_2026-08-01_12-00-00.csv",
+        )
+        self.assertEqual(
+            status["latest_output"],
+            "data/test_vehicle/latest/test_vehicle_autotrader_latest.csv",
+        )
         self.assertTrue(status["pagination_complete"])
         self.assertFalse(status["legacy_price_history_active"])
         self.assertEqual(self.config_path.read_bytes(), original)

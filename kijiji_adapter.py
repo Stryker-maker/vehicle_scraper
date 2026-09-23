@@ -377,9 +377,15 @@ def parse_listing(
         rejections.append("missing_source_listing_id")
     if not url:
         rejections.append("missing_listing_url")
-    if not criteria["min_year"] <= year <= criteria["max_year"]:
+    min_year = criteria.get("min_year")
+    max_year = criteria.get("max_year")
+    min_year_int = min_year if isinstance(min_year, int) else 0
+    max_year_int = max_year if isinstance(max_year, int) else 9999
+    if not min_year_int <= year <= max_year_int:
         rejections.append("year_out_of_range")
-    if not 0 < price <= criteria["max_price_cad"]:
+    max_price = criteria.get("max_price_cad")
+    max_price_int = max_price if isinstance(max_price, int) else 0
+    if not 0 < price <= max_price_int:
         rejections.append("price_out_of_range")
     required_fuel = str(criteria.get("fuel") or "").strip()
     if required_fuel and required_fuel.casefold() not in fuel.casefold():

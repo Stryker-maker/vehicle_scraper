@@ -140,6 +140,8 @@ report = {
     "artifacts": {"requests": str(request_path.relative_to(root)),
         "records": str(records_path.relative_to(root)),
         "reconciliation": str(reconciliation_path.relative_to(root))},
+    "archive_output": f"data/{key}/kijiji/{key}_kijiji_2026-08-01_12-00-00.csv",
+    "latest_output": f"data/{key}/latest/{key}_kijiji_latest.csv",
 }
 reconciliation_path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
 ''',
@@ -168,6 +170,14 @@ reconciliation_path.write_text(json.dumps(report, indent=2) + "\n", encoding="ut
         self.assertEqual(status["location_registry_version"], 1)
         self.assertEqual(status["unknown_location_record_count"], 1)
         self.assertEqual(status["evidence_reconciliation_status"], "reconciled")
+        self.assertEqual(
+            status["archive_output"],
+            "data/test_vehicle/kijiji/test_vehicle_kijiji_2026-08-01_12-00-00.csv",
+        )
+        self.assertEqual(
+            status["latest_output"],
+            "data/test_vehicle/latest/test_vehicle_kijiji_latest.csv",
+        )
         self.assertTrue(status["distance_processing_disabled"])
         self.assertFalse(status["legacy_price_history_active"])
         self.assertEqual(self.config_path.read_bytes(), original)

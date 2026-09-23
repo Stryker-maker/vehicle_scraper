@@ -108,11 +108,12 @@ def extract_page_payload(html: str) -> tuple[list[Any], int | None]:
         if isinstance(pagination, dict):
             candidates.extend([pagination.get("total"), pagination.get("totalResults"), pagination.get("count")])
         for candidate in candidates:
-            try:
-                total = int(candidate)
-                break
-            except (TypeError, ValueError):
-                pass
+            if isinstance(candidate, (int, str, float)) and not isinstance(candidate, bool):
+                try:
+                    total = int(candidate)
+                    break
+                except (TypeError, ValueError):
+                    pass
         return list(listings), total
     raise ValueError("autotrader_listing_payload_not_found")
 
@@ -219,8 +220,14 @@ def parse_listing(
         criteria, rejections = config["criteria"], []
         if not listing_id: rejections.append("missing_source_listing_id")
         if not listing_url: rejections.append("missing_listing_url")
-        if not criteria["min_year"] <= year <= criteria["max_year"]: rejections.append("year_out_of_range")
-        if not 0 < price <= criteria["max_price_cad"]: rejections.append("price_out_of_range")
+        min_year = criteria.get("min_year")
+        max_year = criteria.get("max_year")
+        min_year_int = min_year if isinstance(min_year, int) else 0
+        max_year_int = max_year if isinstance(max_year, int) else 9999
+        if not min_year_int <= year <= max_year_int: rejections.append("year_out_of_range")
+        max_price = criteria.get("max_price_cad")
+        max_price_int = max_price if isinstance(max_price, int) else 0
+        if not 0 < price <= max_price_int: rejections.append("price_out_of_range")
         required_fuel = str(criteria.get("fuel") or "").strip()
         if required_fuel and required_fuel.lower() not in fuel.lower(): rejections.append("fuel_unknown" if not fuel else "fuel_mismatch")
         required_engine = str(criteria.get("engine") or "").strip()
