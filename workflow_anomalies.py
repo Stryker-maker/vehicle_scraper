@@ -638,9 +638,9 @@ def _plan_collection_moves(
     quarantine_dir = root / "data" / vk / "quarantine" / src / report_run_id
     planned_moves: list[tuple[Path, Path]] = []
 
-    # 1. Latest CSV output
+    # 1. Latest CSV output (quarantined only if it exists AND current run recorded a non-None latest_output)
     latest_csv = root / "data" / vk / "latest" / f"{vk}_{src}_latest.csv"
-    if latest_csv.exists():
+    if latest_csv.exists() and status_data.get("latest_output") is not None:
         planned_moves.append((latest_csv, quarantine_dir / f"{vk}_{src}_latest_quarantined.csv"))
 
     # 2. Historical timestamped source archive explicitly recorded for the current run

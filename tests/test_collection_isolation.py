@@ -55,6 +55,7 @@ class CollectionIsolationTests(unittest.TestCase):
             "identity_retired_listing_count": 0,
             "failure_reasons": [] if healthy else ["collector_command_failed"],
             "status_path": f"data/{vehicle_key}/run_status/{source}_latest.json",
+            "latest_output": f"data/{vehicle_key}/latest/{vehicle_key}_{source}_latest.csv",
             "compatibility_fingerprint": "v1",
         }
 
@@ -1260,6 +1261,51 @@ class CollectionIsolationTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "Duplicate collection identity in isolated_collections"):
             verify_staged_manifest(root=self.root, registry_path=Path("vehicle_registry.json"))
+
+    def test_stale_latest_csv_is_not_quarantined_when_current_run_latest_output_is_none(self):
+        """
+        Prove that a stale latest CSV from a previous run is NOT moved/quarantined
+        when the current run's validated status_data records latest_output as None.
+        """
+        vk = "ford_f150"
+        src = "autotrader"
+        run_id = "run_stale_latest_123"
+        run_start = utc_now()
+
+        status = self._source_entry(vk, src, healthy=False, accepted=0, fetched=0, execution_status="failed")
+        status["started_at_utc"] = run_start
+        status["run_id"] = run_id
+        status["latest_output"] = None  # Current run produced NO latest output
+        status["archive_output"] = f"data/{vk}/{src}/{vk}_{src}_2026-08-01_00-00-00.csv"
+
+        status_file = self.root / "data" / vk / "run_status" / f"{src}_latest.json"
+        status_file.parent.mkdir(parents=True, exist_ok=True)
+        status_file.write_text(json.dumps(status), encoding="utf-8")
+
+        stale_latest_csv = self.root / "data" / vk / "latest" / f"{vk}_{src}_latest.csv"
+        archive_csv = self.root / "data" / vk / src / f"{vk}_{src}_2026-08-01_00-00-00.csv"
+        stale_latest_csv.parent.mkdir(parents=True, exist_ok=True)
+        archive_csv.parent.mkdir(parents=True, exist_ok=True)
+        stale_latest_csv.write_text("stale_previous_run_data", encoding="utf-8")
+        archive_csv.write_text("current_archive_data", encoding="utf-8")
+
+        report = {
+            "run_id": run_id,
+            "isolated_collections": [{"vehicle_key": vk, "source": src}],
+        }
+
+        isolated = isolate_anomalous_collections(root=self.root, report=report)
+        self.assertEqual(len(isolated), 1)
+
+        # Stale latest CSV MUST remain untouched in its original location
+        self.assertTrue(stale_latest_csv.exists())
+        self.assertEqual(stale_latest_csv.read_text(encoding="utf-8"), "stale_previous_run_data")
+
+        # Current-run archive CSV MUST be quarantined
+        self.assertFalse(archive_csv.exists())
+        q_dir = self.root / "data" / vk / "quarantine" / src / run_id
+        self.assertTrue((q_dir / archive_csv.name).exists())
+        self.assertFalse((q_dir / f"{vk}_{src}_latest_quarantined.csv").exists())
 
 
 if __name__ == "__main__":

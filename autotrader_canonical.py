@@ -197,6 +197,7 @@ def build_autotrader_canonical_evidence(
         "artifacts": relative,
         "source_adapter_artifacts": adapter_relative,
         "archive_output": report.get("archive_output"),
+        "latest_output": report.get("latest_output"),
     }
     write_jsonl(canonical_paths["raw"], raw_records)
     write_jsonl(canonical_paths["normalized"], normalized_records)
