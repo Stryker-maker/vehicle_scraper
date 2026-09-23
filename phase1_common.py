@@ -317,3 +317,36 @@ def status_is_current_success(status: dict[str, Any], run_id: str) -> bool:
         and status.get("row_cap_disabled") is True
         and status.get("config_isolated") is True
     )
+
+
+def check_source_anomalously_isolated(
+    root: Path, vehicle_key: str, source: str, run_id: str
+) -> bool:
+    """Check if the vehicle/source collection was marked with critical anomaly or isolated in current run."""
+    anomalies_path = root / "data" / "run_status" / "anomalies_latest.json"
+    if not anomalies_path.exists():
+        return False
+    report = load_json(anomalies_path)
+    if not isinstance(report, dict) or report.get("run_id") != run_id:
+        return False
+
+    isolated = report.get("isolated_collections", [])
+    if isinstance(isolated, list):
+        for entry in isolated:
+            if (
+                isinstance(entry, dict)
+                and entry.get("vehicle_key") == vehicle_key
+                and entry.get("source") == source
+            ):
+                return True
+
+    for item in report.get("anomalies", []):
+        if (
+            isinstance(item, dict)
+            and item.get("severity") == "critical"
+            and item.get("vehicle_key") == vehicle_key
+            and item.get("source") == source
+        ):
+            return True
+
+    return False
