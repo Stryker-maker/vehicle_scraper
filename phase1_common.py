@@ -319,6 +319,18 @@ def status_is_current_success(status: dict[str, Any], run_id: str) -> bool:
     )
 
 
+def _parse_iso_ns(iso_str: str | None) -> int | None:
+    if not iso_str or not isinstance(iso_str, str):
+        return None
+    try:
+        dt = datetime.fromisoformat(iso_str.replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return int(dt.timestamp() * 1_000_000_000)
+    except (ValueError, TypeError):
+        return None
+
+
 def check_source_anomalously_isolated(
     root: Path, vehicle_key: str, source: str, run_id: str
 ) -> bool:
