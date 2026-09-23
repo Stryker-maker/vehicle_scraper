@@ -1307,6 +1307,96 @@ class CollectionIsolationTests(unittest.TestCase):
         self.assertTrue((q_dir / archive_csv.name).exists())
         self.assertFalse((q_dir / f"{vk}_{src}_latest_quarantined.csv").exists())
 
+    def test_check_action_policy_enforce_fails_closed_when_critical_anomalies_exist_without_quarantined_files(self):
+        """
+        Prove that _run_check_action with --policy enforce fails closed (returns 1)
+        when all expected sources have critical anomalies, even if isolated_collections is empty
+        because no output files were present to quarantine.
+        """
+        from workflow_anomalies import _run_check_action
+        import argparse
+
+        run_id = "run_enforce_no_files_123"
+
+        health_file = self.root / "data" / "run_status" / "latest.json"
+        health_file.parent.mkdir(parents=True, exist_ok=True)
+        health_file.write_text(
+            json.dumps({"schema_version": 6, "run_id": run_id, "expected_source_runs": 2}),
+            encoding="utf-8",
+        )
+
+        report_file = self.root / "anomalies_no_files.json"
+        report_file.write_text(
+            json.dumps({
+                "anomaly_schema_version": 1,
+                "run_id": run_id,
+                "critical_anomaly_count": 2,
+                "isolated_collections": [],
+                "anomalies": [
+                    {
+                        "severity": "critical",
+                        "code": "collector_command_failed",
+                        "vehicle_key": "ford_f150",
+                        "source": "autotrader",
+                    },
+                    {
+                        "severity": "critical",
+                        "code": "collector_command_failed",
+                        "vehicle_key": "ford_f150",
+                        "source": "kijiji",
+                    },
+                ],
+            }),
+            encoding="utf-8",
+        )
+
+        args = argparse.Namespace(report=str(report_file), policy="enforce")
+        exit_code = _run_check_action(self.root, args)
+        self.assertEqual(exit_code, 1)
+
+    def test_downstream_builders_exclude_critically_isolated_sources(self):
+        """
+        Prove that f350_buyer_intelligence and purpose_outputs exclude sources marked
+        with critical anomalies / isolated in anomalies_latest.json for the current run_id.
+        """
+        from f350_buyer_intelligence import SourceUnavailableError, _load_and_validate_source_status
+
+        vk = "ford_f350"
+        src = "autotrader"
+        run_id = "run_downstream_iso_123"
+
+        # Create status indicating current success
+        config = {"vehicle_key": vk, "sources": {src: {}}}
+        status = self._source_entry(vk, src, healthy=True, accepted=5, fetched=5)
+        status["run_id"] = run_id
+
+        status_file = self.root / "data" / vk / "run_status" / f"{src}_latest.json"
+        status_file.parent.mkdir(parents=True, exist_ok=True)
+        status_file.write_text(json.dumps(status), encoding="utf-8")
+
+        # Mark ford_f350:autotrader as critically anomalous in anomalies_latest.json
+        anomalies_file = self.root / "data" / "run_status" / "anomalies_latest.json"
+        anomalies_file.parent.mkdir(parents=True, exist_ok=True)
+        anomalies_file.write_text(
+            json.dumps({
+                "anomaly_schema_version": 1,
+                "run_id": run_id,
+                "isolated_collections": [{"vehicle_key": vk, "source": src}],
+                "anomalies": [
+                    {
+                        "severity": "critical",
+                        "code": "collector_command_failed",
+                        "vehicle_key": vk,
+                        "source": src,
+                    }
+                ],
+            }),
+            encoding="utf-8",
+        )
+
+        with self.assertRaisesRegex(SourceUnavailableError, "isolated due to critical anomaly"):
+            _load_and_validate_source_status(self.root, config, src, run_id)
+
 
 if __name__ == "__main__":
     unittest.main()

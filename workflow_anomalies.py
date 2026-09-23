@@ -870,8 +870,18 @@ def _run_check_action(root: Path, args: argparse.Namespace) -> int:
         if not isinstance(expected_sources, int) or expected_sources <= 0:
             print("Health report missing or invalid expected_source_runs; failing closed.")
             return 1
-        if len(isolated) >= expected_sources:
-            print(f"All expected collections ({expected_sources}) are isolated; failing closed.")
+        critical_pairs = {(entry["vehicle_key"], entry["source"]) for entry in isolated}
+        for item in report.get("anomalies", []):
+            if isinstance(item, dict) and item.get("severity") == "critical":
+                vk = str(item.get("vehicle_key") or "").strip()
+                src = str(item.get("source") or "").strip()
+                if vk and src and IDENTIFIER_PATTERN.match(vk) and IDENTIFIER_PATTERN.match(src):
+                    critical_pairs.add((vk, src))
+
+        if len(critical_pairs) >= expected_sources:
+            print(
+                f"All expected collections ({expected_sources}) are critically anomalous or isolated; failing closed."
+            )
             return 1
     return 0
 

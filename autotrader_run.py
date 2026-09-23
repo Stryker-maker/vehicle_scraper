@@ -225,7 +225,7 @@ def run_autotrader(
         "exit_code": returncode, "timed_out": timed_out,
         "timeout_seconds": timeout_seconds, "failure_reasons": failures,
         "expected_output": str(output_path.relative_to(root)),
-        "latest_output": evidence.get("latest_output") if fresh else None,
+        "latest_output": str(output_path.relative_to(root)) if fresh else None,
         "archive_output": evidence.get("archive_output"),
         "output_exists": output_path.exists(), "output_updated_this_run": fresh,
         "configured_max_results": None,

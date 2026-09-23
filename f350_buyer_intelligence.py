@@ -460,10 +460,48 @@ class SourceUnavailableError(ValueError):
     """Raised when a source collection is missing or not current success for the requested run."""
 
 
+def _check_source_anomalously_isolated(
+    root: Path, vehicle_key: str, source: str, run_id: str
+) -> bool:
+    """Check if the vehicle/source collection was marked with critical anomaly or isolated in current run."""
+    anomalies_path = root / "data" / "run_status" / "anomalies_latest.json"
+    if not anomalies_path.exists():
+        return False
+    report = load_json(anomalies_path)
+    if not isinstance(report, dict) or report.get("run_id") != run_id:
+        return False
+
+    isolated = report.get("isolated_collections", [])
+    if isinstance(isolated, list):
+        for entry in isolated:
+            if (
+                isinstance(entry, dict)
+                and entry.get("vehicle_key") == vehicle_key
+                and entry.get("source") == source
+            ):
+                return True
+
+    for item in report.get("anomalies", []):
+        if (
+            isinstance(item, dict)
+            and item.get("severity") == "critical"
+            and item.get("vehicle_key") == vehicle_key
+            and item.get("source") == source
+        ):
+            return True
+
+    return False
+
+
 def _load_and_validate_source_status(root: Path, config: dict[str, Any], source: str, run_id: str) -> dict[str, Any]:
     """Validate status existence, schema, and current success state for a source run."""
     if source not in SUPPORTED_SOURCES:
         raise ValueError(f"Unsupported source: {source}")
+    vk = str(config.get("vehicle_key") or "").strip()
+    if _check_source_anomalously_isolated(root, vk, source, run_id):
+        raise SourceUnavailableError(
+            f"{source}: collection for {vk} is isolated due to critical anomaly"
+        )
     status_path = source_status_path(root, config, source)
     if not status_path.exists():
         raise SourceUnavailableError(f"{source}: source status missing")
