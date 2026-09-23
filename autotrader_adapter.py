@@ -203,8 +203,12 @@ def parse_listing(
         listing_id, listing_url = str(item.get("id") or "").strip(), str(item.get("url") or "").strip()
         price_obj = item.get("price") if isinstance(item.get("price"), dict) else {}
         price, year = clean_int(price_obj.get("priceFormatted")), clean_int(vehicle.get("modelYear"))
-        parse_failures = [name for name, value in (("invalid_price", price), ("invalid_year", year)) if value is None]
-        if parse_failures:
+        if price is None or year is None:
+            parse_failures = []
+            if price is None:
+                parse_failures.append("invalid_price")
+            if year is None:
+                parse_failures.append("invalid_year")
             return None, [], parse_failures
 
         mileage = clean_int(vehicle.get("mileageInKm"))
@@ -220,14 +224,11 @@ def parse_listing(
         criteria, rejections = config["criteria"], []
         if not listing_id: rejections.append("missing_source_listing_id")
         if not listing_url: rejections.append("missing_listing_url")
-        min_year = criteria.get("min_year")
-        max_year = criteria.get("max_year")
-        min_year_int = min_year if isinstance(min_year, int) else 0
-        max_year_int = max_year if isinstance(max_year, int) else 9999
-        if not min_year_int <= year <= max_year_int: rejections.append("year_out_of_range")
-        max_price = criteria.get("max_price_cad")
-        max_price_int = max_price if isinstance(max_price, int) else 0
-        if not 0 < price <= max_price_int: rejections.append("price_out_of_range")
+        min_year: int = criteria["min_year"]
+        max_year: int = criteria["max_year"]
+        max_price: int = criteria["max_price_cad"]
+        if not min_year <= year <= max_year: rejections.append("year_out_of_range")
+        if not 0 < price <= max_price: rejections.append("price_out_of_range")
         required_fuel = str(criteria.get("fuel") or "").strip()
         if required_fuel and required_fuel.lower() not in fuel.lower(): rejections.append("fuel_unknown" if not fuel else "fuel_mismatch")
         required_engine = str(criteria.get("engine") or "").strip()
