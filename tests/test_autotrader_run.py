@@ -184,6 +184,72 @@ reconciliation_path.write_text(json.dumps(report, indent=2) + "\n", encoding="ut
             artifact_paths(self.root, self.config, "autotrader")["state"].exists()
         )
 
+    def test_canonical_evidence_failure_preserves_validated_archive_output(self):
+        path = self.root / "fake_adapter_corrupt.py"
+        path.write_text(
+            r'''
+import argparse, json, csv
+from pathlib import Path
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--run-id", required=True)
+args = parser.parse_args()
+root = Path.cwd(); key = "test_vehicle"
+row = {
+    "year": "2020", "make": "Test", "model": "Vehicle",
+    "trim": "Example", "price": "25000", "mileage": "100000",
+    "fuel": "Gas", "dealer": "Example Dealer",
+    "dealer_address": "1 Main St, Calgary, AB", "location": "Calgary, AB",
+    "distance_km": "150", "distance_method": "geodesic_city_center",
+    "distance_evidence_status": "straight_line_estimate_from_source_reported_location",
+    "listing_id": "listing-1", "url": "https://example.invalid/listing-1",
+    "source": "AutoTrader", "query_location": "Calgary, AB",
+    "query_page": "1", "query_offset": "0",
+    "request_url": "https://example.invalid/search?rcs=0",
+}
+latest = root / "data" / key / "latest" / f"{key}_autotrader_latest.csv"
+archive = root / "data" / key / "autotrader" / f"{key}_autotrader_2026-08-01_12-00-00.csv"
+latest.parent.mkdir(parents=True, exist_ok=True)
+archive.parent.mkdir(parents=True, exist_ok=True)
+for p in (latest, archive):
+    with p.open("w", encoding="utf-8", newline="") as handle:
+        w = csv.DictWriter(handle, fieldnames=list(row)); w.writeheader(); w.writerow(row)
+
+base = root / "data" / key / "adapter_evidence" / "autotrader"
+base.mkdir(parents=True, exist_ok=True)
+rec_path = base / "reconciliation_latest.json"
+records_path = base / "records_latest.jsonl"
+
+records_path.write_text("corrupt_non_json_records\n", encoding="utf-8")
+report = {
+    "adapter_schema_version": 1, "vehicle_key": key, "source": "autotrader",
+    "run_id": args.run_id, "fetched_records": 1, "accepted_records": 1,
+    "reconciled": True, "artifacts": {"records": str(records_path.relative_to(root))},
+    "archive_output": str(archive.relative_to(root)),
+    "latest_output": str(latest.relative_to(root)),
+}
+rec_path.write_text(json.dumps(report), encoding="utf-8")
+''',
+            encoding="utf-8",
+        )
+
+        status = run_autotrader(
+            root=self.root,
+            config_path=self.config_path,
+            command=[sys.executable, str(path), "--run-id", "run-corrupt"],
+            run_id="run-corrupt",
+        )
+        self.assertEqual(status["execution_status"], "degraded")
+        self.assertIn("canonical_evidence_failed", status["failure_reasons"])
+        self.assertEqual(
+            status["archive_output"],
+            "data/test_vehicle/autotrader/test_vehicle_autotrader_2026-08-01_12-00-00.csv",
+        )
+        self.assertEqual(
+            status["latest_output"],
+            "data/test_vehicle/latest/test_vehicle_autotrader_latest.csv",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

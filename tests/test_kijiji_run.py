@@ -258,6 +258,74 @@ reconciliation_path.write_text(json.dumps(report, indent=2) + "\n", encoding="ut
         self.assertTrue(report["pagination_complete"])
         self.assertEqual(report["failed_page_count"], 0)
 
+    def test_canonical_evidence_failure_preserves_validated_archive_output(self):
+        path = self.root / "fake_kijiji_adapter_corrupt.py"
+        path.write_text(
+            r'''
+import argparse, json, csv
+from pathlib import Path
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--run-id", required=True)
+args = parser.parse_args()
+root = Path.cwd(); key = "test_vehicle"
+row = {
+    "year": "2020", "make": "Test", "model": "Vehicle", "trim": "Example",
+    "price": "25000", "mileage": "100000", "fuel": "Gas",
+    "dealer": "Example Seller", "dealer_address": "",
+    "dealer_address_evidence_status": "unknown", "location": "",
+    "location_evidence_status": "unknown", "distance_km": "",
+    "distance_method": "disabled_listing_location_not_routed",
+    "distance_evidence_status": "disabled_no_verified_route",
+    "listing_id": "listing-1", "url_region_hint": "calgary",
+    "url_region_status": "unverified_url_evidence",
+    "url": "https://example.invalid/listing-1", "source": "Kijiji",
+    "query_location": "Edmonton, AB", "query_location_id": "1700202",
+    "query_page": "1", "request_url": "https://example.invalid/search",
+}
+latest = root / "data" / key / "latest" / f"{key}_kijiji_latest.csv"
+archive = root / "data" / key / "kijiji" / f"{key}_kijiji_2026-08-01_12-00-00.csv"
+latest.parent.mkdir(parents=True, exist_ok=True)
+archive.parent.mkdir(parents=True, exist_ok=True)
+for p in (latest, archive):
+    with p.open("w", encoding="utf-8", newline="") as handle:
+        w = csv.DictWriter(handle, fieldnames=list(row)); w.writeheader(); w.writerow(row)
+
+base = root / "data" / key / "adapter_evidence" / "kijiji"
+base.mkdir(parents=True, exist_ok=True)
+rec_path = base / "reconciliation_latest.json"
+records_path = base / "records_latest.jsonl"
+
+records_path.write_text("corrupt_non_json_records\n", encoding="utf-8")
+report = {
+    "adapter_schema_version": 1, "vehicle_key": key, "source": "kijiji",
+    "run_id": args.run_id, "fetched_records": 1, "accepted_records": 1,
+    "reconciled": True, "artifacts": {"records": str(records_path.relative_to(root))},
+    "archive_output": str(archive.relative_to(root)),
+    "latest_output": str(latest.relative_to(root)),
+}
+rec_path.write_text(json.dumps(report), encoding="utf-8")
+''',
+            encoding="utf-8",
+        )
+
+        status = run_kijiji(
+            root=self.root,
+            config_path=self.config_path,
+            command=[sys.executable, str(path), "--run-id", "run-corrupt"],
+            run_id="run-corrupt",
+        )
+        self.assertEqual(status["execution_status"], "degraded")
+        self.assertIn("canonical_evidence_failed", status["failure_reasons"])
+        self.assertEqual(
+            status["archive_output"],
+            "data/test_vehicle/kijiji/test_vehicle_kijiji_2026-08-01_12-00-00.csv",
+        )
+        self.assertEqual(
+            status["latest_output"],
+            "data/test_vehicle/latest/test_vehicle_kijiji_latest.csv",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

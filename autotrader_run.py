@@ -8,7 +8,7 @@ import time
 from pathlib import Path
 from typing import Any, Sequence
 
-from autotrader_adapter import ADAPTER_SCHEMA_VERSION
+from autotrader_adapter import ADAPTER_SCHEMA_VERSION, artifact_paths
 from autotrader_canonical import build_autotrader_canonical_evidence
 from baseline_compatibility import build_compatibility_fingerprint
 from canonical_evidence import EVIDENCE_SCHEMA_VERSION
@@ -20,7 +20,7 @@ from identity_lifecycle import (
 )
 from phase1_common import (
     DEFAULT_TIMEOUT_SECONDS, analyze_csv_quality, expected_output_path,
-    file_signature, source_status_path, utc_now, validate_csv, write_json,
+    file_signature, load_json, source_status_path, utc_now, validate_csv, write_json,
 )
 from vehicle_config import CONFIG_SCHEMA_VERSION, load_vehicle_config
 
@@ -65,6 +65,28 @@ def _empty_identity() -> dict[str, Any]:
         "transition_event_count": 0,
         "artifacts": {},
     }
+
+
+def _extract_adapter_archive_output(
+    root: Path, config: dict[str, Any], active_run: str
+) -> str | None:
+    """Extract and validate current-run archive_output from adapter reconciliation report if present."""
+    paths = artifact_paths(root, config)
+    rec_path = paths.get("reconciliation") if isinstance(paths, dict) else None
+    if not rec_path or not rec_path.exists():
+        return None
+    try:
+        data = load_json(rec_path)
+    except (ValueError, OSError):
+        return None
+    if not isinstance(data, dict) or data.get("run_id") != active_run:
+        return None
+    archive_rel = data.get("archive_output")
+    if isinstance(archive_rel, str) and archive_rel.strip():
+        archive_path = root / archive_rel.strip()
+        if archive_path.exists() and archive_path.is_file():
+            return archive_rel.strip()
+    return None
 
 
 def run_autotrader(
@@ -226,7 +248,9 @@ def run_autotrader(
         "timeout_seconds": timeout_seconds, "failure_reasons": failures,
         "expected_output": str(output_path.relative_to(root)),
         "latest_output": str(output_path.relative_to(root)) if fresh else None,
-        "archive_output": evidence.get("archive_output"),
+        "archive_output": evidence.get("archive_output") or (
+            _extract_adapter_archive_output(root, config, active_run) if fresh else None
+        ),
         "output_exists": output_path.exists(), "output_updated_this_run": fresh,
         "configured_max_results": None,
         "effective_max_results": "unbounded", "row_cap_disabled": True,

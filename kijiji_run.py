@@ -16,7 +16,7 @@ from identity_lifecycle import (
     snapshot_artifacts,
     update_source_identity_lifecycle,
 )
-from kijiji_adapter import ADAPTER_SCHEMA_VERSION
+from kijiji_adapter import ADAPTER_SCHEMA_VERSION, artifact_paths
 from kijiji_canonical import build_kijiji_canonical_evidence
 from kijiji_locations import LOCATION_REGISTRY_VERSION
 from phase1_common import (
@@ -24,6 +24,7 @@ from phase1_common import (
     analyze_csv_quality,
     expected_output_path,
     file_signature,
+    load_json,
     source_status_path,
     utc_now,
     validate_csv,
@@ -75,6 +76,28 @@ def _empty_identity() -> dict[str, Any]:
         "transition_event_count": 0,
         "artifacts": {},
     }
+
+
+def _extract_adapter_archive_output(
+    root: Path, config: dict[str, Any], active_run: str
+) -> str | None:
+    """Extract and validate current-run archive_output from adapter reconciliation report if present."""
+    paths = artifact_paths(root, config)
+    rec_path = paths.get("reconciliation") if isinstance(paths, dict) else None
+    if not rec_path or not rec_path.exists():
+        return None
+    try:
+        data = load_json(rec_path)
+    except (ValueError, OSError):
+        return None
+    if not isinstance(data, dict) or data.get("run_id") != active_run:
+        return None
+    archive_rel = data.get("archive_output")
+    if isinstance(archive_rel, str) and archive_rel.strip():
+        archive_path = root / archive_rel.strip()
+        if archive_path.exists() and archive_path.is_file():
+            return archive_rel.strip()
+    return None
 
 
 def run_kijiji(
@@ -283,7 +306,9 @@ def run_kijiji(
         "failure_reasons": failures,
         "expected_output": str(output_path.relative_to(root)),
         "latest_output": str(output_path.relative_to(root)) if fresh else None,
-        "archive_output": evidence.get("archive_output"),
+        "archive_output": evidence.get("archive_output") or (
+            _extract_adapter_archive_output(root, config, active_run) if fresh else None
+        ),
         "output_exists": output_path.exists(),
         "output_updated_this_run": fresh,
         "configured_max_results": None,
