@@ -80,10 +80,13 @@ row = {
     "request_url": "https://example.invalid/search?rcs=0",
 }
 latest = root / "data" / key / "latest" / f"{key}_autotrader_latest.csv"
+archive = root / "data" / key / "autotrader" / f"{key}_autotrader_2026-08-01_12-00-00.csv"
 latest.parent.mkdir(parents=True, exist_ok=True)
-with latest.open("w", encoding="utf-8", newline="") as handle:
-    writer = csv.DictWriter(handle, fieldnames=list(row))
-    writer.writeheader(); writer.writerow(row)
+archive.parent.mkdir(parents=True, exist_ok=True)
+for p in (latest, archive):
+    with p.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=list(row))
+        writer.writeheader(); writer.writerow(row)
 base = root / "data" / key / "adapter_evidence" / "autotrader"
 base.mkdir(parents=True, exist_ok=True)
 request_path = base / "requests_latest.jsonl"
@@ -189,6 +192,7 @@ reconciliation_path.write_text(json.dumps(report, indent=2) + "\n", encoding="ut
         path.write_text(
             r'''
 import argparse, json, csv
+from datetime import datetime, timezone
 from pathlib import Path
 
 parser = argparse.ArgumentParser()
@@ -223,7 +227,7 @@ records_path = base / "records_latest.jsonl"
 records_path.write_text("corrupt_non_json_records\n", encoding="utf-8")
 report = {
     "adapter_schema_version": 1, "vehicle_key": key, "source": "autotrader",
-    "run_id": args.run_id, "generated_at_utc": "2026-12-31T23:59:59Z", "fetched_records": 1, "accepted_records": 1,
+    "run_id": args.run_id, "generated_at_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"), "fetched_records": 1, "accepted_records": 1,
     "reconciled": True, "artifacts": {"records": str(records_path.relative_to(root))},
     "archive_output": str(archive.relative_to(root)),
     "latest_output": str(latest.relative_to(root)),

@@ -19,8 +19,9 @@ from identity_lifecycle import (
     update_source_identity_lifecycle,
 )
 from phase1_common import (
-    DEFAULT_TIMEOUT_SECONDS, _parse_iso_ns, analyze_csv_quality, expected_output_path,
-    file_signature, load_json, source_status_path, utc_now, validate_csv, write_json,
+    DEFAULT_TIMEOUT_SECONDS, analyze_csv_quality, expected_output_path,
+    file_signature, source_status_path, utc_now, validate_csv,
+    validate_invocation_archive_output, write_json,
 )
 from vehicle_config import CONFIG_SCHEMA_VERSION, load_vehicle_config
 
@@ -67,33 +68,6 @@ def _empty_identity() -> dict[str, Any]:
     }
 
 
-def _extract_adapter_archive_output(
-    root: Path, config: dict[str, Any], active_run: str, started_at: str
-) -> str | None:
-    """Extract and validate current-run archive_output from adapter reconciliation report if present."""
-    paths = artifact_paths(root, config)
-    rec_path = paths.get("reconciliation") if isinstance(paths, dict) else None
-    if not rec_path or not rec_path.exists():
-        return None
-    try:
-        data = load_json(rec_path)
-    except (ValueError, OSError):
-        return None
-    if not isinstance(data, dict) or data.get("run_id") != active_run:
-        return None
-
-    gen_at = data.get("generated_at_utc")
-    gen_ns = _parse_iso_ns(gen_at)
-    start_ns = _parse_iso_ns(started_at)
-    if gen_ns is None or start_ns is None or gen_ns < start_ns:
-        return None
-
-    archive_rel = data.get("archive_output")
-    if isinstance(archive_rel, str) and archive_rel.strip():
-        archive_path = root / archive_rel.strip()
-        if archive_path.exists() and archive_path.is_file():
-            return archive_rel.strip()
-    return None
 
 
 def run_autotrader(
@@ -255,9 +229,9 @@ def run_autotrader(
         "timeout_seconds": timeout_seconds, "failure_reasons": failures,
         "expected_output": str(output_path.relative_to(root)),
         "latest_output": str(output_path.relative_to(root)) if fresh else None,
-        "archive_output": evidence.get("archive_output") or (
-            _extract_adapter_archive_output(root, config, active_run, started_at) if fresh else None
-        ),
+        "archive_output": validate_invocation_archive_output(
+            root, config, "autotrader", active_run, started_at, started_ns
+        ) if fresh else None,
         "output_exists": output_path.exists(), "output_updated_this_run": fresh,
         "configured_max_results": None,
         "effective_max_results": "unbounded", "row_cap_disabled": True,

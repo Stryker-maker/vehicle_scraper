@@ -362,3 +362,46 @@ def check_source_anomalously_isolated(
             return True
 
     return False
+
+
+def validate_invocation_archive_output(
+    root: Path,
+    config: dict[str, Any],
+    source: str,
+    active_run: str,
+    started_at: str,
+    started_ns: int,
+) -> str | None:
+    """Validate that the adapter reconciliation report and archive_output belong to the current invocation."""
+    key = str(config["vehicle_key"])
+    rec_path = root / "data" / key / "adapter_evidence" / source / "reconciliation_latest.json"
+    if not rec_path.exists():
+        return None
+
+    try:
+        if rec_path.stat().st_mtime_ns < started_ns - 1_000_000_000:
+            return None
+    except OSError:
+        return None
+
+    try:
+        data = load_json(rec_path)
+    except (ValueError, OSError):
+        return None
+    if not isinstance(data, dict) or data.get("run_id") != active_run:
+        return None
+
+    gen_at = data.get("generated_at_utc")
+    if isinstance(gen_at, str) and gen_at.strip():
+        gen_ns = _parse_iso_ns(gen_at)
+        start_ns = _parse_iso_ns(started_at)
+        if gen_ns is not None and start_ns is not None and gen_ns < start_ns - 1_000_000_000:
+            return None
+
+    archive_rel = data.get("archive_output")
+    if isinstance(archive_rel, str) and archive_rel.strip():
+        archive_path = root / archive_rel.strip()
+        if archive_path.exists() and archive_path.is_file():
+            return archive_rel.strip()
+
+    return None
