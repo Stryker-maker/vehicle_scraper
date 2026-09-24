@@ -369,19 +369,27 @@ def validate_invocation_archive_output(
     config: dict[str, Any],
     source: str,
     active_run: str,
-    started_at: str,
     started_ns: int,
+    rec_before_sig: tuple[int, int] | None,
+    archive_before_sig: tuple[int, int] | None = None,
 ) -> str | None:
-    """Validate that the adapter reconciliation report and archive_output belong to the current invocation."""
+    """Validate that the adapter reconciliation report and archive_output belong to and were created/updated by the current invocation."""
     key = str(config["vehicle_key"])
     rec_path = root / "data" / key / "adapter_evidence" / source / "reconciliation_latest.json"
     if not rec_path.exists():
         return None
 
     try:
-        if rec_path.stat().st_mtime_ns < started_ns - 1_000_000_000:
-            return None
+        rec_mtime = rec_path.stat().st_mtime_ns
     except OSError:
+        return None
+
+    if rec_before_sig is None:
+        rec_fresh = rec_mtime >= started_ns
+    else:
+        rec_fresh = rec_mtime != rec_before_sig[0] and rec_mtime >= started_ns
+
+    if not rec_fresh:
         return None
 
     try:
@@ -391,23 +399,25 @@ def validate_invocation_archive_output(
     if not isinstance(data, dict) or data.get("run_id") != active_run:
         return None
 
-    gen_at = data.get("generated_at_utc")
-    if isinstance(gen_at, str) and gen_at.strip():
-        gen_ns = _parse_iso_ns(gen_at)
-        start_ns = _parse_iso_ns(started_at)
-        if gen_ns is not None and start_ns is not None and gen_ns < start_ns - 1_000_000_000:
-            return None
-
     archive_rel = data.get("archive_output")
     if isinstance(archive_rel, str) and archive_rel.strip():
         archive_path = root / archive_rel.strip()
         if not (archive_path.exists() and archive_path.is_file()):
             return None
+
         try:
-            if archive_path.stat().st_mtime_ns < started_ns - 1_000_000_000:
-                return None
+            arch_mtime = archive_path.stat().st_mtime_ns
         except OSError:
             return None
+
+        if archive_before_sig is None:
+            archive_fresh = arch_mtime >= started_ns
+        else:
+            archive_fresh = arch_mtime != archive_before_sig[0] and arch_mtime >= started_ns
+
+        if not archive_fresh:
+            return None
+
         return archive_rel.strip()
 
     return None

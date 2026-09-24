@@ -20,7 +20,7 @@ from identity_lifecycle import (
 )
 from phase1_common import (
     DEFAULT_TIMEOUT_SECONDS, analyze_csv_quality, expected_output_path,
-    file_signature, source_status_path, utc_now, validate_csv,
+    file_signature, load_json, source_status_path, utc_now, validate_csv,
     validate_invocation_archive_output, write_json,
 )
 from vehicle_config import CONFIG_SCHEMA_VERSION, load_vehicle_config
@@ -91,6 +91,21 @@ def run_autotrader(
     output_path = expected_output_path(root, config, "autotrader")
     status_path = source_status_path(root, config, "autotrader")
     identity_before = snapshot_artifacts(root, config, "autotrader")
+    rec_path = root / "data" / config["vehicle_key"] / "adapter_evidence" / "autotrader" / "reconciliation_latest.json"
+    try:
+        rec_before_sig = (rec_path.stat().st_mtime_ns, rec_path.stat().st_size) if rec_path.exists() else None
+    except OSError:
+        rec_before_sig = None
+    try:
+        prior_rec = load_json(rec_path) if rec_path.exists() else None
+    except (ValueError, OSError):
+        prior_rec = None
+    prior_archive_rel = prior_rec.get("archive_output") if isinstance(prior_rec, dict) else None
+    prior_archive_path = (root / prior_archive_rel) if isinstance(prior_archive_rel, str) and prior_archive_rel.strip() else None
+    try:
+        archive_before_sig = (prior_archive_path.stat().st_mtime_ns, prior_archive_path.stat().st_size) if prior_archive_path and prior_archive_path.exists() else None
+    except OSError:
+        archive_before_sig = None
     before_signature = file_signature(output_path)
     started_at = utc_now()
     started_ns = time.time_ns()
@@ -230,7 +245,7 @@ def run_autotrader(
         "expected_output": str(output_path.relative_to(root)),
         "latest_output": str(output_path.relative_to(root)) if fresh else None,
         "archive_output": validate_invocation_archive_output(
-            root, config, "autotrader", active_run, started_at, started_ns
+            root, config, "autotrader", active_run, started_ns, rec_before_sig, archive_before_sig
         ) if fresh else None,
         "output_exists": output_path.exists(), "output_updated_this_run": fresh,
         "configured_max_results": None,
