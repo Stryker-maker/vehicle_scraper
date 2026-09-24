@@ -401,7 +401,13 @@ def validate_invocation_archive_output(
     archive_rel = data.get("archive_output")
     if isinstance(archive_rel, str) and archive_rel.strip():
         archive_path = root / archive_rel.strip()
-        if archive_path.exists() and archive_path.is_file():
-            return archive_rel.strip()
+        if not (archive_path.exists() and archive_path.is_file()):
+            return None
+        try:
+            if archive_path.stat().st_mtime_ns < started_ns - 1_000_000_000:
+                return None
+        except OSError:
+            return None
+        return archive_rel.strip()
 
     return None
