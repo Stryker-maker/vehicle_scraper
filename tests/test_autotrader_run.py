@@ -391,6 +391,80 @@ rec_path.write_text(json.dumps(report), encoding="utf-8")
         self.assertEqual(status2["execution_status"], "degraded")
         self.assertIsNone(status2["archive_output"])
 
+    def test_fresh_report_naming_different_pre_existing_unchanged_archive_is_rejected(self):
+        status1 = run_autotrader(
+            root=self.root,
+            config_path=self.config_path,
+            command=[sys.executable, str(self.fake_adapter()), "--run-id", "local"],
+            run_id="local",
+        )
+        self.assertEqual(status1["execution_status"], "success")
+
+        key = "test_vehicle"
+        archive_b = self.root / "data" / key / "autotrader" / f"{key}_autotrader_2020-01-01_00-00-00.csv"
+        archive_b.parent.mkdir(parents=True, exist_ok=True)
+        archive_b.write_text("a,b\n1,2\n", encoding="utf-8")
+        old_ts = time.time() - 3600
+        os.utime(archive_b, (old_ts, old_ts))
+
+        time.sleep(0.01)
+
+        path = self.root / "fake_adapter_archive_b.py"
+        path.write_text(
+            f'''
+import argparse, json, csv
+from datetime import datetime, timezone
+from pathlib import Path
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--run-id", required=True)
+args = parser.parse_args()
+root = Path.cwd(); key = "test_vehicle"
+row = {{
+    "year": "2020", "make": "Test", "model": "Vehicle",
+    "trim": "Example", "price": "25000", "mileage": "100000",
+    "fuel": "Gas", "dealer": "Example Dealer",
+    "dealer_address": "1 Main St, Calgary, AB", "location": "Calgary, AB",
+    "distance_km": "150", "distance_method": "geodesic_city_center",
+    "distance_evidence_status": "straight_line_estimate_from_source_reported_location",
+    "listing_id": "listing-1", "url": "https://example.invalid/listing-1",
+    "source": "AutoTrader", "query_location": "Calgary, AB",
+    "query_page": "1", "query_offset": "0",
+    "request_url": "https://example.invalid/search?rcs=0",
+}}
+latest = root / "data" / key / "latest" / f"{{key}}_autotrader_latest.csv"
+latest.parent.mkdir(parents=True, exist_ok=True)
+with latest.open("w", encoding="utf-8", newline="") as handle:
+    w = csv.DictWriter(handle, fieldnames=list(row)); w.writeheader(); w.writerow(row)
+
+base = root / "data" / key / "adapter_evidence" / "autotrader"
+base.mkdir(parents=True, exist_ok=True)
+rec_path = base / "reconciliation_latest.json"
+records_path = base / "records_latest.jsonl"
+records_path.write_text("corrupt", encoding="utf-8")
+
+report = {{
+    "adapter_schema_version": 1, "vehicle_key": key, "source": "autotrader",
+    "run_id": args.run_id, "generated_at_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+    "fetched_records": 1, "accepted_records": 1, "reconciled": True,
+    "artifacts": {{"records": str(records_path.relative_to(root))}},
+    "archive_output": "{str(archive_b.relative_to(self.root))}",
+    "latest_output": str(latest.relative_to(root)),
+}}
+rec_path.write_text(json.dumps(report), encoding="utf-8")
+''',
+            encoding="utf-8",
+        )
+
+        status2 = run_autotrader(
+            root=self.root,
+            config_path=self.config_path,
+            command=[sys.executable, str(path), "--run-id", "local"],
+            run_id="local",
+        )
+        self.assertEqual(status2["execution_status"], "degraded")
+        self.assertIsNone(status2["archive_output"])
+
 
 if __name__ == "__main__":
     unittest.main()

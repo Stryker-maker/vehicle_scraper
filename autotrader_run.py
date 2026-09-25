@@ -96,16 +96,11 @@ def run_autotrader(
         rec_before_sig = (rec_path.stat().st_mtime_ns, rec_path.stat().st_size) if rec_path.exists() else None
     except OSError:
         rec_before_sig = None
-    try:
-        prior_rec = load_json(rec_path) if rec_path.exists() else None
-    except (ValueError, OSError):
-        prior_rec = None
-    prior_archive_rel = prior_rec.get("archive_output") if isinstance(prior_rec, dict) else None
-    prior_archive_path = (root / prior_archive_rel) if isinstance(prior_archive_rel, str) and prior_archive_rel.strip() else None
-    try:
-        archive_before_sig = (prior_archive_path.stat().st_mtime_ns, prior_archive_path.stat().st_size) if prior_archive_path and prior_archive_path.exists() else None
-    except OSError:
-        archive_before_sig = None
+    archive_dir = root / "data" / config["vehicle_key"] / "autotrader"
+    archive_before_sigs: dict[Path, tuple[int, int] | None] = {}
+    if archive_dir.exists():
+        for archive_file in archive_dir.glob("*.csv"):
+            archive_before_sigs[archive_file.resolve()] = file_signature(archive_file)
     before_signature = file_signature(output_path)
     started_at = utc_now()
     started_ns = time.time_ns()
@@ -245,7 +240,7 @@ def run_autotrader(
         "expected_output": str(output_path.relative_to(root)),
         "latest_output": str(output_path.relative_to(root)) if fresh else None,
         "archive_output": validate_invocation_archive_output(
-            root, config, "autotrader", active_run, started_ns, rec_before_sig, archive_before_sig
+            root, config, "autotrader", active_run, started_ns, rec_before_sig, archive_before_sigs
         ) if fresh else None,
         "output_exists": output_path.exists(), "output_updated_this_run": fresh,
         "configured_max_results": None,

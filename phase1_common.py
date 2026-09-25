@@ -371,7 +371,7 @@ def validate_invocation_archive_output(
     active_run: str,
     started_ns: int,
     rec_before_sig: tuple[int, int] | None,
-    archive_before_sig: tuple[int, int] | None = None,
+    archive_before_sigs: dict[Path, tuple[int, int] | None] | None = None,
 ) -> str | None:
     """Validate that the adapter reconciliation report and archive_output belong to and were created/updated by the current invocation."""
     key = str(config["vehicle_key"])
@@ -403,8 +403,10 @@ def validate_invocation_archive_output(
     if isinstance(archive_rel, str) and archive_rel.strip():
         try:
             archive_path = (root / archive_rel.strip()).resolve()
-            archive_path.relative_to(expected_dir)
         except ValueError:
+            return None
+
+        if archive_path.parent != expected_dir:
             return None
 
         if not (archive_path.exists() and archive_path.is_file()):
@@ -418,6 +420,9 @@ def validate_invocation_archive_output(
         archive_after_sig = file_signature(archive_path)
         if not archive_after_sig:
             return None
+
+        before_sigs = archive_before_sigs or {}
+        archive_before_sig = before_sigs.get(archive_path)
 
         if archive_before_sig is None:
             archive_fresh = archive_after_sig[0] >= started_ns
