@@ -261,7 +261,7 @@ rec_path.write_text(json.dumps(report), encoding="utf-8")
         old_archive = self.root / "data" / key / "autotrader" / f"{key}_autotrader_2020-01-01_00-00-00.csv"
         old_archive.parent.mkdir(parents=True, exist_ok=True)
         old_archive.write_text("a,b\n1,2\n", encoding="utf-8")
-        old_ts = time.mktime(time.strptime("2020-01-01 00:00:00", "%Y-%m-%d %H:%M:%S"))
+        old_ts = time.time() - 3600
         os.utime(old_archive, (old_ts, old_ts))
 
         path = self.root / "fake_adapter_old_archive.py"
@@ -321,26 +321,25 @@ rec_path.write_text(json.dumps(report), encoding="utf-8")
         self.assertIsNone(status["archive_output"])
 
     def test_surviving_prior_local_reconciliation_report_is_not_treated_as_current(self):
-        base = self.root / "data" / "test_vehicle" / "adapter_evidence" / "autotrader"
-        base.mkdir(parents=True, exist_ok=True)
-        rec_path = base / "reconciliation_latest.json"
-        stale_archive = self.root / "data" / "test_vehicle" / "autotrader" / "test_vehicle_autotrader_2020-01-01_00-00-00.csv"
-        stale_archive.parent.mkdir(parents=True, exist_ok=True)
-        stale_archive.write_text("a,b\n1,2\n", encoding="utf-8")
-        stale_report = {
-            "adapter_schema_version": 1,
-            "vehicle_key": "test_vehicle",
-            "source": "autotrader",
-            "run_id": "local",
-            "generated_at_utc": "2020-01-01T00:00:00Z",
-            "archive_output": str(stale_archive.relative_to(self.root)),
-        }
-        rec_path.write_text(json.dumps(stale_report), encoding="utf-8")
+        status1 = run_autotrader(
+            root=self.root,
+            config_path=self.config_path,
+            command=[sys.executable, str(self.fake_adapter()), "--run-id", "local"],
+            run_id="local",
+        )
+        self.assertEqual(status1["execution_status"], "success")
+        self.assertEqual(
+            status1["archive_output"],
+            "data/test_vehicle/autotrader/test_vehicle_autotrader_2026-08-01_12-00-00.csv",
+        )
 
-        path = self.root / "fake_adapter_no_rec.py"
+        time.sleep(0.01)
+
+        path = self.root / "fake_adapter_invocation2.py"
         path.write_text(
             r'''
-import csv, argparse
+import argparse, json, csv
+from datetime import datetime, timezone
 from pathlib import Path
 
 parser = argparse.ArgumentParser()
@@ -363,18 +362,34 @@ latest = root / "data" / key / "latest" / f"{key}_autotrader_latest.csv"
 latest.parent.mkdir(parents=True, exist_ok=True)
 with latest.open("w", encoding="utf-8", newline="") as handle:
     w = csv.DictWriter(handle, fieldnames=list(row)); w.writeheader(); w.writerow(row)
+
+base = root / "data" / key / "adapter_evidence" / "autotrader"
+base.mkdir(parents=True, exist_ok=True)
+rec_path = base / "reconciliation_latest.json"
+records_path = base / "records_latest.jsonl"
+records_path.write_text("corrupt", encoding="utf-8")
+
+report = {
+    "adapter_schema_version": 1, "vehicle_key": key, "source": "autotrader",
+    "run_id": args.run_id, "generated_at_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+    "fetched_records": 1, "accepted_records": 1, "reconciled": True,
+    "artifacts": {"records": str(records_path.relative_to(root))},
+    "archive_output": "data/test_vehicle/autotrader/test_vehicle_autotrader_2026-08-01_12-00-00.csv",
+    "latest_output": str(latest.relative_to(root)),
+}
+rec_path.write_text(json.dumps(report), encoding="utf-8")
 ''',
             encoding="utf-8",
         )
 
-        status = run_autotrader(
+        status2 = run_autotrader(
             root=self.root,
             config_path=self.config_path,
             command=[sys.executable, str(path), "--run-id", "local"],
             run_id="local",
         )
-        self.assertEqual(status["execution_status"], "degraded")
-        self.assertIsNone(status["archive_output"])
+        self.assertEqual(status2["execution_status"], "degraded")
+        self.assertIsNone(status2["archive_output"])
 
 
 if __name__ == "__main__":

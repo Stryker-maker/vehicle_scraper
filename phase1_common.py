@@ -375,19 +375,19 @@ def validate_invocation_archive_output(
 ) -> str | None:
     """Validate that the adapter reconciliation report and archive_output belong to and were created/updated by the current invocation."""
     key = str(config["vehicle_key"])
+    expected_dir = (root / "data" / key / source).resolve()
     rec_path = root / "data" / key / "adapter_evidence" / source / "reconciliation_latest.json"
     if not rec_path.exists():
         return None
 
-    try:
-        rec_mtime = rec_path.stat().st_mtime_ns
-    except OSError:
+    rec_after_sig = file_signature(rec_path)
+    if not rec_after_sig:
         return None
 
     if rec_before_sig is None:
-        rec_fresh = rec_mtime >= started_ns
+        rec_fresh = rec_after_sig[0] >= started_ns
     else:
-        rec_fresh = rec_mtime != rec_before_sig[0] and rec_mtime >= started_ns
+        rec_fresh = rec_after_sig != rec_before_sig and rec_after_sig[0] >= started_ns
 
     if not rec_fresh:
         return None
@@ -401,19 +401,31 @@ def validate_invocation_archive_output(
 
     archive_rel = data.get("archive_output")
     if isinstance(archive_rel, str) and archive_rel.strip():
-        archive_path = root / archive_rel.strip()
+        try:
+            archive_path = (root / archive_rel.strip()).resolve()
+            archive_path.relative_to(expected_dir)
+        except ValueError:
+            return None
+
         if not (archive_path.exists() and archive_path.is_file()):
             return None
 
-        try:
-            arch_mtime = archive_path.stat().st_mtime_ns
-        except OSError:
+        filename = archive_path.name
+        expected_prefix = f"{key}_{source}_"
+        if not (filename.startswith(expected_prefix) and filename.endswith(".csv")):
+            return None
+
+        archive_after_sig = file_signature(archive_path)
+        if not archive_after_sig:
             return None
 
         if archive_before_sig is None:
-            archive_fresh = arch_mtime >= started_ns
+            archive_fresh = archive_after_sig[0] >= started_ns
         else:
-            archive_fresh = arch_mtime != archive_before_sig[0] and arch_mtime >= started_ns
+            archive_fresh = (
+                archive_after_sig != archive_before_sig
+                and archive_after_sig[0] >= started_ns
+            )
 
         if not archive_fresh:
             return None
