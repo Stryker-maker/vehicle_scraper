@@ -317,3 +317,124 @@ def status_is_current_success(status: dict[str, Any], run_id: str) -> bool:
         and status.get("row_cap_disabled") is True
         and status.get("config_isolated") is True
     )
+
+
+def _parse_iso_ns(iso_str: str | None) -> int | None:
+    if not iso_str or not isinstance(iso_str, str):
+        return None
+    try:
+        dt = datetime.fromisoformat(iso_str.replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return int(dt.timestamp() * 1_000_000_000)
+    except (ValueError, TypeError):
+        return None
+
+
+def check_source_anomalously_isolated(
+    root: Path, vehicle_key: str, source: str, run_id: str
+) -> bool:
+    """Check if the vehicle/source collection was marked with critical anomaly or isolated in current run."""
+    anomalies_path = root / "data" / "run_status" / "anomalies_latest.json"
+    if not anomalies_path.exists():
+        return False
+    report = load_json(anomalies_path)
+    if not isinstance(report, dict) or report.get("run_id") != run_id:
+        return False
+
+    isolated = report.get("isolated_collections", [])
+    if isinstance(isolated, list):
+        for entry in isolated:
+            if (
+                isinstance(entry, dict)
+                and entry.get("vehicle_key") == vehicle_key
+                and entry.get("source") == source
+            ):
+                return True
+
+    for item in report.get("anomalies", []):
+        if (
+            isinstance(item, dict)
+            and item.get("severity") == "critical"
+            and item.get("vehicle_key") == vehicle_key
+            and item.get("source") == source
+        ):
+            return True
+
+    return False
+
+
+def validate_invocation_archive_output(
+    root: Path,
+    config: dict[str, Any],
+    source: str,
+    active_run: str,
+    started_ns: int,
+    rec_before_sig: tuple[int, int] | None,
+    archive_before_sigs: dict[Path, tuple[int, int] | None] | None = None,
+) -> str | None:
+    """Validate that the adapter reconciliation report and archive_output belong to and were created/updated by the current invocation."""
+    key = str(config["vehicle_key"])
+    expected_dir = (root / "data" / key / source).resolve()
+    rec_path = root / "data" / key / "adapter_evidence" / source / "reconciliation_latest.json"
+    if not rec_path.exists():
+        return None
+
+    rec_after_sig = file_signature(rec_path)
+    if not rec_after_sig:
+        return None
+
+    if rec_before_sig is None:
+        rec_fresh = rec_after_sig[0] >= started_ns
+    else:
+        rec_fresh = rec_after_sig != rec_before_sig and rec_after_sig[0] >= started_ns
+
+    if not rec_fresh:
+        return None
+
+    try:
+        data = load_json(rec_path)
+    except (ValueError, OSError):
+        return None
+    if not isinstance(data, dict) or data.get("run_id") != active_run:
+        return None
+
+    archive_rel = data.get("archive_output")
+    if isinstance(archive_rel, str) and archive_rel.strip():
+        try:
+            archive_path = (root / archive_rel.strip()).resolve()
+        except ValueError:
+            return None
+
+        if archive_path.parent != expected_dir:
+            return None
+
+        if not (archive_path.exists() and archive_path.is_file()):
+            return None
+
+        filename = archive_path.name
+        expected_prefix = f"{key}_{source}_"
+        if not (filename.startswith(expected_prefix) and filename.endswith(".csv")):
+            return None
+
+        archive_after_sig = file_signature(archive_path)
+        if not archive_after_sig:
+            return None
+
+        before_sigs = archive_before_sigs or {}
+        archive_before_sig = before_sigs.get(archive_path)
+
+        if archive_before_sig is None:
+            archive_fresh = archive_after_sig[0] >= started_ns
+        else:
+            archive_fresh = (
+                archive_after_sig != archive_before_sig
+                and archive_after_sig[0] >= started_ns
+            )
+
+        if not archive_fresh:
+            return None
+
+        return archive_rel.strip()
+
+    return None
