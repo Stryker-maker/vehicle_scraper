@@ -83,6 +83,41 @@ def _raise_for_canonical_review_exclusions(summary: dict) -> None:
         )
 
 
+def _source_key(value: dict) -> tuple[str, str]:
+    return str(value.get("vehicle_key") or ""), str(value.get("source") or "")
+
+
+def _validate_isolation_for_health_gate(*, health: dict, anomaly: dict) -> None:
+    """Fail closed unless every unhealthy source is explicitly and successfully isolated."""
+    if anomaly.get("run_id") != health.get("run_id"):
+        raise RuntimeError("Anomaly report run_id does not match the current health report")
+
+    isolation_failures = [
+        item for item in anomaly.get("anomalies", [])
+        if isinstance(item, dict) and item.get("code") == "collection_isolation_failed"
+    ]
+    if isolation_failures:
+        raise RuntimeError("Collection isolation reported one or more failures")
+
+    unhealthy = {
+        _source_key(entry)
+        for entry in health.get("sources", [])
+        if isinstance(entry, dict) and not entry.get("healthy")
+    }
+    isolated = {
+        _source_key(entry)
+        for entry in anomaly.get("isolated_collections", [])
+        if isinstance(entry, dict)
+    }
+    if unhealthy != isolated:
+        missing = sorted(unhealthy - isolated)
+        unexpected = sorted(isolated - unhealthy)
+        raise RuntimeError(
+            "Unhealthy source isolation is incomplete: "
+            f"missing={missing}, unexpected={unexpected}"
+        )
+
+
 def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(description=__doc__)
     actions = root.add_subparsers(dest="action", required=True)
@@ -97,6 +132,7 @@ def parser() -> argparse.ArgumentParser:
     add_reporting_scope_arguments(report)
     check = actions.add_parser("check-health")
     check.add_argument("--report", default="data/run_status/latest.json")
+    check.add_argument("--anomaly-report", default=None)
     return root
 
 
@@ -131,12 +167,21 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.action == "check-health":
         report = load_json(root / args.report)
         if report.get("overall_status") not in {"success", "success_with_warnings"}:
+            if not args.anomaly_report:
+                print(
+                    f"Run health is {report.get('overall_status', 'unknown')}: "
+                    f"{report.get('unhealthy_source_runs', '?')} source run(s) unhealthy.",
+                    file=sys.stderr,
+                )
+                return 1
+            anomaly = load_json(root / args.anomaly_report)
+            _validate_isolation_for_health_gate(health=report, anomaly=anomaly)
             print(
-                f"Run health is {report.get('overall_status', 'unknown')}: "
-                f"{report.get('unhealthy_source_runs', '?')} source run(s) unhealthy.",
-                file=sys.stderr,
+                f"Run health is {report.get('overall_status', 'unknown')}, but all "
+                f"{report.get('unhealthy_source_runs', 0)} unhealthy source run(s) "
+                "are explicitly isolated; healthy collections may continue."
             )
-            return 1
+            return 0
         message = (
             "All expected source runs produced fresh, uncapped output with reconciled "
             "canonical and identity/lifecycle evidence; data-quality warnings require manual review."
