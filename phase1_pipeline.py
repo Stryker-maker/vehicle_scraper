@@ -198,13 +198,13 @@ def main(argv: Sequence[str] | None = None) -> int:
                 for item in anomaly.get("isolated_collections", [])
                 if isinstance(item, dict)
             ]
+            anomaly_for_validation = dict(anomaly)
+            anomaly_for_validation["isolated_collections"] = requested_isolation
             try:
-                isolated = isolate_anomalous_collections(root=root, report=anomaly)
-                anomaly_for_validation = dict(anomaly)
-                anomaly_for_validation["isolated_collections"] = requested_isolation
                 _validate_isolation_for_health_gate(
                     health=report, anomaly=anomaly_for_validation
                 )
+                isolated = isolate_anomalous_collections(root=root, report=anomaly)
                 if isolated != requested_isolation:
                     raise RuntimeError(
                         "Collection anomaly isolation did not produce the requested isolation set"
