@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import json
 import os
 import subprocess
 import tempfile
@@ -9,6 +10,7 @@ from pathlib import Path
 
 from autotrader_history import write_csv_outputs as write_autotrader_csv_outputs
 from kijiji_history import write_csv_outputs as write_kijiji_csv_outputs
+from purpose_outputs import _write_csv as write_purpose_csv
 
 
 class CsvLineTerminatorTests(unittest.TestCase):
@@ -74,6 +76,72 @@ class CsvLineTerminatorTests(unittest.TestCase):
                 env=env,
             )
             self.assertEqual(check.returncode, 0, check.stdout + check.stderr)
+
+
+    def _assert_direct_csv_writer_publication_safe(self, writer) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            output = root / "data" / "test_vehicle" / "purpose_output" / "value_monitor" / "comparables_latest.csv"
+            records = [
+                {
+                    "vehicle_key": "test_vehicle",
+                    "source": "AutoTrader",
+                    "price_cad": 65000,
+                    "location": "Calgary, AB",
+                    "subject_comparability_reasons": ["year_match", "model_match"],
+                }
+            ]
+            writer(
+                output,
+                (
+                    "vehicle_key",
+                    "source",
+                    "price_cad",
+                    "location",
+                    "subject_comparability_reasons",
+                ),
+                records,
+            )
+
+            raw = output.read_bytes()
+            self.assertNotIn(b"\r\n", raw)
+            self.assertNotIn(b"\r", raw)
+            with output.open("r", encoding="utf-8", newline="") as handle:
+                parsed = list(csv.DictReader(handle))
+            self.assertEqual(parsed[0]["price_cad"], "65000")
+            self.assertEqual(parsed[0]["location"], "Calgary, AB")
+            self.assertEqual(
+                json.loads(parsed[0]["subject_comparability_reasons"]),
+                ["year_match", "model_match"],
+            )
+
+            env = self._git_env(root)
+            subprocess.run(
+                ["git", "-c", "core.autocrlf=false", "init"],
+                cwd=root,
+                check=True,
+                capture_output=True,
+                env=env,
+            )
+            subprocess.run(
+                ["git", "add", "data"],
+                cwd=root,
+                check=True,
+                capture_output=True,
+                env=env,
+            )
+            check = subprocess.run(
+                ["git", "diff", "--cached", "--check"],
+                cwd=root,
+                text=True,
+                capture_output=True,
+                check=False,
+                env=env,
+            )
+            self.assertEqual(check.returncode, 0, check.stdout + check.stderr)
+
+    def test_purpose_output_csv_is_lf_and_git_diff_check_clean(self):
+        self._assert_direct_csv_writer_publication_safe(write_purpose_csv)
 
     def test_autotrader_csv_is_lf_and_git_diff_check_clean(self):
         self._assert_publication_safe(write_autotrader_csv_outputs, "AutoTrader")
