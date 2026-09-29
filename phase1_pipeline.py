@@ -186,18 +186,32 @@ def main(argv: Sequence[str] | None = None) -> int:
                 )
                 return 1
             anomaly = load_json(anomaly_path)
-            try:
-                isolated = isolate_anomalous_collections(root=root, report=anomaly)
-            except (OSError, ValueError, RuntimeError) as exc:
-                print(f"Collection anomaly isolation failed: {exc}", file=sys.stderr)
-                return 1
-            if isolated != anomaly.get("isolated_collections", []):
+            if anomaly.get("run_id") != report.get("run_id"):
                 print(
-                    "Collection anomaly isolation did not produce a stable isolation report.",
+                    "Collection anomaly isolation failed: Anomaly report run_id does "
+                    "not match the current health report",
                     file=sys.stderr,
                 )
                 return 1
-            _validate_isolation_for_health_gate(health=report, anomaly=anomaly)
+            requested_isolation = [
+                dict(item)
+                for item in anomaly.get("isolated_collections", [])
+                if isinstance(item, dict)
+            ]
+            try:
+                isolated = isolate_anomalous_collections(root=root, report=anomaly)
+                anomaly_for_validation = dict(anomaly)
+                anomaly_for_validation["isolated_collections"] = requested_isolation
+                _validate_isolation_for_health_gate(
+                    health=report, anomaly=anomaly_for_validation
+                )
+                if isolated != requested_isolation:
+                    raise RuntimeError(
+                        "Collection anomaly isolation did not produce the requested isolation set"
+                    )
+            except (OSError, ValueError, RuntimeError) as exc:
+                print(f"Collection anomaly isolation failed: {exc}", file=sys.stderr)
+                return 1
             print(
                 f"Run health is {report.get('overall_status', 'unknown')}, but all "
                 f"{report.get('unhealthy_source_runs', 0)} unhealthy source run(s) "
