@@ -1,6 +1,7 @@
 import unittest
+from unittest.mock import patch
 
-from phase1_pipeline import _validate_isolation_for_health_gate
+from phase1_pipeline import _validate_isolation_for_health_gate, main
 
 
 class Phase1HealthIsolationGateTests(unittest.TestCase):
@@ -88,3 +89,46 @@ class Phase1HealthIsolationGateTests(unittest.TestCase):
 
         with self.assertRaisesRegex(RuntimeError, "run_id"):
             _validate_isolation_for_health_gate(health=health, anomaly=anomaly)
+
+    def test_stale_anomaly_report_cannot_trigger_isolation_mutation(self):
+        with patch("phase1_pipeline.load_json") as load_json, patch(
+            "phase1_pipeline.isolate_anomalous_collections"
+        ) as isolate:
+            load_json.side_effect = [
+                {
+                    "run_id": "run-current",
+                    "overall_status": "degraded",
+                    "unhealthy_source_runs": 1,
+                    "sources": [
+                        {
+                            "vehicle_key": "ford_f150",
+                            "source": "kijiji",
+                            "healthy": False,
+                        }
+                    ],
+                },
+                {
+                    "run_id": "run-old",
+                    "isolated_collections": [
+                        {"vehicle_key": "ford_f150", "source": "kijiji"}
+                    ],
+                    "anomalies": [],
+                },
+            ]
+            with patch("phase1_pipeline.Path.exists", return_value=True), patch(
+                "sys.argv",
+                [
+                    "phase1_pipeline.py",
+                    "check-health",
+                    "--report",
+                    "health.json",
+                    "--anomaly-report",
+                    "anomalies.json",
+                ],
+            ):
+                self.assertEqual(main(), 1)
+            isolate.assert_not_called()
+
+
+if __name__ == "__main__":
+    unittest.main()
