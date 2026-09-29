@@ -930,7 +930,7 @@ def _csv_value(value: Any) -> Any:
 def _write_csv(path: Path, fieldnames: Sequence[str], records: Sequence[dict[str, Any]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fieldnames, extrasaction="ignore")
+        writer = csv.DictWriter(\n            handle, fieldnames=fieldnames, extrasaction="ignore", lineterminator="\\n"\n        )
         writer.writeheader()
         for record in records:
             writer.writerow({field: _csv_value(record.get(field)) for field in fieldnames})
