@@ -723,7 +723,7 @@ def build(root: Path, config_path: Path, run_id: str, sources: Sequence[str] | N
     write_jsonl(paths["seller_questions"], questions)
     paths["investigation_csv"].parent.mkdir(parents=True, exist_ok=True)
     with paths["investigation_csv"].open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=CSV_FIELDS, extrasaction="ignore")
+        writer = csv.DictWriter(\n            handle, fieldnames=CSV_FIELDS, extrasaction="ignore", lineterminator="\\n"\n        )
         writer.writeheader()
         writer.writerows(csv_row(value) for value in listings)
     summary = market_summary(listings, run_id, effective_scope, valid_sources, hashlib.sha256(override_bytes).hexdigest())
