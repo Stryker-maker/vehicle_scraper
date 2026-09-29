@@ -22,6 +22,7 @@ from phase1_runtime import (
     run_source,
 )
 from vehicle_registry import DEFAULT_REGISTRY_PATH, active_source_plan, registry_entries
+from workflow_anomalies import isolate_anomalous_collections
 
 __all__ = [
     "EVIDENCE_SCHEMA_VERSION", "IDENTITY_LIFECYCLE_SCHEMA_VERSION",
@@ -132,7 +133,9 @@ def parser() -> argparse.ArgumentParser:
     add_reporting_scope_arguments(report)
     check = actions.add_parser("check-health")
     check.add_argument("--report", default="data/run_status/latest.json")
-    check.add_argument("--anomaly-report", default=None)
+    check.add_argument(
+        "--anomaly-report", default="data/run_status/anomalies_latest.json"
+    )
     return root
 
 
@@ -174,7 +177,26 @@ def main(argv: Sequence[str] | None = None) -> int:
                     file=sys.stderr,
                 )
                 return 1
-            anomaly = load_json(root / args.anomaly_report)
+            anomaly_path = root / args.anomaly_report
+            if not anomaly_path.exists():
+                print(
+                    f"Run health is {report.get('overall_status', 'unknown')}, but the "
+                    f"required anomaly report is missing: {args.anomaly_report}",
+                    file=sys.stderr,
+                )
+                return 1
+            anomaly = load_json(anomaly_path)
+            try:
+                isolated = isolate_anomalous_collections(root=root, report=anomaly)
+            except (OSError, ValueError, RuntimeError) as exc:
+                print(f"Collection anomaly isolation failed: {exc}", file=sys.stderr)
+                return 1
+            if isolated != anomaly.get("isolated_collections", []):
+                print(
+                    "Collection anomaly isolation did not produce a stable isolation report.",
+                    file=sys.stderr,
+                )
+                return 1
             _validate_isolation_for_health_gate(health=report, anomaly=anomaly)
             print(
                 f"Run health is {report.get('overall_status', 'unknown')}, but all "
