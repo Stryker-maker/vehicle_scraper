@@ -26,8 +26,7 @@ class Phase1HealthIsolationGateTests(unittest.TestCase):
 
         _validate_isolation_for_health_gate(health=health, anomaly=anomaly)
 
-    @staticmethod
-    def test_gate_rejects_unhealthy_source_that_is_not_isolated():
+    def test_gate_rejects_unhealthy_source_that_is_not_isolated(self):
         health = {
             "run_id": "run-123",
             "overall_status": "degraded",
