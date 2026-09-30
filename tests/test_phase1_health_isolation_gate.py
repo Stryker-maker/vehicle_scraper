@@ -5,7 +5,8 @@ from phase1_pipeline import _validate_isolation_for_health_gate, main
 
 
 class Phase1HealthIsolationGateTests(unittest.TestCase):
-    def test_degraded_health_passes_when_every_unhealthy_source_is_isolated(self):
+    @staticmethod
+    def test_degraded_health_passes_when_every_unhealthy_source_is_isolated():
         health = {
             "run_id": "run-123",
             "overall_status": "degraded",
@@ -25,7 +26,8 @@ class Phase1HealthIsolationGateTests(unittest.TestCase):
 
         _validate_isolation_for_health_gate(health=health, anomaly=anomaly)
 
-    def test_gate_rejects_unhealthy_source_that_is_not_isolated(self):
+    @staticmethod
+    def test_gate_rejects_unhealthy_source_that_is_not_isolated():
         health = {
             "run_id": "run-123",
             "overall_status": "degraded",

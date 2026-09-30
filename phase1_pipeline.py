@@ -139,32 +139,48 @@ def parser() -> argparse.ArgumentParser:
     return root
 
 
+def _handle_run_source(args: argparse.Namespace, root: Path) -> int:
+    command = list(args.command)
+    if command and command[0] == "--":
+        command = command[1:]
+    if not command:
+        raise ValueError("Collector command is required after --")
+    run_source(
+        root=root, source=args.source, config_path=Path(args.config),
+        command=command, timeout_seconds=args.timeout_seconds,
+    )
+    return 0
+
+
+def _handle_build_manual_review(args: argparse.Namespace, root: Path) -> int:
+    summary = build_manual_review(
+        root=root, source_plan=reporting_source_plan(args, root=root)
+    )
+    _raise_for_canonical_review_exclusions(summary)
+    return 0
+
+
+def _handle_report_health(args: argparse.Namespace, root: Path) -> int:
+    report = collect_health(
+        root=root, source_plan=reporting_source_plan(args, root=root)
+    )
+    json_path, md_path = write_health_report(root=root, report=report)
+    print(f"Health JSON: {json_path.relative_to(root)}")
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = parser().parse_args(argv)
     root = Path.cwd()
-    if args.action == "run-source":
-        command = list(args.command)
-        if command and command[0] == "--":
-            command = command[1:]
-        if not command:
-            raise ValueError("Collector command is required after --")
-        run_source(
-            root=root, source=args.source, config_path=Path(args.config),
-            command=command, timeout_seconds=args.timeout_seconds,
-        )
-        return 0
-    if args.action == "build-manual-review":
-        summary = build_manual_review(
-            root=root, source_plan=reporting_source_plan(args, root=root)
-        )
-        _raise_for_canonical_review_exclusions(summary)
-        return 0
-    if args.action == "report-health":
-        report = collect_health(
-            root=root, source_plan=reporting_source_plan(args, root=root)
-        )
-        json_path, md_path = write_health_report(root=root, report=report)
-        print(f"Health JSON: {json_path.relative_to(root)}")
+    handlers = {
+        "run-source": _handle_run_source,
+        "build-manual-review": _handle_build_manual_review,
+        "report-health": _handle_report_health,
+    }
+    handler = handlers.get(args.action)
+    if handler is None:
+        raise ValueError(f"Unknown action: {args.action}")
+    return handler(args, root)
         print(f"Health summary: {md_path.relative_to(root)}")
         return 0
     if args.action == "check-health":

@@ -14,7 +14,8 @@ from purpose_outputs import _write_csv as write_purpose_csv
 
 
 class CsvLineTerminatorTests(unittest.TestCase):
-    def _git_env(self, root: Path) -> dict[str, str]:
+    @staticmethod
+    def _git_env(root: Path) -> dict[str, str]:
         env = os.environ.copy()
         env["GIT_CONFIG_NOSYSTEM"] = "1"
         env["HOME"] = str(root / "home")
