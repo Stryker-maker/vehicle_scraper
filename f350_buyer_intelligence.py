@@ -201,8 +201,6 @@ def extract_configuration_evidence(normalized: dict[str, Any], raw_payload: Any)
             r"\bfull\s+service\s+history\b", r"\bservice\s+records?\s+(?:available|included)\b",
             r"\bmaintenance\s+records?\s+(?:available|included)\b", r"\bdealer[-\s]+maintained\b",
         )),))
-        service = service or ""
-        service_match = service_match or ""
     accident = _text(normalized.get("accident_claim")) or "Unknown"
     use_claims: list[str] = []
     negative_commercial = bool(re.search(r"\b(?:never|not|no)\s+(?:used\s+)?(?:as\s+)?(?:a\s+)?(?:fleet|commercial|rental)\b", lowered))

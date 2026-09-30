@@ -167,6 +167,14 @@ def _flatten(value: Any, path: str = "") -> list[str]:
             result.append(f"{path}={text}" if path else text)
     return result
 
+def _validate_input_field(name: str, value: Any, allowed_statuses: set[str]) -> dict[str, Any]:
+    if not isinstance(value, dict) or set(value) != {"value", "evidence_status"}:
+        raise ValueError(f"{name} must contain value and evidence_status")
+    if value["evidence_status"] not in allowed_statuses:
+        raise ValueError(f"{name} has unsupported evidence_status")
+    return value
+
+
 def load_purpose_inputs(path: Path) -> dict[str, Any]:
     value = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(value, dict) or value.get("schema_version") != PURPOSE_INPUT_SCHEMA_VERSION:
@@ -187,18 +195,17 @@ def load_purpose_inputs(path: Path) -> dict[str, Any]:
         if expected_profile == "owned_vehicle_value":
             _process_owned_vehicle_entry(vehicle_key, entry)
         else:
-            if set(entry) != {"analysis_profile", "seller", "purchase_reason"}:
-                raise ValueError(f"{vehicle_key}: unknown family-friend purchase input field")
-            _validate_input_field(
-                f"{vehicle_key}.seller",
-                entry["seller"],
-                {"owner_reported_historical_unverified", "owner_input_required"},
-            )
-            _validate_input_field(
-                f"{vehicle_key}.purchase_reason",
-                entry["purchase_reason"],
-                {"owner_input_optional"},
-            )
+            if set(entry) != {"analysis_profile", "preferences"}:
+                raise ValueError(f"{vehicle_key}: unknown family input field")
+            preferences = entry.get("preferences")
+            if not isinstance(preferences, dict) or set(preferences) != set(FAMILY_PREFERENCE_FIELDS):
+                raise ValueError(f"{vehicle_key}: preference field set mismatch")
+            for field_name in FAMILY_PREFERENCE_FIELDS:
+                _validate_input_field(
+                    f"{vehicle_key}.{field_name}",
+                    preferences[field_name],
+                    {"friend_input_required", "friend_reported_unverified"},
+                )
     return value
 
 def _process_owned_vehicle_entry(vehicle_key: str, entry: dict[str, Any]) -> None:
@@ -215,20 +222,6 @@ def _process_owned_vehicle_entry(vehicle_key: str, entry: dict[str, Any]) -> Non
         )
     if not _text(entry.get("sale_goal")):
         raise ValueError(f"{vehicle_key}: sale_goal invalid")
-                raise ValueError(f"{vehicle_key}: sale_goal is required")
-        else:
-            if set(entry) != {"analysis_profile", "preferences"}:
-                raise ValueError(f"{vehicle_key}: unknown family input field")
-            preferences = entry.get("preferences")
-            if not isinstance(preferences, dict) or set(preferences) != set(FAMILY_PREFERENCE_FIELDS):
-                raise ValueError(f"{vehicle_key}: preference field set mismatch")
-            for field_name in FAMILY_PREFERENCE_FIELDS:
-                _validate_input_field(
-                    f"{vehicle_key}.{field_name}",
-                    preferences[field_name],
-                    {"friend_input_required", "friend_reported_unverified"},
-                )
-    return value
 
 
 def artifact_paths(root: Path, config: dict[str, Any], profile: str) -> dict[str, Path]:
@@ -666,6 +659,7 @@ def _family_evidence(bundle: dict[str, Any], base: dict[str, Any]) -> dict[str, 
 
 def _apply_numeric_preferences(
     base: dict[str, Any],
+    evidence: dict[str, Any],
     preferences: dict[str, Any],
     reasons: list[str],
     mismatches: list[str],
@@ -674,6 +668,10 @@ def _apply_numeric_preferences(
     mapping = {
         "budget_max_cad": (base["price_cad"], "max"),
         "min_year": (base["year"], "min"),
+        "max_year": (base["year"], "max"),
+        "max_mileage_km": (base["mileage_km"], "max"),
+        "max_distance_km": (base["distance_km"], "max"),
+        "minimum_seating": (evidence["seating"]["value"], "min"),
     }
     for field, (listing_value, relation) in mapping.items():
         preferred = _profile_value(preferences, field)
@@ -697,11 +695,7 @@ def evaluate_preferences(
     mismatches: list[str] = []
     unknown_listing: list[str] = []
 
-    _apply_numeric_preferences(base, preferences, reasons, mismatches, unknown_listing)
-    numeric_check("max_year", base["year"], "max")
-    numeric_check("max_mileage_km", base["mileage_km"], "max")
-    numeric_check("max_distance_km", base["distance_km"], "max")
-    numeric_check("minimum_seating", evidence["seating"]["value"], "min")
+    _apply_numeric_preferences(base, evidence, preferences, reasons, mismatches, unknown_listing)
 
     seller_types = _profile_value(preferences, "acceptable_seller_types")
     seller_type = _text(base["normalized"].get("seller_type_claim"))

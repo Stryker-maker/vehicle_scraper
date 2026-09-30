@@ -1,10 +1,23 @@
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from phase1_pipeline import _validate_isolation_for_health_gate, main
 
 
 class Phase1HealthIsolationGateTests(unittest.TestCase):
+    def test_report_health_prints_json_and_summary_paths(self):
+        root = Path.cwd()
+        with patch("phase1_pipeline.collect_health", return_value={}), patch(
+            "phase1_pipeline.write_health_report",
+            return_value=(root / "health.json", root / "health.md"),
+        ), patch("builtins.print") as output:
+            self.assertEqual(main(["report-health", "--configs", "config_f350.json"]), 0)
+        self.assertEqual(output.call_args_list, [
+            unittest.mock.call("Health JSON: health.json"),
+            unittest.mock.call("Health summary: health.md"),
+        ])
+
     @staticmethod
     def test_degraded_health_passes_when_every_unhealthy_source_is_isolated():
         health = {

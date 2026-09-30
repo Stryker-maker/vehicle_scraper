@@ -308,6 +308,21 @@ class BuildTests(unittest.TestCase):
             },
         }
 
+    def test_listing_without_service_history_retains_maintenance_question(self):
+        bundle = self.bundle(0, 50000, 100000)
+        bundle["raw_payload"]["description"] = "Crew Cab SRW 4x4"
+        listing, questions = buyer._listing(
+            bundle, [], {}, {"seller_questions": "questions.jsonl"}, "single_source"
+        )
+        self.assertIsNone(listing["configuration_evidence"]["service_history"]["value"])
+        self.assertIn("service_history", listing["missing_investigation_fields"])
+        maintenance = [
+            question for question in questions["questions"]
+            if question["reason"] == "service_history_missing"
+        ]
+        self.assertEqual(len(maintenance), 1)
+        self.assertIn("maintenance and repair records", maintenance[0]["question"])
+
     def test_build_writes_transparent_outputs_without_rank_or_score(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
