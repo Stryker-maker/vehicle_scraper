@@ -167,23 +167,6 @@ def _flatten(value: Any, path: str = "") -> list[str]:
             result.append(f"{path}={text}" if path else text)
     return result
 
-
-def source_text(raw_payload: Any, normalized: dict[str, Any]) -> str:
-    values = [
-        _text(normalized.get("trim")),
-        _text(normalized.get("engine")),
-        _text(normalized.get("fuel")),
-        _text(normalized.get("accident_claim")),
-        _text(normalized.get("seller_type_claim")),
-        *_flatten(raw_payload),
-    ]
-    return " | ".join(value for value in values if value)
-
-
-def _field(value: Any, evidence_status: str) -> dict[str, Any]:
-    return {"value": value, "evidence_status": evidence_status}
-
-
 def _validate_input_field(name: str, value: Any, allowed_statuses: set[str]) -> dict[str, Any]:
     if not isinstance(value, dict) or set(value) != {"value", "evidence_status"}:
         raise ValueError(f"{name} must contain value and evidence_status")
@@ -202,23 +185,15 @@ def load_purpose_inputs(path: Path) -> dict[str, Any]:
     for vehicle_key, entry in vehicles.items():
         if not isinstance(entry, dict):
             raise ValueError(f"{vehicle_key}: purpose input must be an object")
-        expected_profile = "owned_vehicle_value" if vehicle_key in OWNED_VEHICLES else "family_friend_purchase"
+        expected_profile = (
+            "owned_vehicle_value"
+            if vehicle_key in OWNED_VEHICLES
+            else "family_friend_purchase"
+        )
         if entry.get("analysis_profile") != expected_profile:
             raise ValueError(f"{vehicle_key}: analysis profile mismatch")
         if expected_profile == "owned_vehicle_value":
-            if set(entry) != {"analysis_profile", "subject_profile", "sale_goal"}:
-                raise ValueError(f"{vehicle_key}: unknown owned-value input field")
-            subject = entry.get("subject_profile")
-            if not isinstance(subject, dict) or set(subject) != set(OWNED_SUBJECT_FIELDS):
-                raise ValueError(f"{vehicle_key}: subject profile field set mismatch")
-            for field_name in OWNED_SUBJECT_FIELDS:
-                _validate_input_field(
-                    f"{vehicle_key}.{field_name}",
-                    subject[field_name],
-                    {"owner_reported_historical_unverified", "owner_input_required"},
-                )
-            if not _text(entry.get("sale_goal")):
-                raise ValueError(f"{vehicle_key}: sale_goal is required")
+            _process_owned_vehicle_entry(vehicle_key, entry)
         else:
             if set(entry) != {"analysis_profile", "preferences"}:
                 raise ValueError(f"{vehicle_key}: unknown family input field")
@@ -232,6 +207,21 @@ def load_purpose_inputs(path: Path) -> dict[str, Any]:
                     {"friend_input_required", "friend_reported_unverified"},
                 )
     return value
+
+def _process_owned_vehicle_entry(vehicle_key: str, entry: dict[str, Any]) -> None:
+    if set(entry) != {"analysis_profile", "subject_profile", "sale_goal"}:
+        raise ValueError(f"{vehicle_key}: unknown owned-value input field")
+    subject = entry["subject_profile"]
+    if not isinstance(subject, dict) or set(subject) != set(OWNED_SUBJECT_FIELDS):
+        raise ValueError(f"{vehicle_key}: subject profile field set mismatch")
+    for field_name in OWNED_SUBJECT_FIELDS:
+        _validate_input_field(
+            f"{vehicle_key}.{field_name}",
+            subject[field_name],
+            {"owner_reported_historical_unverified", "owner_input_required"},
+        )
+    if not _text(entry.get("sale_goal")):
+        raise ValueError(f"{vehicle_key}: sale_goal invalid")
 
 
 def artifact_paths(root: Path, config: dict[str, Any], profile: str) -> dict[str, Path]:
@@ -461,6 +451,19 @@ def _string_match(subject: str, listing: str) -> bool:
     return bool(subject_tokens) and all(token in listing_text for token in subject_tokens[:2])
 
 
+def _field_status(field_name: str, subject: dict[str, Any], listing_value: Any) -> str:
+    subject_value = _profile_value(subject, field_name)
+    if subject_value in (None, "", []):
+        return "skip"
+    if listing_value in (None, "", []):
+        return "unknown"
+    if field_name == "year":
+        return "match" if subject_value == listing_value else "conflict"
+    if _string_match(str(subject_value), str(listing_value)):
+        return "match"
+    return "conflict"
+
+
 def owned_comparability(
     base: dict[str, Any],
     bundle: dict[str, Any],
@@ -479,14 +482,16 @@ def owned_comparability(
     matches: list[str] = []
     conflicts: list[str] = []
     unknown_listing: list[str] = []
-    for field_name in ("year", "trim", "fuel", "engine", "drivetrain"):
-        subject_value = _profile_value(subject, field_name)
-        listing_value = listing_values[field_name]
-        if subject_value in (None, "", []):
+    for field_name, listing_value in listing_values.items():
+        status = _field_status(field_name, subject, listing_value)
+        if status == "skip":
             continue
-        if listing_value in (None, "", []):
+        if status == "unknown":
             unknown_listing.append(field_name)
-            continue
+        elif status == "match":
+            matches.append(field_name)
+        else:
+            conflicts.append(field_name)
         if field_name == "year":
             matched = _int(subject_value) == _int(listing_value)
         elif field_name in {"trim", "engine"}:
@@ -652,6 +657,33 @@ def _family_evidence(bundle: dict[str, Any], base: dict[str, Any]) -> dict[str, 
         "accident_title": _accident_title(normalized, text),
     }
 
+def _apply_numeric_preferences(
+    base: dict[str, Any],
+    evidence: dict[str, Any],
+    preferences: dict[str, Any],
+    reasons: list[str],
+    mismatches: list[str],
+    unknown_listing: list[str]
+) -> None:
+    mapping = {
+        "budget_max_cad": (base["price_cad"], "max"),
+        "min_year": (base["year"], "min"),
+        "max_year": (base["year"], "max"),
+        "max_mileage_km": (base["mileage_km"], "max"),
+        "max_distance_km": (base["distance_km"], "max"),
+        "minimum_seating": (evidence["seating"]["value"], "min"),
+    }
+    for field, (listing_value, relation) in mapping.items():
+        preferred = _profile_value(preferences, field)
+        if preferred is None:
+            continue
+        if listing_value is None:
+            unknown_listing.append(field)
+        elif (relation == "max" and listing_value > preferred) or \
+             (relation == "min" and listing_value < preferred):
+            mismatches.append(field)
+        else:
+            reasons.append(f"preference_match:{field}")
 
 def evaluate_preferences(
     base: dict[str, Any],
@@ -663,26 +695,7 @@ def evaluate_preferences(
     mismatches: list[str] = []
     unknown_listing: list[str] = []
 
-    def numeric_check(field_name: str, listing_value: int | float | None, relation: str) -> None:
-        preferred = _profile_value(preferences, field_name)
-        if preferred is None:
-            return
-        if listing_value is None:
-            unknown_listing.append(field_name)
-            return
-        if relation == "max" and listing_value > preferred:
-            mismatches.append(field_name)
-        elif relation == "min" and listing_value < preferred:
-            mismatches.append(field_name)
-        else:
-            reasons.append(f"preference_match:{field_name}")
-
-    numeric_check("budget_max_cad", base["price_cad"], "max")
-    numeric_check("min_year", base["year"], "min")
-    numeric_check("max_year", base["year"], "max")
-    numeric_check("max_mileage_km", base["mileage_km"], "max")
-    numeric_check("max_distance_km", base["distance_km"], "max")
-    numeric_check("minimum_seating", evidence["seating"]["value"], "min")
+    _apply_numeric_preferences(base, evidence, preferences, reasons, mismatches, unknown_listing)
 
     seller_types = _profile_value(preferences, "acceptable_seller_types")
     seller_type = _text(base["normalized"].get("seller_type_claim"))
@@ -733,7 +746,7 @@ def evaluate_preferences(
     return status, reasons, missing_preferences
 
 
-def family_seller_questions(base: dict[str, Any], evidence: dict[str, Any]) -> list[dict[str, str]]:
+def family_seller_questions(_base: dict[str, Any], evidence: dict[str, Any]) -> list[dict[str, str]]:
     questions: list[dict[str, str]] = []
 
     def add(category: str, priority: str, question: str, reason: str) -> None:
@@ -930,7 +943,12 @@ def _csv_value(value: Any) -> Any:
 def _write_csv(path: Path, fieldnames: Sequence[str], records: Sequence[dict[str, Any]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fieldnames, extrasaction="ignore")
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=fieldnames,
+            extrasaction="ignore",
+            lineterminator="\n"
+        )
         writer.writeheader()
         for record in records:
             writer.writerow({field: _csv_value(record.get(field)) for field in fieldnames})
