@@ -371,6 +371,213 @@ class CollectionIsolationTests(unittest.TestCase):
             self.assertIn(f"{vk}_{src}_latest_quarantined.csv", q_files)
             self.assertIn(f"{vk}_{src}_2026-08-01_00-00-00.csv", q_files)
 
+    def test_no_output_collection_counts_as_successfully_handled_without_mutation(self):
+        """
+        Prove that a valid collection with no current output files is still reported
+        as successfully handled and does not cause filesystem mutation.
+        """
+        run_id = "run_multi_123"
+        report = {
+            "run_id": run_id,
+            "isolated_collections": [
+                {"vehicle_key": "ford_f150", "source": "autotrader"},
+            ],
+        }
+
+        status = self._source_entry(
+            "ford_f150",
+            "autotrader",
+            healthy=False,
+            accepted=0,
+            fetched=0,
+            execution_status="failed",
+        )
+        status["started_at_utc"] = utc_now()
+        status["run_id"] = run_id
+        status["archive_output"] = None
+        status["latest_output"] = None
+
+        status_file = (
+            self.root
+            / "data"
+            / "ford_f150"
+            / "run_status"
+            / "autotrader_latest.json"
+        )
+        status_file.parent.mkdir(parents=True, exist_ok=True)
+        status_file.write_text(json.dumps(status), encoding="utf-8")
+
+        isolated = isolate_anomalous_collections(
+            root=self.root,
+            report=report,
+        )
+
+        self.assertEqual(
+            isolated,
+            [{"vehicle_key": "ford_f150", "source": "autotrader"}],
+        )
+        self.assertEqual(
+            report["isolated_collections"],
+            [{"vehicle_key": "ford_f150", "source": "autotrader"}],
+        )
+
+        anomaly_codes = {
+            anomaly["code"]
+            for anomaly in report.get("anomalies", [])
+        }
+        self.assertIn("no_isolation_outputs_present", anomaly_codes)
+
+        self.assertTrue(status_file.exists())
+        self.assertEqual(
+            status_file.read_text(encoding="utf-8"),
+            json.dumps(status),
+        )
+
+        quarantine_root = (
+            self.root
+            / "data"
+            / "ford_f150"
+            / "quarantine"
+            / "autotrader"
+        )
+        self.assertFalse(quarantine_root.exists())
+
+    def test_isolation_handles_mixed_output_and_no_output_collections_atomically(self):
+        """
+        Prove that a mixed isolation request containing one collection with files
+        and one collection with no files handles both collections successfully,
+        while moving only the collection that has output files.
+        """
+        run_id = "run_multi_123"
+        report = {
+            "run_id": run_id,
+            "isolated_collections": [
+                {"vehicle_key": "ford_f150", "source": "autotrader"},
+                {"vehicle_key": "subaru_forester", "source": "kijiji"},
+            ],
+        }
+
+        f150_status = self._source_entry(
+            "ford_f150",
+            "autotrader",
+            healthy=False,
+            accepted=0,
+            fetched=0,
+            execution_status="failed",
+        )
+        f150_status["started_at_utc"] = utc_now()
+        f150_status["run_id"] = run_id
+        f150_status["archive_output"] = (
+            "data/ford_f150/autotrader/"
+            "ford_f150_autotrader_2026-08-01_00-00-00.csv"
+        )
+
+        f150_status_path = (
+            self.root
+            / "data"
+            / "ford_f150"
+            / "run_status"
+            / "autotrader_latest.json"
+        )
+        f150_status_path.parent.mkdir(parents=True, exist_ok=True)
+        f150_status_path.write_text(
+            json.dumps(f150_status),
+            encoding="utf-8",
+        )
+
+        f150_latest = (
+            self.root
+            / "data"
+            / "ford_f150"
+            / "latest"
+            / "ford_f150_autotrader_latest.csv"
+        )
+        f150_archive = (
+            self.root
+            / "data"
+            / "ford_f150"
+            / "autotrader"
+            / "ford_f150_autotrader_2026-08-01_00-00-00.csv"
+        )
+        f150_latest.parent.mkdir(parents=True, exist_ok=True)
+        f150_archive.parent.mkdir(parents=True, exist_ok=True)
+
+        f150_latest.write_text("f150_latest_data", encoding="utf-8")
+        f150_archive.write_text("f150_archive_data", encoding="utf-8")
+
+        f150_latest_before = f150_latest.read_text(encoding="utf-8")
+        f150_archive_before = f150_archive.read_text(encoding="utf-8")
+
+        f150_quarantine = (
+            self.root
+            / "data"
+            / "ford_f150"
+            / "quarantine"
+            / "autotrader"
+            / run_id
+        )
+
+        f150_expected_latest = (
+            f150_quarantine
+            / "ford_f150_autotrader_latest_quarantined.csv"
+        )
+        f150_expected_archive = (
+            f150_quarantine
+            / "ford_f150_autotrader_2026-08-01_00-00-00.csv"
+        )
+
+        f150_anomaly_codes_before = set(
+            anomaly["code"]
+            for anomaly in report.get("anomalies", [])
+        )
+
+        isolated = isolate_anomalous_collections(
+            root=self.root,
+            report=report,
+        )
+
+        self.assertEqual(
+            isolated,
+            [
+                {"vehicle_key": "ford_f150", "source": "autotrader"},
+                {"vehicle_key": "subaru_forester", "source": "kijiji"},
+            ],
+        )
+
+        self.assertFalse(f150_latest.exists())
+        self.assertFalse(f150_archive.exists())
+
+        self.assertTrue(f150_expected_latest.exists())
+        self.assertTrue(f150_expected_archive.exists())
+
+        self.assertEqual(
+            f150_expected_latest.read_text(encoding="utf-8"),
+            f150_latest_before,
+        )
+        self.assertEqual(
+            f150_expected_archive.read_text(encoding="utf-8"),
+            f150_archive_before,
+        )
+
+        self.assertIn(
+            {"vehicle_key": "subaru_forester", "source": "kijiji"},
+            report["isolated_collections"],
+        )
+
+        anomaly_codes_after = {
+            anomaly["code"]
+            for anomaly in report.get("anomalies", [])
+        }
+        self.assertIn(
+            "no_isolation_outputs_present",
+            anomaly_codes_after,
+        )
+
+        self.assertEqual(
+            f150_anomaly_codes_before,
+            set(),
+        )
+    
     def test_malformed_unreadable_anomaly_report_causes_publication_to_fail_closed(self):
         """
         Prove that an unreadable or malformed anomalies_latest.json causes prepare_manifest() to fail closed.
