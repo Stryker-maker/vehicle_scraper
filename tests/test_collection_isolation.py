@@ -552,10 +552,10 @@ class CollectionIsolationTests(unittest.TestCase):
             / "ford_f150_autotrader_2026-08-01_00-00-00.csv"
         )
 
-        f150_anomaly_codes_before = set(
+        f150_anomaly_codes_before = {
             anomaly["code"]
             for anomaly in report.get("anomalies", [])
-        )
+        }
 
         isolated = isolate_anomalous_collections(
             root=self.root,
@@ -595,14 +595,10 @@ class CollectionIsolationTests(unittest.TestCase):
             for anomaly in report.get("anomalies", [])
             if anomaly.get("code") == "no_isolation_outputs_present"
         ]
-        self.assertIn(
-            {
-                "vehicle_key": "subaru_forester",
-                "source": "kijiji",
-                "code": "no_isolation_outputs_present",
-            },
-            no_output_anomalies,
-        )
+
+        self.assertEqual(len(no_output_anomalies), 1)
+        self.assertEqual(no_output_anomalies[0]["vehicle_key"], "subaru_forester")
+        self.assertEqual(no_output_anomalies[0]["source"], "kijiji")
         
         self.assertEqual(
             f150_anomaly_codes_before,
