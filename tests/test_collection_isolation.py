@@ -485,6 +485,32 @@ class CollectionIsolationTests(unittest.TestCase):
             encoding="utf-8",
         )
 
+        subaru_status = self._source_entry(
+            "subaru_forester",
+            "kijiji",
+            healthy=False,
+            accepted=0,
+            fetched=0,
+            execution_status="failed",
+        )
+        subaru_status["started_at_utc"] = utc_now()
+        subaru_status["run_id"] = run_id
+        subaru_status["archive_output"] = None
+        subaru_status["latest_output"] = None
+
+        subaru_status_path = (
+            self.root
+            / "data"
+            / "subaru_forester"
+            / "run_status"
+            / "kijiji_latest.json"
+        )
+        subaru_status_path.parent.mkdir(parents=True, exist_ok=True)
+        subaru_status_path.write_text(
+            json.dumps(subaru_status),
+            encoding="utf-8",
+        )
+        
         f150_latest = (
             self.root
             / "data"
@@ -1180,38 +1206,6 @@ class CollectionIsolationTests(unittest.TestCase):
         self.assertTrue(f150_latest.exists())
         self.assertEqual(f350_latest.read_text(encoding="utf-8"), "f350_latest_data")
         self.assertEqual(f150_latest.read_text(encoding="utf-8"), "f150_latest_data")
-
-    def test_valid_provenance_with_no_output_files_omitted_from_isolated_collections(self):
-        """
-        Prove that a collection with valid provenance but no latest CSV and no archive CSV
-        is omitted from isolated_collections and receives a no_isolation_outputs_present diagnostic.
-        """
-        vk = "ford_f150"
-        src = "autotrader"
-        run_id = "run_no_files_123"
-        run_start = utc_now()
-
-        status = self._source_entry(vk, src, healthy=False, accepted=0, fetched=0, execution_status="failed")
-        status["started_at_utc"] = run_start
-        status["run_id"] = run_id
-        status_file = self.root / "data" / vk / "run_status" / f"{src}_latest.json"
-        status_file.parent.mkdir(parents=True, exist_ok=True)
-        status_file.write_text(json.dumps(status), encoding="utf-8")
-
-        report = {
-            "run_id": run_id,
-            "isolated_collections": [{"vehicle_key": vk, "source": src}],
-        }
-
-        isolated = isolate_anomalous_collections(root=self.root, report=report)
-
-        # Empty move plan MUST NOT claim successful isolation
-        self.assertEqual(isolated, [])
-        self.assertEqual(report["isolated_collections"], [])
-
-        no_output_anomalies = [a for a in report["anomalies"] if a.get("code") == "no_isolation_outputs_present"]
-        self.assertEqual(len(no_output_anomalies), 1)
-        self.assertEqual(no_output_anomalies[0]["vehicle_key"], vk)
 
     def test_archive_path_escaping_collection_directory_raises_value_error_and_prevents_moves(self):
         """
