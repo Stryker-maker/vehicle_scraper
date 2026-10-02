@@ -590,15 +590,20 @@ class CollectionIsolationTests(unittest.TestCase):
             report["isolated_collections"],
         )
 
-        anomaly_codes_after = {
-            anomaly["code"]
+        no_output_anomalies = [
+            anomaly
             for anomaly in report.get("anomalies", [])
-        }
+            if anomaly.get("code") == "no_isolation_outputs_present"
+        ]
         self.assertIn(
-            "no_isolation_outputs_present",
-            anomaly_codes_after,
+            {
+                "vehicle_key": "subaru_forester",
+                "source": "kijiji",
+                "code": "no_isolation_outputs_present",
+            },
+            no_output_anomalies,
         )
-
+        
         self.assertEqual(
             f150_anomaly_codes_before,
             set(),
