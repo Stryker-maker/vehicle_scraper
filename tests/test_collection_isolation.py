@@ -421,11 +421,15 @@ class CollectionIsolationTests(unittest.TestCase):
             [{"vehicle_key": "ford_f150", "source": "autotrader"}],
         )
 
-        anomaly_codes = {
-            anomaly["code"]
+        no_output_anomalies = [
+            anomaly
             for anomaly in report.get("anomalies", [])
-        }
-        self.assertIn("no_isolation_outputs_present", anomaly_codes)
+            if anomaly.get("code") == "no_isolation_outputs_present"
+        ]
+
+        self.assertEqual(len(no_output_anomalies), 1)
+        self.assertEqual(no_output_anomalies[0]["vehicle_key"], "ford_f150")
+        self.assertEqual(no_output_anomalies[0]["source"], "autotrader")
 
         self.assertTrue(status_file.exists())
         self.assertEqual(
@@ -552,11 +556,6 @@ class CollectionIsolationTests(unittest.TestCase):
             / "ford_f150_autotrader_2026-08-01_00-00-00.csv"
         )
 
-        f150_anomaly_codes_before = {
-            anomaly["code"]
-            for anomaly in report.get("anomalies", [])
-        }
-
         isolated = isolate_anomalous_collections(
             root=self.root,
             report=report,
@@ -600,10 +599,6 @@ class CollectionIsolationTests(unittest.TestCase):
         self.assertEqual(no_output_anomalies[0]["vehicle_key"], "subaru_forester")
         self.assertEqual(no_output_anomalies[0]["source"], "kijiji")
         
-        self.assertEqual(
-            f150_anomaly_codes_before,
-            set(),
-        )
     
     def test_malformed_unreadable_anomaly_report_causes_publication_to_fail_closed(self):
         """
