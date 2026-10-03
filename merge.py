@@ -176,7 +176,7 @@ def save_merged(merged):
 
     for path in [archive_file, latest_file]:
         with open(path, "w", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=MERGED_FIELDS, extrasaction="ignore")
+            writer = csv.DictWriter(f, fieldnames=MERGED_FIELDS, extrasaction="ignore", lineterminator="\n")
             writer.writeheader()
             writer.writerows(merged)
 
