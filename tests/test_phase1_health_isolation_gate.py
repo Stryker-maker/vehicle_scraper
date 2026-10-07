@@ -58,10 +58,18 @@ class Phase1HealthIsolationGateTests(unittest.TestCase):
                     "anomalies": [],
                 },
             ]
-            self.assertEqual(
-                main(["check-health", "--report", "health.json", "--anomaly-report", "anomalies.json"]),
-                1,
+            with patch("phase1_pipeline.Path.exists", return_value=True), patch(
+                "sys.stderr"
+            ) as stderr:
+                self.assertEqual(
+                    main(["check-health", "--report", "health.json", "--anomaly-report", "anomalies.json"]),
+                    1,
+                )
+            self.assertIn(
+                "must be a list of objects",
+                "".join(call.args[0] for call in stderr.write.call_args_list),
             )
+            self.assertEqual(load_json.call_count, 2)
             isolate.assert_not_called()
 
     def test_gate_rejects_unhealthy_source_that_is_not_isolated(self):
