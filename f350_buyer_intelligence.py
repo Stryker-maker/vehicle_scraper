@@ -194,6 +194,8 @@ def extract_configuration_evidence(normalized: dict[str, Any], raw_payload: Any)
     engine_hours, engine_match = _hours(text, "engine")
     idle_hours, idle_match = _hours(text, "idle")
     lowered = text.casefold()
+    service: str | None
+    service_match: str | None
     if re.search(r"\b(?:no|without)\s+(?:service|maintenance)\s+records?\b", lowered):
         service, service_match = "records_not_available_claim", "no service records"
     else:
