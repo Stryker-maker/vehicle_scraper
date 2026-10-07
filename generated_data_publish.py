@@ -260,6 +260,7 @@ def parser() -> argparse.ArgumentParser:
     prepare.add_argument("--ref-name", required=True)
     verify = sub.add_parser("verify-staged")
     verify.add_argument("--registry", default=str(DEFAULT_REGISTRY_PATH))
+    sub.add_parser("verify-staged-csv-whitespace")
     return result
 
 
@@ -280,6 +281,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.action == "verify-staged":
         report = verify_staged_manifest(root=root, registry_path=Path(args.registry))
         print(json.dumps(report, indent=2, sort_keys=True))
+        return 0
+    if args.action == "verify-staged-csv-whitespace":
+        verify_staged_csv_whitespace(root)
         return 0
     raise AssertionError(args.action)
 
