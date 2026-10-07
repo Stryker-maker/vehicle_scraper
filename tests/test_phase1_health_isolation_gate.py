@@ -39,7 +39,7 @@ class Phase1HealthIsolationGateTests(unittest.TestCase):
 
         _validate_isolation_for_health_gate(health=health, anomaly=anomaly)
 
-    def test_gate_rejects_unhealthy_source_that_is_not_isolated(self):    def test_malformed_isolated_collections_fail_closed_before_mutation(self):
+    def test_malformed_isolated_collections_fail_closed_before_mutation(self):
         with patch("phase1_pipeline.load_json") as load_json, patch(
             "phase1_pipeline.isolate_anomalous_collections"
         ) as isolate:
