@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import json
 import os
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -22,6 +23,13 @@ class CsvLineTerminatorTests(unittest.TestCase):
         env["HOME"] = str(root / "home")
         env["XDG_CONFIG_HOME"] = str(root / "config")
         return env
+
+    @staticmethod
+    def _git_executable() -> str:
+        executable = shutil.which("git")
+        if executable is None:
+            raise RuntimeError("git executable is required for CSV publication safety tests")
+        return executable
 
     def _assert_publication_safe(self, writer, source: str) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -56,21 +64,21 @@ class CsvLineTerminatorTests(unittest.TestCase):
 
             env = self._git_env(root)
             subprocess.run(
-                ["git", "-c", "core.autocrlf=false", "init"],
+                [self._git_executable(), "-c", "core.autocrlf=false", "init"],
                 cwd=root,
                 check=True,
                 capture_output=True,
                 env=env,
             )
             subprocess.run(
-                ["git", "add", "data"],
+                [self._git_executable(), "add", "data"],
                 cwd=root,
                 check=True,
                 capture_output=True,
                 env=env,
             )
             check = subprocess.run(
-                ["git", "diff", "--cached", "--check"],
+                [self._git_executable(), "diff", "--cached", "--check"],
                 cwd=root,
                 text=True,
                 capture_output=True,
