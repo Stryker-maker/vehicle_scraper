@@ -152,7 +152,8 @@ class AdapterTests(unittest.TestCase):
         self.assertEqual(report["accepted_records"], 3)
         self.assertEqual(self.config_path.read_bytes(), original)
         with (self.root / report["latest_output"]).open("r", encoding="utf-8", newline="") as handle:
-            header = next(csv.reader(handle))
+            reader = csv.reader(handle)
+            header = next(reader, [])
         self.assertNotIn("rank", header)
         self.assertNotIn("score", header)
         self.assertIn("distance_evidence_status", header)
