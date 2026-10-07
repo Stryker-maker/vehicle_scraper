@@ -13,6 +13,7 @@ from unittest import mock
 from autotrader_history import write_csv_outputs as write_autotrader_csv_outputs
 from kijiji_history import write_csv_outputs as write_kijiji_csv_outputs
 from purpose_outputs import _write_csv as write_purpose_csv
+from generated_data_publish import verify_staged_csv_whitespace
 
 
 class CsvLineTerminatorTests(unittest.TestCase):
@@ -129,6 +130,26 @@ class CsvLineTerminatorTests(unittest.TestCase):
                 ["year_match", "model_match"],
             )
             self._assert_staged_git_diff_clean(root)
+
+    def test_staged_csv_whitespace_allows_embedded_lf_but_rejects_trailing_space(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            output = root / "data" / "test_vehicle" / "embedded.csv"
+            output.parent.mkdir(parents=True)
+            with output.open("w", encoding="utf-8", newline="") as handle:
+                writer = csv.writer(handle, lineterminator="\\n", quoting=csv.QUOTE_ALL)
+                writer.writerow(["location"])
+                writer.writerow(["Calgary \\nAB"])
+            env = self._git_env(root)
+            git = self._git_executable()
+            subprocess.run([git, "-c", "core.autocrlf=false", "init"], cwd=root, check=True, capture_output=True, env=env)
+            subprocess.run([git, "add", "data"], cwd=root, check=True, capture_output=True, env=env)
+            verify_staged_csv_whitespace(root)
+
+            output.write_bytes(b'"location"\\n"Calgary" \\n')
+            subprocess.run([git, "add", "data"], cwd=root, check=True, capture_output=True, env=env)
+            with self.assertRaisesRegex(ValueError, "trailing whitespace"):
+                verify_staged_csv_whitespace(root)
 
     def test_purpose_output_csv_is_lf_and_git_diff_check_clean(self):
         self._assert_direct_csv_writer_publication_safe(write_purpose_csv)
