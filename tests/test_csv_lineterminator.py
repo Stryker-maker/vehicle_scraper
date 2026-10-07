@@ -151,6 +151,100 @@ class CsvLineTerminatorTests(unittest.TestCase):
     def test_kijiji_csv_is_lf_and_git_diff_check_clean(self):
         self._assert_publication_safe(write_kijiji_csv_outputs, "Kijiji")
 
+    def test_buyer_intelligence_csv_preserves_bare_cr(self):
+        import f350_buyer_intelligence as buyer
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            overrides_path = root / "overrides.json"
+            overrides_path.write_text(
+                json.dumps({
+                    "schema_version": 1,
+                    "vehicle_key": "ford_f350",
+                    "overrides": {},
+                }),
+                encoding="utf-8",
+            )
+            listing = {
+                "vehicle_key": "ford_f350",
+                "source": "autotrader",
+                "canonical_listing_id": "listing-1",
+                "trim_claim": "Lariat\rSpecial",
+            }
+            with mock.patch.object(
+                buyer, "load_vehicle_config", return_value={"vehicle_key": "ford_f350"}
+            ), mock.patch.object(
+                buyer,
+                "_collect_available_f350_source_bundles",
+                return_value=([], ["autotrader"]),
+            ), mock.patch.object(
+                buyer,
+                "_generate_f350_investigation_outputs",
+                return_value=([listing], [{"canonical_listing_id": "listing-1", "questions": []}]),
+            ), mock.patch.object(
+                buyer, "market_summary", return_value={"listing_claim_count": 1}
+            ), mock.patch.object(
+                buyer, "write_summary_markdown"
+            ):
+                summary = buyer.build(
+                    root, root / "config_f350.json", "run-1", ["autotrader"], overrides_path
+                )
+
+            output = buyer.artifact_paths(root, {"vehicle_key": "ford_f350"})["investigation_csv"]
+            raw = output.read_bytes()
+            self.assertNotIn(b"\r\n", raw)
+            self.assertIn(b"\r", raw)
+            with output.open("r", encoding="utf-8", newline="") as handle:
+                parsed = list(csv.DictReader(handle))
+            self.assertEqual(parsed[0]["trim_claim"], "Lariat\rSpecial")
+            self.assertEqual(summary["listing_claim_count"], 1)
+
+    def test_manual_review_csv_preserves_bare_cr(self):
+        import phase1_reporting as reporting
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            config_path = root / "config.json"
+            config_path.write_text(json.dumps({"vehicle_key": "test_vehicle"}), encoding="utf-8")
+            status_path = root / "status.json"
+            status_path.write_text("{}", encoding="utf-8")
+            config = {"vehicle_key": "test_vehicle"}
+            status = {"run_id": "run-1", "execution_status": "success"}
+            record = {"canonical_listing_id": "listing-1"}
+            identity = {"canonical_listing_id": "listing-1"}
+            duplicate = {
+                "candidates": [],
+                "candidate_count": 0,
+                "high_confidence_count": 0,
+                "medium_confidence_count": 0,
+                "low_confidence_count": 0,
+                "artifact": "data/test_vehicle/duplicates.json",
+            }
+            with mock.patch.object(reporting, "load_json", side_effect=[config, status]), \
+                mock.patch.object(reporting, "source_status_path", return_value=status_path), \
+                mock.patch.object(reporting, "status_is_current_success", return_value=True), \
+                mock.patch.object(reporting, "_accepted_records", return_value=[record]), \
+                mock.patch.object(reporting, "load_current_identity_records", return_value=[identity]), \
+                mock.patch.object(reporting, "build_duplicate_candidates", return_value=duplicate), \
+                mock.patch.object(reporting, "candidate_index", return_value={}), \
+                mock.patch.object(
+                    reporting,
+                    "transform_manual_review_record",
+                    return_value={"location": "Calgary,\rAB"},
+                ):
+                reporting.build_manual_review(
+                    root=root,
+                    source_plan=[(config_path, ("autotrader",))],
+                    run_id="run-1",
+                )
+            output = root / "data/test_vehicle/manual_review/test_vehicle_manual_review_latest.csv"
+            raw = output.read_bytes()
+            self.assertNotIn(b"\r\n", raw)
+            self.assertIn(b"\r", raw)
+            with output.open("r", encoding="utf-8", newline="") as handle:
+                parsed = list(csv.DictReader(handle))
+            self.assertEqual(parsed[0]["location"], "Calgary,\rAB")
+
 
 if __name__ == "__main__":
     unittest.main()
