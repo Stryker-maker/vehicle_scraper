@@ -50,7 +50,11 @@ def write_csv_outputs(
     for path in (archive, latest):
         with path.open("w", encoding="utf-8", newline="") as handle:
             writer = csv.DictWriter(
-                handle, fieldnames=fields, extrasaction="ignore"
+                handle,
+                fieldnames=fields,
+                extrasaction="ignore",
+                lineterminator="\n",
+                quoting=csv.QUOTE_ALL,
             )
             writer.writeheader()
             writer.writerows(rows)

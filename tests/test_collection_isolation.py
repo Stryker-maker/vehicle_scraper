@@ -116,6 +116,162 @@ class CollectionIsolationTests(unittest.TestCase):
         dummy_config_f150 = dict(dummy_config, vehicle_key="ford_f150", model="F-150")
         (self.root / "config_f150.json").write_text(json.dumps(dummy_config_f150), encoding="utf-8")
 
+    def test_no_output_collection_counts_as_successfully_handled_without_mutation(self):
+        """Treat a valid collection with no current-run outputs as successfully isolated."""
+        run_id = "run_no_output_001"
+        vehicle_key = "ford_f150"
+        source = "autotrader"
+
+        status_dir = self.root / "data" / vehicle_key / "run_status"
+        status_dir.mkdir(parents=True, exist_ok=True)
+        (status_dir / f"{source}_latest.json").write_text(
+            json.dumps(
+                {
+                    "run_id": run_id,
+                    "started_at_utc": utc_now(),
+                    "latest_output": None,
+                    "archive_output": None,
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        report = {
+            "run_id": run_id,
+            "isolated_collections": [
+                {"vehicle_key": vehicle_key, "source": source}
+            ],
+            "anomalies": [],
+        }
+
+        isolated = isolate_anomalous_collections(
+            root=self.root,
+            report=report,
+        )
+
+        self.assertEqual(
+            isolated,
+            [{"vehicle_key": vehicle_key, "source": source}],
+        )
+        self.assertEqual(
+            report["isolated_collections"],
+            [{"vehicle_key": vehicle_key, "source": source}],
+        )
+        self.assertTrue(
+            any(
+                anomaly.get("code") == "no_isolation_outputs_present"
+                for anomaly in report["anomalies"]
+            )
+        )
+        self.assertFalse(
+            (self.root / "data" / vehicle_key / "latest").exists()
+        )
+        self.assertFalse(
+            (self.root / "data" / vehicle_key / "quarantine").exists()
+        )
+
+    def test_isolation_handles_mixed_output_and_no_output_collections_atomically(self):
+        """A no-output collection must not cause another collection's isolation to fail."""
+        run_id = "run_mixed_output_001"
+        output_vehicle = "ford_f350"
+        empty_vehicle = "ford_f150"
+        source = "autotrader"
+
+        output_status_dir = (
+            self.root / "data" / output_vehicle / "run_status"
+        )
+        output_status_dir.mkdir(parents=True, exist_ok=True)
+
+        empty_status_dir = (
+            self.root / "data" / empty_vehicle / "run_status"
+        )
+        empty_status_dir.mkdir(parents=True, exist_ok=True)
+
+        output_archive = (
+            self.root
+            / "data"
+            / output_vehicle
+            / source
+            / f"{output_vehicle}_{source}_{run_id}.csv"
+        )
+        output_archive.parent.mkdir(parents=True, exist_ok=True)
+        output_archive.write_text(
+            "vehicle_key,source\nford_f350,autotrader\n",
+            encoding="utf-8",
+        )
+
+        (output_status_dir / f"{source}_latest.json").write_text(
+            json.dumps(
+                {
+                    "run_id": run_id,
+                    "started_at_utc": utc_now(),
+                    "latest_output": None,
+                    "archive_output": str(
+                        output_archive.relative_to(self.root)
+                    ),
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        (empty_status_dir / f"{source}_latest.json").write_text(
+            json.dumps(
+                {
+                    "run_id": run_id,
+                    "started_at_utc": utc_now(),
+                    "latest_output": None,
+                    "archive_output": None,
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        report = {
+            "run_id": run_id,
+            "isolated_collections": [
+                {"vehicle_key": output_vehicle, "source": source},
+                {"vehicle_key": empty_vehicle, "source": source},
+            ],
+            "anomalies": [],
+        }
+
+        isolated = isolate_anomalous_collections(
+            root=self.root,
+            report=report,
+        )
+
+        expected = [
+            {"vehicle_key": output_vehicle, "source": source},
+            {"vehicle_key": empty_vehicle, "source": source},
+        ]
+
+        self.assertEqual(isolated, expected)
+        self.assertEqual(report["isolated_collections"], expected)
+
+        quarantined_archive = (
+            self.root
+            / "data"
+            / output_vehicle
+            / "quarantine"
+            / source
+            / run_id
+            / output_archive.name
+        )
+
+        self.assertTrue(quarantined_archive.is_file())
+        self.assertFalse(output_archive.exists())
+        self.assertFalse(
+            (self.root / "data" / empty_vehicle / "quarantine").exists()
+        )
+        self.assertTrue(
+            any(
+                anomaly.get("code") == "no_isolation_outputs_present"
+                and anomaly.get("vehicle_key") == empty_vehicle
+                and anomaly.get("source") == source
+                for anomaly in report["anomalies"]
+            )
+        )
+    
     def test_collection_isolation_end_to_end(self):
         """
         End-to-end test proving collection isolation:
@@ -974,10 +1130,10 @@ class CollectionIsolationTests(unittest.TestCase):
         self.assertEqual(f350_latest.read_text(encoding="utf-8"), "f350_latest_data")
         self.assertEqual(f150_latest.read_text(encoding="utf-8"), "f150_latest_data")
 
-    def test_valid_provenance_with_no_output_files_omitted_from_isolated_collections(self):
+    def test_valid_provenance_with_no_output_files_included_in_isolated_collections(self):
         """
         Prove that a collection with valid provenance but no latest CSV and no archive CSV
-        is omitted from isolated_collections and receives a no_isolation_outputs_present diagnostic.
+        is included in isolated_collections and receives a no_isolation_outputs_present diagnostic.
         """
         vk = "ford_f150"
         src = "autotrader"
@@ -998,9 +1154,9 @@ class CollectionIsolationTests(unittest.TestCase):
 
         isolated = isolate_anomalous_collections(root=self.root, report=report)
 
-        # Empty move plan MUST NOT claim successful isolation
-        self.assertEqual(isolated, [])
-        self.assertEqual(report["isolated_collections"], [])
+        expected = [{"vehicle_key": vk, "source": src}]
+        self.assertEqual(isolated, expected)
+        self.assertEqual(report["isolated_collections"], expected)
 
         no_output_anomalies = [a for a in report["anomalies"] if a.get("code") == "no_isolation_outputs_present"]
         self.assertEqual(len(no_output_anomalies), 1)

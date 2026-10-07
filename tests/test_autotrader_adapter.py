@@ -1,6 +1,7 @@
 import json
 import sys
 import tempfile
+import csv
 import unittest
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -150,7 +151,9 @@ class AdapterTests(unittest.TestCase):
         self.assertEqual(report["fetched_records"], 3)
         self.assertEqual(report["accepted_records"], 3)
         self.assertEqual(self.config_path.read_bytes(), original)
-        header = (self.root / report["latest_output"]).read_text().splitlines()[0].split(",")
+        with (self.root / report["latest_output"]).open("r", encoding="utf-8", newline="") as handle:
+            reader = csv.reader(handle)
+            header = next(reader, [])
         self.assertNotIn("rank", header)
         self.assertNotIn("score", header)
         self.assertIn("distance_evidence_status", header)
