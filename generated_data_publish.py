@@ -43,6 +43,57 @@ def staged_name_status(root: Path) -> list[tuple[str, str]]:
     return result
 
 
+def verify_staged_csv_whitespace(root: Path) -> None:
+    """Validate staged CSV whitespace without rejecting embedded newlines in quoted fields."""
+    completed = subprocess.run(
+        ["git", "diff", "--cached", "--name-only", "--diff-filter=ACMRTUXB", "--",
+         ":(glob)**/*.csv"],
+        cwd=root,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if completed.returncode != 0:
+        raise RuntimeError(completed.stderr.strip() or "git_diff_cached_csv_list_failed")
+    errors: list[str] = []
+    for path in filter(None, completed.stdout.splitlines()):
+        blob = subprocess.run(["git", "show", f":{path}"], cwd=root, capture_output=True, check=False)
+        if blob.returncode != 0:
+            raise RuntimeError(blob.stderr.decode("utf-8", errors="replace").strip() or f"git_show_failed:{path}")
+        text = blob.stdout.decode("utf-8")
+        in_quotes = False
+        line_start = 1
+        physical: list[str] = []
+        index = 0
+        while index < len(text):
+            char = text[index]
+            if char == '"':
+                if in_quotes and index + 1 < len(text) and text[index + 1] == '"':
+                    physical.extend(('"', '"'))
+                    index += 2
+                    continue
+                in_quotes = not in_quotes
+                physical.append(char)
+            elif char == "\n":
+                if not in_quotes:
+                    if physical and physical[-1] in {" ", "\t"}:
+                        errors.append(f"{path}:{line_start}: trailing whitespace")
+                    if physical and physical[-1] == "\r":
+                        errors.append(f"{path}:{line_start}: CRLF line terminator")
+                    physical = []
+                    line_start += 1
+                else:
+                    physical.append(char)
+            else:
+                physical.append(char)
+            index += 1
+        if not in_quotes and physical and physical[-1] in {" ", "\t"}:
+            errors.append(f"{path}:{line_start}: trailing whitespace")
+        if in_quotes:
+            errors.append(f"{path}:{line_start}: unterminated quoted field")
+    if errors:
+        raise ValueError("Invalid staged CSV whitespace: " + "; ".join(errors))
+
 def governed_keys(root: Path, registry_path: Path) -> tuple[list[str], list[str]]:
     entries = registry_entries(root=root, registry_path=registry_path)
     active = [str(entry["vehicle_key"]) for entry in entries if entry["enabled"]]
