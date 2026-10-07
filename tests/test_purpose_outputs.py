@@ -129,6 +129,12 @@ class PurposeBehaviorTests(unittest.TestCase):
             for name in purpose.FAMILY_PREFERENCE_FIELDS
         }
 
+    def test_owned_field_matching_uses_type_appropriate_rules(self):
+        subject = self.owned_subject()
+        self.assertEqual(purpose._field_status("year", subject, "2013"), "match")
+        self.assertEqual(purpose._field_status("fuel", subject, "Biodiesel"), "conflict")
+        self.assertEqual(purpose._field_status("fuel", subject, "diesel"), "match")
+
     def test_ram_comparability_is_explainable_not_ranked(self):
         record = purpose._owned_record(
             self.bundle("ram_3500"),

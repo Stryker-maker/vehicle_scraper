@@ -167,6 +167,18 @@ def _flatten(value: Any, path: str = "") -> list[str]:
             result.append(f"{path}={text}" if path else text)
     return result
 
+def source_text(raw_payload: Any, normalized: dict[str, Any]) -> str:
+    values = [
+        _text(normalized.get("trim")),
+        _text(normalized.get("engine")),
+        _text(normalized.get("fuel")),
+        _text(normalized.get("accident_claim")),
+        _text(normalized.get("seller_type_claim")),
+        *_flatten(raw_payload),
+    ]
+    return " | ".join(value for value in values if value)
+
+
 def _validate_input_field(name: str, value: Any, allowed_statuses: set[str]) -> dict[str, Any]:
     if not isinstance(value, dict) or set(value) != {"value", "evidence_status"}:
         raise ValueError(f"{name} must contain value and evidence_status")
@@ -458,10 +470,12 @@ def _field_status(field_name: str, subject: dict[str, Any], listing_value: Any) 
     if listing_value in (None, "", []):
         return "unknown"
     if field_name == "year":
-        return "match" if subject_value == listing_value else "conflict"
-    if _string_match(str(subject_value), str(listing_value)):
-        return "match"
-    return "conflict"
+        matched = _int(subject_value) == _int(listing_value)
+    elif field_name in {"trim", "engine"}:
+        matched = _string_match(str(subject_value), str(listing_value))
+    else:
+        matched = str(subject_value).casefold() == str(listing_value).casefold()
+    return "match" if matched else "conflict"
 
 
 def owned_comparability(
@@ -492,13 +506,6 @@ def owned_comparability(
             matches.append(field_name)
         else:
             conflicts.append(field_name)
-        if field_name == "year":
-            matched = _int(subject_value) == _int(listing_value)
-        elif field_name in {"trim", "engine"}:
-            matched = _string_match(str(subject_value), str(listing_value))
-        else:
-            matched = str(subject_value).casefold() == str(listing_value).casefold()
-        (matches if matched else conflicts).append(field_name)
     reasons = [
         *(f"subject_match:{name}" for name in matches),
         *(f"subject_conflict:{name}" for name in conflicts),
