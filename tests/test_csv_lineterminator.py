@@ -185,6 +185,8 @@ class CsvLineTerminatorTests(unittest.TestCase):
                 buyer, "market_summary", return_value={"listing_claim_count": 1}
             ), mock.patch.object(
                 buyer, "write_summary_markdown"
+            ), mock.patch.object(
+                buyer, "csv_row", return_value={"trim_claim": "Lariat\rSpecial"}
             ):
                 summary = buyer.build(
                     root, root / "config_f350.json", "run-1", ["autotrader"], overrides_path
@@ -230,7 +232,7 @@ class CsvLineTerminatorTests(unittest.TestCase):
                 mock.patch.object(
                     reporting,
                     "transform_manual_review_record",
-                    return_value={"location": "Calgary,\rAB"},
+                    return_value={"location": "Calgary,\rAB", "quality_warnings": []},
                 ):
                 reporting.build_manual_review(
                     root=root,
