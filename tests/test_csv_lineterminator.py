@@ -7,6 +7,7 @@ import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from autotrader_history import write_csv_outputs as write_autotrader_csv_outputs
 from kijiji_history import write_csv_outputs as write_kijiji_csv_outputs
@@ -34,7 +35,7 @@ class CsvLineTerminatorTests(unittest.TestCase):
                     "trim": "Lariat",
                     "price": "65000",
                     "mileage": "100000",
-                    "location": "Calgary, AB",
+                    "location": "Calgary,\rAB",
                     "source": source,
                 }
             ]
@@ -44,13 +45,13 @@ class CsvLineTerminatorTests(unittest.TestCase):
             for output in outputs:
                 raw = output.read_bytes()
                 self.assertNotIn(b"\r\n", raw)
-                self.assertNotIn(b"\r", raw)
+                self.assertIn(b"\r", raw)
                 with output.open("r", encoding="utf-8", newline="") as handle:
                     parsed = list(csv.reader(handle))
                 self.assertGreaterEqual(len(parsed), 2)
                 header = parsed[0]
                 values = parsed[1]
-                self.assertEqual(values[header.index("location")], "Calgary, AB")
+                self.assertEqual(values[header.index("location")], "Calgary,\rAB")
                 self.assertEqual(values[header.index("price")], "65000")
 
             env = self._git_env(root)
@@ -88,7 +89,7 @@ class CsvLineTerminatorTests(unittest.TestCase):
                     "vehicle_key": "test_vehicle",
                     "source": "AutoTrader",
                     "price_cad": 65000,
-                    "location": "Calgary, AB",
+                    "location": "Calgary,\rAB",
                     "subject_comparability_reasons": ["year_match", "model_match"],
                 }
             ]
@@ -106,11 +107,11 @@ class CsvLineTerminatorTests(unittest.TestCase):
 
             raw = output.read_bytes()
             self.assertNotIn(b"\r\n", raw)
-            self.assertNotIn(b"\r", raw)
+            self.assertIn(b"\r", raw)
             with output.open("r", encoding="utf-8", newline="") as handle:
                 parsed = list(csv.DictReader(handle))
             self.assertEqual(parsed[0]["price_cad"], "65000")
-            self.assertEqual(parsed[0]["location"], "Calgary, AB")
+            self.assertEqual(parsed[0]["location"], "Calgary,\rAB")
             self.assertEqual(
                 json.loads(parsed[0]["subject_comparability_reasons"]),
                 ["year_match", "model_match"],

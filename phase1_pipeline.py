@@ -196,11 +196,18 @@ def _handle_check_health(args: argparse.Namespace, root: Path) -> int:
                 file=sys.stderr,
             )
             return 1
-        requested_isolation = [
-            dict(item)
-            for item in anomaly.get("isolated_collections", [])
-            if isinstance(item, dict)
-        ]
+        raw_isolated_collections = anomaly.get("isolated_collections", [])
+        if (
+            not isinstance(raw_isolated_collections, list)
+            or any(not isinstance(item, dict) for item in raw_isolated_collections)
+        ):
+            print(
+                "Collection anomaly isolation failed: "
+                "isolated_collections must be a list of objects",
+                file=sys.stderr,
+            )
+            return 1
+        requested_isolation = [dict(item) for item in raw_isolated_collections]
         anomaly_for_validation = dict(anomaly)
         anomaly_for_validation["isolated_collections"] = requested_isolation
         try:

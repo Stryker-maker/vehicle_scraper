@@ -117,6 +117,17 @@ class MarketAndOverrideTests(unittest.TestCase):
             "configured_query_accepted_listing_claims_not_complete_market",
         )
 
+    def test_small_cohort_does_not_create_regression_authority(self):    def test_pre_2020_target_does_not_use_early_2020s_fallback(self):
+        rows = [
+            {"year": 2020, "price_cad": 50000, "mileage_km": 80000},
+            {"year": 2021, "price_cad": 52000, "mileage_km": 70000},
+            {"year": 2022, "price_cad": 54000, "mileage_km": 60000},
+            {"year": 2023, "price_cad": 56000, "mileage_km": 50000},
+        ]
+        basis, selected = buyer.cohort(rows, {"year": 2019})
+        self.assertEqual(basis, "all_current_accepted_f350_claims")
+        self.assertEqual(selected, rows)
+
     def test_small_cohort_does_not_create_regression_authority(self):
         rows = [
             {"year": 2023, "price_cad": 50000, "mileage_km": 80000},

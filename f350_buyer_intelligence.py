@@ -279,8 +279,9 @@ def cohort(rows: Sequence[dict[str, Any]], target: dict[str, Any]) -> tuple[str,
         cohort_checks = [
             (f"exact_model_year_{year}", lambda: _cohort_exact(priced, year)),
             (f"model_year_{year}_plus_minus_1", lambda: _cohort_adjacent(priced, year)),
-            ("early_2020s_2020_2023", lambda: _cohort_early(priced)),
         ]
+        if 2020 <= year <= 2023:
+            cohort_checks.append(("early_2020s_2020_2023", lambda: _cohort_early(priced)))
         for name, func in cohort_checks:
             subset = func()
             if len(subset) >= MIN_BAND_COHORT:
@@ -473,7 +474,6 @@ def load_owner_overrides(path: Path) -> dict[str, Any]:
     for canonical_id, override in value["overrides"].items():
         _validate_override_entry(canonical_id, override, allowed)
 
-    return value
     return value
 
 
@@ -772,7 +772,11 @@ def build(root: Path, config_path: Path, run_id: str, sources: Sequence[str] | N
     paths["investigation_csv"].parent.mkdir(parents=True, exist_ok=True)
     with paths["investigation_csv"].open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(
-            handle, fieldnames=CSV_FIELDS, extrasaction="ignore", lineterminator="\n"
+            handle,
+            fieldnames=CSV_FIELDS,
+            extrasaction="ignore",
+            lineterminator="\n",
+            quoting=csv.QUOTE_ALL,
         )
         writer.writeheader()
         writer.writerows(csv_row(value) for value in listings)

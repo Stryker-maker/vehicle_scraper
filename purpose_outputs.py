@@ -958,7 +958,8 @@ def _write_csv(path: Path, fieldnames: Sequence[str], records: Sequence[dict[str
             handle,
             fieldnames=fieldnames,
             extrasaction="ignore",
-            lineterminator="\n"
+            lineterminator="\n",
+            quoting=csv.QUOTE_ALL,
         )
         writer.writeheader()
         for record in records:

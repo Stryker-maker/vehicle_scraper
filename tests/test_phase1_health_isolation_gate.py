@@ -39,6 +39,31 @@ class Phase1HealthIsolationGateTests(unittest.TestCase):
 
         _validate_isolation_for_health_gate(health=health, anomaly=anomaly)
 
+    def test_gate_rejects_unhealthy_source_that_is_not_isolated(self):    def test_malformed_isolated_collections_fail_closed_before_mutation(self):
+        with patch("phase1_pipeline.load_json") as load_json, patch(
+            "phase1_pipeline.isolate_anomalous_collections"
+        ) as isolate:
+            load_json.side_effect = [
+                {
+                    "run_id": "run-current",
+                    "overall_status": "degraded",
+                    "unhealthy_source_runs": 1,
+                    "sources": [
+                        {"vehicle_key": "ford_f150", "source": "kijiji", "healthy": False}
+                    ],
+                },
+                {
+                    "run_id": "run-current",
+                    "isolated_collections": None,
+                    "anomalies": [],
+                },
+            ]
+            self.assertEqual(
+                main(["check-health", "--report", "health.json", "--anomaly-report", "anomalies.json"]),
+                1,
+            )
+            isolate.assert_not_called()
+
     def test_gate_rejects_unhealthy_source_that_is_not_isolated(self):
         health = {
             "run_id": "run-123",

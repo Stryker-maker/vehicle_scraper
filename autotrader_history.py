@@ -69,6 +69,7 @@ def write_csv_outputs(
                 fieldnames=[*SOURCE_FIELDS, *EXTRA_FIELDS],
                 extrasaction="ignore",
                 lineterminator="\n",
+                quoting=csv.QUOTE_ALL,
             )
             writer.writeheader()
             writer.writerows(rows)
