@@ -89,7 +89,7 @@ class CsvLineTerminatorTests(unittest.TestCase):
                 self.assertEqual(values[header.index("location")], "Calgary,\rAB")
                 self.assertEqual(values[header.index("price")], "65000")
 
-            self._assert_staged_git_diff_clean(root)\n
+            self._assert_staged_git_diff_clean(root)
 
     def _assert_direct_csv_writer_publication_safe(self, writer) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -128,7 +128,6 @@ class CsvLineTerminatorTests(unittest.TestCase):
                 json.loads(parsed[0]["subject_comparability_reasons"]),
                 ["year_match", "model_match"],
             )
-
             self._assert_staged_git_diff_clean(root)
 
     def test_purpose_output_csv_is_lf_and_git_diff_check_clean(self):
