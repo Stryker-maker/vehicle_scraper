@@ -123,35 +123,13 @@ class CsvLineTerminatorTests(unittest.TestCase):
                 parsed = list(csv.DictReader(handle))
             self.assertEqual(parsed[0]["price_cad"], "65000")
             self.assertEqual(parsed[0]["location"], "Calgary,\rAB")
+            self._assert_staged_git_diff_clean(root)
             self.assertEqual(
                 json.loads(parsed[0]["subject_comparability_reasons"]),
                 ["year_match", "model_match"],
             )
 
-            env = self._git_env(root)
-            subprocess.run(
-                ["git", "-c", "core.autocrlf=false", "init"],
-                cwd=root,
-                check=True,
-                capture_output=True,
-                env=env,
-            )
-            subprocess.run(
-                ["git", "add", "data"],
-                cwd=root,
-                check=True,
-                capture_output=True,
-                env=env,
-            )
-            check = subprocess.run(
-                ["git", "diff", "--cached", "--check"],
-                cwd=root,
-                text=True,
-                capture_output=True,
-                check=False,
-                env=env,
-            )
-            self.assertEqual(check.returncode, 0, check.stdout + check.stderr)
+            self._assert_staged_git_diff_clean(root)
 
     def test_purpose_output_csv_is_lf_and_git_diff_check_clean(self):
         self._assert_direct_csv_writer_publication_safe(write_purpose_csv)
@@ -211,6 +189,7 @@ class CsvLineTerminatorTests(unittest.TestCase):
                 parsed = list(csv.DictReader(handle))
             self.assertEqual(parsed[0]["trim_claim"], "Lariat\rSpecial")
             self.assertEqual(summary["listing_claim_count"], 1)
+            self._assert_staged_git_diff_clean(root)
 
     def test_manual_review_csv_preserves_bare_cr(self):
         import phase1_reporting as reporting
