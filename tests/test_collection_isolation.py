@@ -191,7 +191,7 @@ class CollectionIsolationTests(unittest.TestCase):
             self.root
             / "data"
             / output_vehicle
-            / "archive"
+            / source
             / f"{output_vehicle}_{source}_{run_id}.csv"
         )
         output_archive.parent.mkdir(parents=True, exist_ok=True)
