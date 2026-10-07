@@ -118,7 +118,7 @@ class CollectionIsolationTests(unittest.TestCase):
 
     def test_no_output_collection_counts_as_successfully_handled_without_mutation(self):
         """Treat a valid collection with no current-run outputs as successfully isolated."""
-        run_id = "run-no-output"
+        run_id = "run_no_output_001"
         vehicle_key = "ford_f150"
         source = "autotrader"
 
@@ -172,7 +172,7 @@ class CollectionIsolationTests(unittest.TestCase):
 
     def test_isolation_handles_mixed_output_and_no_output_collections_atomically(self):
         """A no-output collection must not cause another collection's isolation to fail."""
-        run_id = "run-mixed-output"
+        run_id = "run_mixed_output_001"
         output_vehicle = "ford_f350"
         empty_vehicle = "ford_f150"
         source = "autotrader"

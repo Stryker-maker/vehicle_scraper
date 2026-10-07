@@ -179,6 +179,10 @@ def source_text(raw_payload: Any, normalized: dict[str, Any]) -> str:
     return " | ".join(value for value in values if value)
 
 
+def _field(value: Any, evidence_status: str) -> dict[str, Any]:
+    return {"value": value, "evidence_status": evidence_status}
+
+
 def _validate_input_field(name: str, value: Any, allowed_statuses: set[str]) -> dict[str, Any]:
     if not isinstance(value, dict) or set(value) != {"value", "evidence_status"}:
         raise ValueError(f"{name} must contain value and evidence_status")
