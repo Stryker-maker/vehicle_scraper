@@ -31,6 +31,33 @@ class CsvLineTerminatorTests(unittest.TestCase):
             raise RuntimeError("git executable is required for CSV publication safety tests")
         return executable
 
+    def _assert_staged_git_diff_clean(self, root: Path) -> None:
+        env = self._git_env(root)
+        git = self._git_executable()
+        subprocess.run(
+            [git, "-c", "core.autocrlf=false", "init"],
+            cwd=root,
+            check=True,
+            capture_output=True,
+            env=env,
+        )
+        subprocess.run(
+            [git, "add", "data"],
+            cwd=root,
+            check=True,
+            capture_output=True,
+            env=env,
+        )
+        check = subprocess.run(
+            [git, "diff", "--cached", "--check"],
+            cwd=root,
+            text=True,
+            capture_output=True,
+            check=False,
+            env=env,
+        )
+        self.assertEqual(check.returncode, 0, check.stdout + check.stderr)
+
     def _assert_publication_safe(self, writer, source: str) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -62,31 +89,7 @@ class CsvLineTerminatorTests(unittest.TestCase):
                 self.assertEqual(values[header.index("location")], "Calgary,\rAB")
                 self.assertEqual(values[header.index("price")], "65000")
 
-            env = self._git_env(root)
-            subprocess.run(
-                [self._git_executable(), "-c", "core.autocrlf=false", "init"],
-                cwd=root,
-                check=True,
-                capture_output=True,
-                env=env,
-            )
-            subprocess.run(
-                [self._git_executable(), "add", "data"],
-                cwd=root,
-                check=True,
-                capture_output=True,
-                env=env,
-            )
-            check = subprocess.run(
-                [self._git_executable(), "diff", "--cached", "--check"],
-                cwd=root,
-                text=True,
-                capture_output=True,
-                check=False,
-                env=env,
-            )
-            self.assertEqual(check.returncode, 0, check.stdout + check.stderr)
-
+            self._assert_staged_git_diff_clean(root)\n
 
     def _assert_direct_csv_writer_publication_safe(self, writer) -> None:
         with tempfile.TemporaryDirectory() as temp:

@@ -140,6 +140,17 @@ class MarketAndOverrideTests(unittest.TestCase):
             "insufficient_comparables",
         )
 
+    def test_non_finite_target_price_is_rejected(self):
+        rows = [
+            {"year": 2023, "price_cad": 50000, "mileage_km": 80000},
+            {"year": 2023, "price_cad": 52000, "mileage_km": 70000},
+            {"year": 2023, "price_cad": 51000, "mileage_km": 75000},
+        ]
+        for price in (float("nan"), float("inf"), float("-inf")):
+            result = buyer.market_context(rows, {"year": 2023, "price_cad": price})
+            self.assertEqual(result["price_position"], "insufficient_comparables")
+            self.assertIsNone(result["price_difference_from_median_cad"])
+
     def test_override_requires_reason_and_preserves_computed_result(self):
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / "overrides.json"

@@ -320,6 +320,7 @@ def regression(rows: Sequence[dict[str, Any]], mileage_km: int | None) -> dict[s
     if status != "ok":
         return {**base, "status": status}
     stats = _compute_regression(pairs)
+    assert mileage_km is not None
     projected = round(stats["intercept"] + stats["slope"] * mileage_km)
     return {**base,
             "status": "available",
@@ -334,7 +335,14 @@ def market_context(rows: Sequence[dict[str, Any]], target: dict[str, Any]) -> di
     prices = [float(row["price_cad"]) for row in selected]
     q1, median, q3 = percentile(prices, 0.25), percentile(prices, 0.5), percentile(prices, 0.75)
     price = target.get("price_cad")
-    if price is None or not isinstance(price, (int, float)) or len(selected) < MIN_BAND_COHORT or any(v is None for v in (q1, median, q3)):
+    if (
+        price is None
+        or not isinstance(price, (int, float))
+        or not math.isfinite(float(price))
+        or len(selected) < MIN_BAND_COHORT
+    ):
+        position, difference = "insufficient_comparables", None
+    elif q1 is None or median is None or q3 is None:
         position, difference = "insufficient_comparables", None
     else:
         price = float(price)
