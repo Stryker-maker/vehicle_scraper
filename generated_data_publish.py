@@ -72,6 +72,24 @@ def _csv_consume_quote(
     return index + 1, True, line_start, False
 
 
+def _csv_handle_carriage_return(
+    path: str,
+    text: str,
+    index: int,
+    line_start: int,
+    physical: list[str],
+    errors: list[str],
+    in_quotes: bool,
+) -> None:
+    """Record a carriage return as quoted content, CRLF, or a bare CR error."""
+    is_crlf = index + 1 < len(text) and text[index + 1] == "\n"
+    if in_quotes or is_crlf:
+        physical.append("\r")
+    else:
+        errors.append(f"{path}:{line_start}: bare CR outside quoted field")
+        physical.append("\r")
+
+
 def _staged_csv_text_errors(path: str, text: str) -> list[str]:
     """Return staged CSV formatting errors with physical line numbers."""
     errors: list[str] = []
@@ -89,12 +107,10 @@ def _staged_csv_text_errors(path: str, text: str) -> list[str]:
             if escaped_quote:
                 continue
             physical.append(char)
-        elif char == "\r" and not in_quotes:
-            if index + 1 < len(text) and text[index + 1] == "\n":
-                physical.append(char)
-            else:
-                errors.append(f"{path}:{line_start}: bare CR outside quoted field")
-                physical.append(char)
+        elif char == "\r":
+            _csv_handle_carriage_return(
+                path, text, index, line_start, physical, errors, in_quotes
+            )
         elif char == "\n":
             if not in_quotes:
                 errors.extend(_csv_physical_line_errors(path, line_start, physical))
@@ -110,6 +126,7 @@ def _staged_csv_text_errors(path: str, text: str) -> list[str]:
     if in_quotes:
         errors.append(f"{path}:{quoted_field_start_line}: unterminated quoted field")
     return errors
+
 
 def verify_staged_csv_whitespace(root: Path) -> None:
     """Validate staged CSV whitespace without rejecting embedded newlines in quoted fields."""
