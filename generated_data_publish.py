@@ -91,7 +91,7 @@ def _csv_handle_carriage_return(
 
 
 def _csv_handle_line_feed(
-    line_start: int, physical: list[str], errors: list[str], in_quotes: bool
+    path: str, line_start: int, physical: list[str], errors: list[str], in_quotes: bool
 ) -> tuple[int, list[str]]:
     """Validate a record-ending line feed or retain it inside a quoted field."""
     if not in_quotes:
@@ -141,7 +141,7 @@ def _staged_csv_text_errors(path: str, text: str) -> list[str]:
             )
         elif char == "\n":
             line_start, physical = _csv_handle_line_feed(
-                line_start, physical, errors, in_quotes
+                path, line_start, physical, errors, in_quotes
             )
         else:
             physical.append(char)
