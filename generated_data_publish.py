@@ -74,6 +74,12 @@ def verify_staged_csv_whitespace(root: Path) -> None:
                     continue
                 in_quotes = not in_quotes
                 physical.append(char)
+            elif char == "\r" and not in_quotes:
+                if index + 1 < len(text) and text[index + 1] == "\n":
+                    physical.append(char)
+                else:
+                    errors.append(f"{path}:{line_start}: bare CR outside quoted field")
+                    physical.append(char)
             elif char == "\n":
                 if not in_quotes:
                     if physical and physical[-1] in {" ", "\t"}:
