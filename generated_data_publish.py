@@ -58,6 +58,7 @@ def _staged_csv_text_errors(path: str, text: str) -> list[str]:
     errors: list[str] = []
     in_quotes = False
     line_start = 1
+    quoted_field_start_line: int | None = None
     physical: list[str] = []
     index = 0
     while index < len(text):
@@ -67,7 +68,12 @@ def _staged_csv_text_errors(path: str, text: str) -> list[str]:
                 physical.extend(('"', '"'))
                 index += 2
                 continue
-            in_quotes = not in_quotes
+            if in_quotes:
+                in_quotes = False
+                quoted_field_start_line = None
+            else:
+                in_quotes = True
+                quoted_field_start_line = line_start
             physical.append(char)
         elif char == "\r" and not in_quotes:
             if index + 1 < len(text) and text[index + 1] == "\n":
@@ -79,16 +85,16 @@ def _staged_csv_text_errors(path: str, text: str) -> list[str]:
             if not in_quotes:
                 errors.extend(_csv_physical_line_errors(path, line_start, physical))
                 physical = []
-                line_start += 1
             else:
                 physical.append(char)
+            line_start += 1
         else:
             physical.append(char)
         index += 1
     if not in_quotes and physical:
         errors.extend(_csv_physical_line_errors(path, line_start, physical, check_line_ending=False))
     if in_quotes:
-        errors.append(f"{path}:{line_start}: unterminated quoted field")
+        errors.append(f"{path}:{quoted_field_start_line}: unterminated quoted field")
     return errors
 
 
