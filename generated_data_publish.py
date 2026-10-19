@@ -90,6 +90,34 @@ def _csv_handle_carriage_return(
         physical.append("\r")
 
 
+def _csv_handle_line_feed(
+    line_start: int, physical: list[str], errors: list[str], in_quotes: bool
+) -> tuple[int, list[str]]:
+    """Validate a record-ending line feed or retain it inside a quoted field."""
+    if not in_quotes:
+        errors.extend(_csv_physical_line_errors(path, line_start, physical))
+        physical = []
+    else:
+        physical.append("\n")
+    return line_start + 1, physical
+
+
+def _csv_final_text_errors(
+    path: str,
+    line_start: int,
+    physical: list[str],
+    in_quotes: bool,
+    quoted_field_start_line: int | None,
+) -> list[str]:
+    """Validate remaining text and report an unterminated quoted field."""
+    errors: list[str] = []
+    if not in_quotes and physical:
+        errors.extend(_csv_physical_line_errors(path, line_start, physical, check_line_ending=False))
+    if in_quotes:
+        errors.append(f"{path}:{quoted_field_start_line}: unterminated quoted field")
+    return errors
+
+
 def _staged_csv_text_errors(path: str, text: str) -> list[str]:
     """Return staged CSV formatting errors with physical line numbers."""
     errors: list[str] = []
@@ -112,19 +140,15 @@ def _staged_csv_text_errors(path: str, text: str) -> list[str]:
                 path, text, index, line_start, physical, errors, in_quotes
             )
         elif char == "\n":
-            if not in_quotes:
-                errors.extend(_csv_physical_line_errors(path, line_start, physical))
-                physical = []
-            else:
-                physical.append(char)
-            line_start += 1
+            line_start, physical = _csv_handle_line_feed(
+                line_start, physical, errors, in_quotes
+            )
         else:
             physical.append(char)
         index += 1
-    if not in_quotes and physical:
-        errors.extend(_csv_physical_line_errors(path, line_start, physical, check_line_ending=False))
-    if in_quotes:
-        errors.append(f"{path}:{quoted_field_start_line}: unterminated quoted field")
+    errors.extend(
+        _csv_final_text_errors(path, line_start, physical, in_quotes, quoted_field_start_line)
+    )
     return errors
 
 
