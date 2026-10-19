@@ -91,15 +91,24 @@ def _csv_handle_carriage_return(
 
 
 def _csv_handle_line_feed(
-    path: str, line_start: int, physical: list[str], errors: list[str], in_quotes: bool
-) -> tuple[int, list[str]]:
+    path: str,
+    line_start: int,
+    physical: list[str],
+    errors: list[str],
+    in_quotes: bool,
+    *,
+    is_crlf: bool,
+) -> list[str]:
     """Validate a record-ending line feed or retain it inside a quoted field."""
-    if not in_quotes:
-        errors.extend(_csv_physical_line_errors(path, line_start, physical))
-        physical = []
-    else:
+    if in_quotes:
         physical.append("\n")
-    return line_start + 1, physical
+        return physical
+    if is_crlf:
+        errors.append(f"{path}:{line_start}: CRLF line terminator")
+    errors.extend(
+        _csv_physical_line_errors(path, line_start, physical, check_line_ending=not is_crlf)
+    )
+    return []
 
 
 def _csv_final_text_errors(
@@ -140,9 +149,15 @@ def _staged_csv_text_errors(path: str, text: str) -> list[str]:
                 path, text, index, line_start, physical, errors, in_quotes
             )
         elif char == "\n":
-            line_start, physical = _csv_handle_line_feed(
-                path, line_start, physical, errors, in_quotes
+            physical = _csv_handle_line_feed(
+                path,
+                line_start,
+                physical,
+                errors,
+                in_quotes,
+                is_crlf=index > 0 and text[index - 1] == "\r",
             )
+            line_start += 1
         else:
             physical.append(char)
         index += 1
