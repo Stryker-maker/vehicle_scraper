@@ -46,6 +46,7 @@ def staged_name_status(root: Path) -> list[tuple[str, str]]:
 def _csv_physical_line_errors(
     path: str, line_number: int, physical: list[str], *, check_line_ending: bool = True
 ) -> list[str]:
+    """Return formatting errors detected on one physical CSV line."""
     errors: list[str] = []
     if physical and physical[-1] in {" ", "\t"}:
         errors.append(f"{path}:{line_number}: trailing whitespace")
@@ -54,7 +55,25 @@ def _csv_physical_line_errors(
     return errors
 
 
+def _csv_consume_quote(
+    text: str,
+    index: int,
+    physical: list[str],
+    in_quotes: bool,
+    quoted_field_start_line: int | None,
+    line_start: int,
+) -> tuple[int, bool, int | None]:
+    """Consume a quote or escaped quote and return the updated parser state."""
+    if in_quotes and index + 1 < len(text) and text[index + 1] == '"':
+        physical.extend(('"', '"'))
+        return index + 2, in_quotes, quoted_field_start_line
+    if in_quotes:
+        return index + 1, False, None
+    return index + 1, True, line_start
+
+
 def _staged_csv_text_errors(path: str, text: str) -> list[str]:
+    """Return staged CSV formatting errors with physical line numbers."""
     errors: list[str] = []
     in_quotes = False
     line_start = 1
@@ -64,16 +83,11 @@ def _staged_csv_text_errors(path: str, text: str) -> list[str]:
     while index < len(text):
         char = text[index]
         if char == '"':
-            if in_quotes and index + 1 < len(text) and text[index + 1] == '"':
-                physical.extend(('"', '"'))
-                index += 2
+            index, in_quotes, quoted_field_start_line = _csv_consume_quote(
+                text, index, physical, in_quotes, quoted_field_start_line, line_start
+            )
+            if physical and physical[-1] == '"' and index > 0 and text[index - 1] == '"' and in_quotes:
                 continue
-            if in_quotes:
-                in_quotes = False
-                quoted_field_start_line = None
-            else:
-                in_quotes = True
-                quoted_field_start_line = line_start
             physical.append(char)
         elif char == "\r" and not in_quotes:
             if index + 1 < len(text) and text[index + 1] == "\n":
@@ -96,7 +110,6 @@ def _staged_csv_text_errors(path: str, text: str) -> list[str]:
     if in_quotes:
         errors.append(f"{path}:{quoted_field_start_line}: unterminated quoted field")
     return errors
-
 
 def verify_staged_csv_whitespace(root: Path) -> None:
     """Validate staged CSV whitespace without rejecting embedded newlines in quoted fields."""
