@@ -179,6 +179,18 @@ class CsvLineTerminatorTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "trailing whitespace"):
                 verify_staged_csv_whitespace(root)
 
+    def test_staged_csv_whitespace_reports_physical_line_after_embedded_lf(self):
+        self._assert_staged_csv_bytes(
+            b'"a\nb"\nvalue \n',
+            r"validation\.csv:3: trailing whitespace",
+        )
+
+    def test_staged_csv_whitespace_reports_opening_line_for_unterminated_multiline_field(self):
+        self._assert_staged_csv_bytes(
+            b'"a\nb',
+            r"validation\.csv:1: unterminated quoted field",
+        )
+
     def test_staged_csv_whitespace_rejects_bare_cr_outside_quoted_field(self):
         self._assert_staged_csv_bytes(
             b'"location"\nCalgary\rAB\n',
