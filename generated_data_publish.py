@@ -43,11 +43,13 @@ def staged_name_status(root: Path) -> list[tuple[str, str]]:
     return result
 
 
-def _csv_physical_line_errors(path: str, line_number: int, physical: list[str]) -> list[str]:
+def _csv_physical_line_errors(
+    path: str, line_number: int, physical: list[str], *, check_line_ending: bool = True
+) -> list[str]:
     errors: list[str] = []
     if physical and physical[-1] in {" ", "\t"}:
         errors.append(f"{path}:{line_number}: trailing whitespace")
-    if physical and physical[-1] == "\r":
+    if check_line_ending and physical and physical[-1] == "\r":
         errors.append(f"{path}:{line_number}: CRLF line terminator")
     return errors
 
@@ -84,7 +86,7 @@ def _staged_csv_text_errors(path: str, text: str) -> list[str]:
             physical.append(char)
         index += 1
     if not in_quotes and physical:
-        errors.extend(_csv_physical_line_errors(path, line_start, physical))
+        errors.extend(_csv_physical_line_errors(path, line_start, physical, check_line_ending=False))
     if in_quotes:
         errors.append(f"{path}:{line_start}: unterminated quoted field")
     return errors
