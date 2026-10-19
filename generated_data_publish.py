@@ -62,14 +62,14 @@ def _csv_consume_quote(
     in_quotes: bool,
     quoted_field_start_line: int | None,
     line_start: int,
-) -> tuple[int, bool, int | None]:
+) -> tuple[int, bool, int | None, bool]:
     """Consume a quote or escaped quote and return the updated parser state."""
     if in_quotes and index + 1 < len(text) and text[index + 1] == '"':
         physical.extend(('"', '"'))
-        return index + 2, in_quotes, quoted_field_start_line
+        return index + 2, in_quotes, quoted_field_start_line, True
     if in_quotes:
-        return index + 1, False, None
-    return index + 1, True, line_start
+        return index + 1, False, None, False
+    return index + 1, True, line_start, False
 
 
 def _staged_csv_text_errors(path: str, text: str) -> list[str]:
@@ -83,10 +83,10 @@ def _staged_csv_text_errors(path: str, text: str) -> list[str]:
     while index < len(text):
         char = text[index]
         if char == '"':
-            index, in_quotes, quoted_field_start_line = _csv_consume_quote(
+            index, in_quotes, quoted_field_start_line, escaped_quote = _csv_consume_quote(
                 text, index, physical, in_quotes, quoted_field_start_line, line_start
             )
-            if physical and physical[-1] == '"' and index > 0 and text[index - 1] == '"' and in_quotes:
+            if escaped_quote:
                 continue
             physical.append(char)
         elif char == "\r" and not in_quotes:
