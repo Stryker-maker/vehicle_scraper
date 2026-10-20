@@ -13,7 +13,7 @@ from unittest import mock
 from autotrader_history import write_csv_outputs as write_autotrader_csv_outputs
 from kijiji_history import write_csv_outputs as write_kijiji_csv_outputs
 from purpose_outputs import _write_csv as write_purpose_csv
-from generated_data_publish import verify_staged_csv_whitespace
+from generated_data_publish import _staged_csv_text_errors, verify_staged_csv_whitespace
 
 
 class CsvLineTerminatorTests(unittest.TestCase):
@@ -185,6 +185,17 @@ class CsvLineTerminatorTests(unittest.TestCase):
             subprocess.run([git, "add", "data"], cwd=root, check=True, capture_output=True, env=env)
             with self.assertRaisesRegex(ValueError, "trailing whitespace"):
                 verify_staged_csv_whitespace(root)
+
+    def test_staged_csv_whitespace_ignores_quoted_crlf_and_reports_unquoted_mixed_terminators(self):
+        """Ignore quoted CRLF bytes and report later unquoted terminators on their physical lines."""
+        text = '"location"\n"Calgary\r\nAB"\nBare\rCR record\n"CRLF"\r\n'
+        self.assertEqual(
+            _staged_csv_text_errors("sample.csv", text),
+            [
+                "sample.csv:4: bare CR outside quoted field",
+                "sample.csv:5: CRLF line terminator",
+            ],
+        )
 
     def test_staged_csv_whitespace_reports_physical_line_after_embedded_lf(self):
         """Report the physical line of a formatting error after a multiline quoted field."""

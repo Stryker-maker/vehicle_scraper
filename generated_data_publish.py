@@ -152,6 +152,11 @@ def _csv_scan_character(
 
 def _staged_csv_text_errors(path: str, text: str) -> list[str]:
     """Return staged CSV formatting errors with physical line numbers."""
+    return _scan_csv_text_errors(path, text)
+
+
+def _scan_csv_text_errors(path: str, text: str) -> list[str]:
+    """Scan CSV text while delegating each character to the focused state handlers."""
     errors: list[str] = []
     in_quotes = False
     line_start = 1
