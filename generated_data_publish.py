@@ -189,6 +189,7 @@ def _scan_csv_text_errors(path: str, text: str) -> list[str]:
     )
     return errors
 
+
 def verify_staged_csv_whitespace(root: Path) -> None:
     """Validate staged CSV whitespace without rejecting embedded newlines in quoted fields."""
     git = _git_executable()
