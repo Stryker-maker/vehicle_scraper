@@ -19,6 +19,7 @@ from generated_data_publish import verify_staged_csv_whitespace
 class CsvLineTerminatorTests(unittest.TestCase):
     @staticmethod
     def _git_env(root: Path) -> dict[str, str]:
+        """Build a clean Git environment for an isolated temporary repository."""
         env = os.environ.copy()
         env["GIT_CONFIG_NOSYSTEM"] = "1"
         env["HOME"] = str(root / "home")
@@ -27,12 +28,14 @@ class CsvLineTerminatorTests(unittest.TestCase):
 
     @staticmethod
     def _git_executable() -> str:
+        """Return the Git executable required by the publication safety tests."""
         executable = shutil.which("git")
         if executable is None:
             raise RuntimeError("git executable is required for CSV publication safety tests")
         return executable
 
     def _assert_staged_csv_bytes(self, raw: bytes, expected_error: str | None = None) -> None:
+        """Stage CSV bytes in a temporary repository and assert the validator result."""
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             output = root / "data" / "test_vehicle" / "validation.csv"
@@ -61,6 +64,7 @@ class CsvLineTerminatorTests(unittest.TestCase):
                     verify_staged_csv_whitespace(root)
 
     def _assert_staged_git_diff_clean(self, root: Path) -> None:
+        """Assert staged files pass Git's whitespace check."""
         env = self._git_env(root)
         git = self._git_executable()
         subprocess.run(
@@ -88,6 +92,7 @@ class CsvLineTerminatorTests(unittest.TestCase):
         self.assertEqual(check.returncode, 0, check.stdout + check.stderr)
 
     def _assert_publication_safe(self, writer, source: str) -> None:
+        """Verify a source writer preserves embedded carriage returns and LF record endings."""
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             config = {"vehicle_key": "test_vehicle"}
@@ -121,6 +126,7 @@ class CsvLineTerminatorTests(unittest.TestCase):
             self._assert_staged_git_diff_clean(root)
 
     def _assert_direct_csv_writer_publication_safe(self, writer) -> None:
+        """Verify a direct CSV writer preserves embedded carriage returns and safe record endings."""
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             output = root / "data" / "test_vehicle" / "purpose_output" / "value_monitor" / "comparables_latest.csv"
@@ -160,6 +166,7 @@ class CsvLineTerminatorTests(unittest.TestCase):
             self._assert_staged_git_diff_clean(root)
 
     def test_staged_csv_whitespace_allows_embedded_lf_but_rejects_trailing_space(self):
+        """Allow embedded LF inside a quoted field but reject trailing record whitespace."""
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             output = root / "data" / "test_vehicle" / "embedded.csv"
@@ -180,44 +187,53 @@ class CsvLineTerminatorTests(unittest.TestCase):
                 verify_staged_csv_whitespace(root)
 
     def test_staged_csv_whitespace_reports_physical_line_after_embedded_lf(self):
+        """Report the physical line of a formatting error after a multiline quoted field."""
         self._assert_staged_csv_bytes(
             b'"a\nb"\nvalue \n',
             r"data/test_vehicle/validation\.csv:3: trailing whitespace",
         )
 
     def test_staged_csv_whitespace_reports_opening_line_for_unterminated_multiline_field(self):
+        """Report the opening line of an unterminated multiline quoted field."""
         self._assert_staged_csv_bytes(
             b'"a\nb',
             r"data/test_vehicle/validation\.csv:1: unterminated quoted field",
         )
 
     def test_staged_csv_whitespace_rejects_bare_cr_outside_quoted_field(self):
+        """Reject bare carriage returns outside quoted fields."""
         self._assert_staged_csv_bytes(
             b'"location"\nCalgary\rAB\n',
             "bare CR outside quoted field",
         )
 
     def test_staged_csv_whitespace_allows_bare_cr_inside_quoted_field(self):
+        """Allow carriage returns embedded inside quoted fields."""
         self._assert_staged_csv_bytes(
             b'"location"\n"Calgary\rAB"\n',
         )
 
     def test_staged_csv_whitespace_rejects_crlf_record_terminators(self):
+        """Reject CRLF record terminators in staged CSV files."""
         self._assert_staged_csv_bytes(
             b'"location"\r\n"Calgary"\r\n',
             "CRLF line terminator",
         )
 
     def test_purpose_output_csv_is_lf_and_git_diff_check_clean(self):
+        """Check purpose-output CSV files use safe line endings and pass Git's whitespace check."""
         self._assert_direct_csv_writer_publication_safe(write_purpose_csv)
 
     def test_autotrader_csv_is_lf_and_git_diff_check_clean(self):
+        """Check AutoTrader CSV outputs preserve quoted carriage returns and safe line endings."""
         self._assert_publication_safe(write_autotrader_csv_outputs, "AutoTrader")
 
     def test_kijiji_csv_is_lf_and_git_diff_check_clean(self):
+        """Check Kijiji CSV outputs preserve quoted carriage returns and safe line endings."""
         self._assert_publication_safe(write_kijiji_csv_outputs, "Kijiji")
 
     def test_buyer_intelligence_csv_preserves_bare_cr(self):
+        """Ensure buyer-intelligence CSV output preserves carriage returns inside quoted values."""
         import f350_buyer_intelligence as buyer
 
         with tempfile.TemporaryDirectory() as temp:
@@ -269,6 +285,7 @@ class CsvLineTerminatorTests(unittest.TestCase):
             self._assert_staged_git_diff_clean(root)
 
     def test_manual_review_csv_preserves_bare_cr(self):
+        """Ensure manual-review CSV output preserves carriage returns inside quoted values."""
         import phase1_reporting as reporting
 
         with tempfile.TemporaryDirectory() as temp:
