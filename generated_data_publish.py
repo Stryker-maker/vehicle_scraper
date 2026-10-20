@@ -118,6 +118,38 @@ def _csv_final_text_errors(
     return errors
 
 
+def _csv_scan_character(
+    path: str,
+    text: str,
+    index: int,
+    line_start: int,
+    physical: list[str],
+    errors: list[str],
+    in_quotes: bool,
+    quoted_field_start_line: int | None,
+) -> tuple[int, int, list[str], bool, int | None]:
+    """Process one CSV character and return the updated scanner state."""
+    char = text[index]
+    if char == '"':
+        index, in_quotes, quoted_field_start_line, escaped_quote = _csv_consume_quote(
+            text, index, physical, in_quotes, quoted_field_start_line, line_start
+        )
+        if escaped_quote:
+            return index, line_start, physical, in_quotes, quoted_field_start_line
+        physical.append(char)
+    elif char == "\r":
+        _csv_handle_carriage_return(
+            path, text, index, line_start, physical, errors, in_quotes
+        )
+    elif char == "\n":
+        line_start, physical = _csv_handle_line_feed(
+            path, line_start, physical, errors, in_quotes
+        )
+    else:
+        physical.append(char)
+    return index + 1, line_start, physical, in_quotes, quoted_field_start_line
+
+
 def _staged_csv_text_errors(path: str, text: str) -> list[str]:
     """Return staged CSV formatting errors with physical line numbers."""
     errors: list[str] = []
@@ -127,30 +159,20 @@ def _staged_csv_text_errors(path: str, text: str) -> list[str]:
     physical: list[str] = []
     index = 0
     while index < len(text):
-        char = text[index]
-        if char == '"':
-            index, in_quotes, quoted_field_start_line, escaped_quote = _csv_consume_quote(
-                text, index, physical, in_quotes, quoted_field_start_line, line_start
-            )
-            if escaped_quote:
-                continue
-            physical.append(char)
-        elif char == "\r":
-            _csv_handle_carriage_return(
-                path, text, index, line_start, physical, errors, in_quotes
-            )
-        elif char == "\n":
-            line_start, physical = _csv_handle_line_feed(
-                path, line_start, physical, errors, in_quotes
-            )
-        else:
-            physical.append(char)
-        index += 1
+        index, line_start, physical, in_quotes, quoted_field_start_line = _csv_scan_character(
+            path,
+            text,
+            index,
+            line_start,
+            physical,
+            errors,
+            in_quotes,
+            quoted_field_start_line,
+        )
     errors.extend(
         _csv_final_text_errors(path, line_start, physical, in_quotes, quoted_field_start_line)
     )
     return errors
-
 
 def verify_staged_csv_whitespace(root: Path) -> None:
     """Validate staged CSV whitespace without rejecting embedded newlines in quoted fields."""
