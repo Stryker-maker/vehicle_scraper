@@ -204,8 +204,8 @@ class CsvLineTerminatorTests(unittest.TestCase):
 
     def test_publication_git_commands_use_resolved_executable_path(self):
         """Use the resolved Git executable for staged-diff and staged-blob commands."""
-        git = str(Path(shutil.which("git") or "/usr/bin/git").resolve())
-        with mock.patch("generated_data_publish.shutil.which", return_value=git), mock.patch(
+        git = str(Path("git").resolve())
+        with mock.patch("generated_data_publish.shutil.which", return_value="git"), mock.patch(
             "generated_data_publish.subprocess.run",
             side_effect=[
                 mock.Mock(returncode=0, stdout="M\tdata/test.csv\n", stderr=""),
