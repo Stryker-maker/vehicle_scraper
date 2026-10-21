@@ -213,9 +213,11 @@ class CsvLineTerminatorTests(unittest.TestCase):
                 mock.Mock(returncode=0, stdout=b'"a"\n', stderr=b""),
             ],
         ) as run:
-            staged_name_status(Path.cwd())
+            result = staged_name_status(Path.cwd())
             verify_staged_csv_whitespace(Path.cwd())
 
+        self.assertEqual(run.call_count, 3)
+        self.assertEqual(result, [("M", "data/test.csv")])
         self.assertEqual(run.call_args_list[0].args[0][0], git)
         self.assertEqual(run.call_args_list[1].args[0][0], git)
         self.assertEqual(run.call_args_list[2].args[0][0], git)
