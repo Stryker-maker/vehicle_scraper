@@ -210,9 +210,9 @@ def verify_staged_csv_whitespace(root: Path) -> None:
             raise RuntimeError(blob.stderr.decode("utf-8", errors="replace").strip() or f"git_show_failed:{path}")
         errors.extend(_staged_csv_text_errors(path, blob.stdout.decode("utf-8")))
     if errors:
+        raise ValueError("Invalid staged CSV whitespace: " + "; ".join(errors))
 
 
-def governed_keys(root: Path, registry_path: Path) -> tuple[list[str], list[str]]:
 def governed_keys(root: Path, registry_path: Path) -> tuple[list[str], list[str]]:
     entries = registry_entries(root=root, registry_path=registry_path)
     active = [str(entry["vehicle_key"]) for entry in entries if entry["enabled"]]
