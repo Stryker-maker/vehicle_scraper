@@ -224,9 +224,11 @@ class CsvLineTerminatorTests(unittest.TestCase):
 
     def test_publication_git_executable_missing_fails_clearly(self):
         """Fail with a clear runtime error when Git is unavailable."""
-        with mock.patch("generated_data_publish.shutil.which", return_value=None):
-            with self.assertRaisesRegex(RuntimeError, "git executable is required"):
-                _git_executable()
+        with (
+            mock.patch("generated_data_publish.shutil.which", return_value=None),
+            self.assertRaisesRegex(RuntimeError, "git executable is required"),
+        ):
+            _git_executable()
 
     def test_staged_csv_whitespace_reports_physical_line_after_embedded_lf(self):
         """Report the physical line of a formatting error after a multiline quoted field."""
