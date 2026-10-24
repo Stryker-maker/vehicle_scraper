@@ -6,9 +6,10 @@ on:
       - main
     paths-ignore:
       - 'data/**'
+  # Include stacked/child PRs whose base is another working branch,
+  # not only PRs targeting main. This keeps analysis active throughout
+  # the repository's staged PR workflow.
   pull_request:
-    branches:
-      - main
     types: [opened, synchronize, reopened]
     paths-ignore:
       - 'data/**'

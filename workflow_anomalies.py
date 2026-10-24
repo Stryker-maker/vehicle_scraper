@@ -709,7 +709,6 @@ def _plan_single_entry_isolation(
                     threshold="files_present",
                 )
             )
-            return None, None
         return (pair, moves), None
     except (ValueError, RuntimeError) as exc:
         report.setdefault("anomalies", []).append(
@@ -770,7 +769,7 @@ def isolate_anomalous_collections(root: Path, report: dict[str, Any]) -> list[di
     # Phase 2: Execute all planned moves under a single combined rollback boundary
     try:
         _execute_isolation_moves(combined_planned_moves)
-        completed_collections = [pair for pair, moves in planned_entries if moves]
+        completed_collections = [pair for pair, _moves in planned_entries]
     except (ValueError, RuntimeError) as exc:
         for pair, _ in planned_entries:
             report.setdefault("anomalies", []).append(

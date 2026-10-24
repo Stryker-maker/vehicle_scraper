@@ -339,7 +339,8 @@ jobs:
           git add data/run_status/publication_latest.json
           python storage_retention.py validate-staged --registry vehicle_registry.json
           python generated_data_publish.py verify-staged --registry vehicle_registry.json
-          git diff --cached --check
+          git diff --cached --check -- . ':(exclude,glob)**/*.csv'
+          python generated_data_publish.py verify-staged-csv-whitespace
           git diff --cached --name-status
           git diff --cached --stat
           git fetch origin "$GITHUB_REF_NAME"

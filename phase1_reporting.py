@@ -318,7 +318,11 @@ def build_manual_review(
         for output in (archive, latest):
             with output.open("w", encoding="utf-8", newline="") as handle:
                 writer = csv.DictWriter(
-                    handle, fieldnames=MANUAL_REVIEW_FIELDS, extrasaction="ignore"
+                    handle,
+                    fieldnames=MANUAL_REVIEW_FIELDS,
+                    extrasaction="ignore",
+                    lineterminator="\n",
+                    quoting=csv.QUOTE_ALL,
                 )
                 writer.writeheader()
                 writer.writerows(rows)

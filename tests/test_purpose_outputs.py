@@ -43,6 +43,26 @@ class PurposeInputTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "field set mismatch"):
                 purpose.load_purpose_inputs(path)
 
+    def test_family_preferences_validation_fails_closed(self):
+        root = Path(__file__).resolve().parents[1]
+        original = json.loads((root / "purpose_inputs.json").read_text(encoding="utf-8"))
+        for mutation in ("missing_preferences", "extra_field", "missing_field", "invalid_status"):
+            with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as temp:
+                value = copy.deepcopy(original)
+                entry = value["vehicles"]["honda_odyssey"]
+                if mutation == "missing_preferences":
+                    del entry["preferences"]
+                elif mutation == "extra_field":
+                    entry["preferences"]["invented"] = {}
+                elif mutation == "missing_field":
+                    del entry["preferences"]["min_year"]
+                else:
+                    entry["preferences"]["min_year"]["evidence_status"] = "verified"
+                path = Path(temp) / "inputs.json"
+                path.write_text(json.dumps(value), encoding="utf-8")
+                with self.assertRaises(ValueError):
+                    purpose.load_purpose_inputs(path)
+
 
 class PurposeBehaviorTests(unittest.TestCase):
     def owned_subject(self):
@@ -108,6 +128,12 @@ class PurposeBehaviorTests(unittest.TestCase):
             }
             for name in purpose.FAMILY_PREFERENCE_FIELDS
         }
+
+    def test_owned_field_matching_uses_type_appropriate_rules(self):
+        subject = self.owned_subject()
+        self.assertEqual(purpose._field_status("year", subject, "2013"), "match")
+        self.assertEqual(purpose._field_status("fuel", subject, "Biodiesel"), "conflict")
+        self.assertEqual(purpose._field_status("fuel", subject, "diesel"), "match")
 
     def test_ram_comparability_is_explainable_not_ranked(self):
         record = purpose._owned_record(
@@ -180,6 +206,38 @@ class PurposeBehaviorTests(unittest.TestCase):
         self.assertNotIn("engine_hours", record)
         self.assertNotIn("rank", record)
         self.assertNotIn("score", record)
+
+    def test_numeric_preferences_report_matches_mismatches_and_missing_evidence(self):
+        for field, key, limit, outside in (
+            ("budget_max_cad", "price_cad", 30000, 30001),
+            ("min_year", "year", 2020, 2019),
+            ("max_year", "year", 2023, 2024),
+            ("max_mileage_km", "mileage_km", 150000, 150001),
+            ("max_distance_km", "distance_km", 500, 501),
+            ("minimum_seating", "seating", 7, 6),
+        ):
+            for value, expected in (
+                (limit, "preference_match"),
+                (outside, "preference_mismatch"),
+                (None, "listing_evidence_missing"),
+            ):
+                with self.subTest(field=field, value=value):
+                    preferences = self.incomplete_preferences()
+                    preferences[field] = {"value": limit, "evidence_status": "friend_reported_unverified"}
+                    bundle = self.bundle("kia_carnival")
+                    base = purpose._base_record(bundle, "family_friend_purchase", "single_source")
+                    evidence = {
+                        "seating": {"value": 8},
+                        "accident_title": {"value": None},
+                        "service_history": {"value": None},
+                        "cargo_features": {"value": []},
+                    }
+                    if key == "seating":
+                        evidence[key]["value"] = value
+                    else:
+                        base[key] = value
+                    _, reasons, _ = purpose.evaluate_preferences(base, evidence, preferences)
+                    self.assertIn(f"{expected}:{field}", reasons)
 
     def test_recorded_preferences_produce_visible_mismatch_not_silent_exclusion(self):
         preferences = self.incomplete_preferences()
