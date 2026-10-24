@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import subprocess
 from collections import Counter
 from pathlib import Path
@@ -15,9 +16,18 @@ PUBLICATION_SCHEMA_VERSION = 1
 MANIFEST_PATH = Path("data/run_status/publication_latest.json")
 
 
+def _git_executable() -> str:
+    """Return Git's resolved executable path or fail clearly when Git is unavailable."""
+    executable = shutil.which("git")
+    if executable is None:
+        raise RuntimeError("git executable is required for staged publication validation")
+    return str(Path(executable).resolve())
+
+
 def staged_name_status(root: Path) -> list[tuple[str, str]]:
+    git = _git_executable()
     completed = subprocess.run(
-        ["git", "diff", "--cached", "--name-status", "--diff-filter=ACDMRTUXB"],
+        [git, "diff", "--cached", "--name-status", "--diff-filter=ACDMRTUXB"],
         cwd=root,
         text=True,
         capture_output=True,
@@ -43,10 +53,148 @@ def staged_name_status(root: Path) -> list[tuple[str, str]]:
     return result
 
 
+def _csv_physical_line_errors(
+    path: str, line_number: int, physical: list[str], *, check_line_ending: bool = True
+) -> list[str]:
+    """Return formatting errors detected on one physical CSV line."""
+    errors: list[str] = []
+    if physical and physical[-1] in {" ", "\t"}:
+        errors.append(f"{path}:{line_number}: trailing whitespace")
+    if check_line_ending and physical and physical[-1] == "\r":
+        errors.append(f"{path}:{line_number}: CRLF line terminator")
+    return errors
+
+
+def _csv_consume_quote(
+    text: str,
+    index: int,
+    physical: list[str],
+    in_quotes: bool,
+    quoted_field_start_line: int | None,
+    line_start: int,
+) -> tuple[int, bool, int | None, bool]:
+    """Consume a quote or escaped quote and return the updated parser state."""
+    if in_quotes and index + 1 < len(text) and text[index + 1] == '"':
+        physical.extend(('"', '"'))
+        return index + 2, in_quotes, quoted_field_start_line, True
+    if in_quotes:
+        return index, False, None, False
+    return index, True, line_start, False
+
+
+def _csv_handle_carriage_return(
+    path: str,
+    text: str,
+    index: int,
+    line_start: int,
+    physical: list[str],
+    errors: list[str],
+    in_quotes: bool,
+) -> None:
+    """Record a carriage return as quoted content, CRLF, or a bare CR error."""
+    is_crlf = index + 1 < len(text) and text[index + 1] == "\n"
+    if in_quotes or is_crlf:
+        physical.append("\r")
+    else:
+        errors.append(f"{path}:{line_start}: bare CR outside quoted field")
+        physical.append("\r")
+
+
+def _csv_handle_line_feed(
+    path: str, line_start: int, physical: list[str], errors: list[str], in_quotes: bool
+) -> tuple[int, list[str]]:
+    """Validate a record-ending line feed or retain it inside a quoted field."""
+    if not in_quotes:
+        errors.extend(_csv_physical_line_errors(path, line_start, physical))
+        physical = []
+    else:
+        physical.append("\n")
+    return line_start + 1, physical
+
+
+def _csv_final_text_errors(
+    path: str,
+    line_start: int,
+    physical: list[str],
+    in_quotes: bool,
+    quoted_field_start_line: int | None,
+) -> list[str]:
+    """Validate remaining text and report an unterminated quoted field."""
+    errors: list[str] = []
+    if not in_quotes and physical:
+        errors.extend(_csv_physical_line_errors(path, line_start, physical, check_line_ending=False))
+    if in_quotes:
+        errors.append(f"{path}:{quoted_field_start_line}: unterminated quoted field")
+    return errors
+
+
+def _csv_scan_character(
+    path: str,
+    text: str,
+    index: int,
+    line_start: int,
+    physical: list[str],
+    errors: list[str],
+    in_quotes: bool,
+    quoted_field_start_line: int | None,
+) -> tuple[int, int, list[str], bool, int | None]:
+    """Process one CSV character and return the updated scanner state."""
+    char = text[index]
+    if char == '"':
+        index, in_quotes, quoted_field_start_line, escaped_quote = _csv_consume_quote(
+            text, index, physical, in_quotes, quoted_field_start_line, line_start
+        )
+        if escaped_quote:
+            return index, line_start, physical, in_quotes, quoted_field_start_line
+        physical.append(char)
+    elif char == "\r":
+        _csv_handle_carriage_return(
+            path, text, index, line_start, physical, errors, in_quotes
+        )
+    elif char == "\n":
+        line_start, physical = _csv_handle_line_feed(
+            path, line_start, physical, errors, in_quotes
+        )
+    else:
+        physical.append(char)
+    return index + 1, line_start, physical, in_quotes, quoted_field_start_line
+
+
+def _staged_csv_text_errors(path: str, text: str) -> list[str]:
+    """Return staged CSV formatting errors with physical line numbers."""
+    return _scan_csv_text_errors(path, text)
+
+
+def _scan_csv_text_errors(path: str, text: str) -> list[str]:
+    """Scan CSV text while delegating each character to the focused state handlers."""
+    errors: list[str] = []
+    in_quotes = False
+    line_start = 1
+    quoted_field_start_line: int | None = None
+    physical: list[str] = []
+    index = 0
+    while index < len(text):
+        index, line_start, physical, in_quotes, quoted_field_start_line = _csv_scan_character(
+            path,
+            text,
+            index,
+            line_start,
+            physical,
+            errors,
+            in_quotes,
+            quoted_field_start_line,
+        )
+    errors.extend(
+        _csv_final_text_errors(path, line_start, physical, in_quotes, quoted_field_start_line)
+    )
+    return errors
+
+
 def verify_staged_csv_whitespace(root: Path) -> None:
     """Validate staged CSV whitespace without rejecting embedded newlines in quoted fields."""
+    git = _git_executable()
     completed = subprocess.run(
-        ["git", "diff", "--cached", "--name-only", "--diff-filter=ACMRTUXB", "--",
+        [git, "diff", "--cached", "--name-only", "--diff-filter=ACMRTUXB", "--",
          ":(glob)**/*.csv"],
         cwd=root,
         text=True,
@@ -57,48 +205,13 @@ def verify_staged_csv_whitespace(root: Path) -> None:
         raise RuntimeError(completed.stderr.strip() or "git_diff_cached_csv_list_failed")
     errors: list[str] = []
     for path in filter(None, completed.stdout.splitlines()):
-        blob = subprocess.run(["git", "show", f":{path}"], cwd=root, capture_output=True, check=False)
+        blob = subprocess.run([git, "show", f":{path}"], cwd=root, capture_output=True, check=False)
         if blob.returncode != 0:
             raise RuntimeError(blob.stderr.decode("utf-8", errors="replace").strip() or f"git_show_failed:{path}")
-        text = blob.stdout.decode("utf-8")
-        in_quotes = False
-        line_start = 1
-        physical: list[str] = []
-        index = 0
-        while index < len(text):
-            char = text[index]
-            if char == '"':
-                if in_quotes and index + 1 < len(text) and text[index + 1] == '"':
-                    physical.extend(('"', '"'))
-                    index += 2
-                    continue
-                in_quotes = not in_quotes
-                physical.append(char)
-            elif char == "\r" and not in_quotes:
-                if index + 1 < len(text) and text[index + 1] == "\n":
-                    physical.append(char)
-                else:
-                    errors.append(f"{path}:{line_start}: bare CR outside quoted field")
-                    physical.append(char)
-            elif char == "\n":
-                if not in_quotes:
-                    if physical and physical[-1] in {" ", "\t"}:
-                        errors.append(f"{path}:{line_start}: trailing whitespace")
-                    if physical and physical[-1] == "\r":
-                        errors.append(f"{path}:{line_start}: CRLF line terminator")
-                    physical = []
-                    line_start += 1
-                else:
-                    physical.append(char)
-            else:
-                physical.append(char)
-            index += 1
-        if not in_quotes and physical and physical[-1] in {" ", "\t"}:
-            errors.append(f"{path}:{line_start}: trailing whitespace")
-        if in_quotes:
-            errors.append(f"{path}:{line_start}: unterminated quoted field")
+        errors.extend(_staged_csv_text_errors(path, blob.stdout.decode("utf-8")))
     if errors:
         raise ValueError("Invalid staged CSV whitespace: " + "; ".join(errors))
+
 
 def governed_keys(root: Path, registry_path: Path) -> tuple[list[str], list[str]]:
     entries = registry_entries(root=root, registry_path=registry_path)
