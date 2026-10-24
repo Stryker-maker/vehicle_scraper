@@ -13,7 +13,12 @@ from unittest import mock
 from autotrader_history import write_csv_outputs as write_autotrader_csv_outputs
 from kijiji_history import write_csv_outputs as write_kijiji_csv_outputs
 from purpose_outputs import _write_csv as write_purpose_csv
-from generated_data_publish import _staged_csv_text_errors, verify_staged_csv_whitespace
+from generated_data_publish import (
+    _git_executable,
+    _staged_csv_text_errors,
+    staged_name_status,
+    verify_staged_csv_whitespace,
+)
 
 
 class CsvLineTerminatorTests(unittest.TestCase):
@@ -196,6 +201,32 @@ class CsvLineTerminatorTests(unittest.TestCase):
                 "sample.csv:5: CRLF line terminator",
             ],
         )
+
+    def test_publication_git_commands_use_resolved_executable_path(self):
+        """Use the resolved Git executable for staged-diff and staged-blob commands."""
+        git = str(Path("git").resolve())
+        with mock.patch("generated_data_publish.shutil.which", return_value="git"), mock.patch(
+            "generated_data_publish.subprocess.run",
+            side_effect=[
+                mock.Mock(returncode=0, stdout="M\tdata/test.csv\n", stderr=""),
+                mock.Mock(returncode=0, stdout="data/test.csv\n", stderr=""),
+                mock.Mock(returncode=0, stdout=b'"a"\n', stderr=b""),
+            ],
+        ) as run:
+            result = staged_name_status(Path.cwd())
+            verify_staged_csv_whitespace(Path.cwd())
+
+        self.assertEqual(run.call_count, 3)
+        self.assertEqual(result, [("M", "data/test.csv")])
+        self.assertEqual(run.call_args_list[0].args[0][0], git)
+        self.assertEqual(run.call_args_list[1].args[0][0], git)
+        self.assertEqual(run.call_args_list[2].args[0][0], git)
+
+    def test_publication_git_executable_missing_fails_clearly(self):
+        """Fail with a clear runtime error when Git is unavailable."""
+        with mock.patch("generated_data_publish.shutil.which", return_value=None):
+            with self.assertRaisesRegex(RuntimeError, "git executable is required"):
+                _git_executable()
 
     def test_staged_csv_whitespace_reports_physical_line_after_embedded_lf(self):
         """Report the physical line of a formatting error after a multiline quoted field."""

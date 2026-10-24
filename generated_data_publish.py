@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import subprocess
 from collections import Counter
 from pathlib import Path
@@ -15,9 +16,18 @@ PUBLICATION_SCHEMA_VERSION = 1
 MANIFEST_PATH = Path("data/run_status/publication_latest.json")
 
 
+def _git_executable() -> str:
+    """Return Git's resolved executable path or fail clearly when Git is unavailable."""
+    executable = shutil.which("git")
+    if executable is None:
+        raise RuntimeError("git executable is required for staged publication validation")
+    return str(Path(executable).resolve())
+
+
 def staged_name_status(root: Path) -> list[tuple[str, str]]:
+    git = _git_executable()
     completed = subprocess.run(
-        ["git", "diff", "--cached", "--name-status", "--diff-filter=ACDMRTUXB"],
+        [git, "diff", "--cached", "--name-status", "--diff-filter=ACDMRTUXB"],
         cwd=root,
         text=True,
         capture_output=True,
@@ -179,10 +189,12 @@ def _scan_csv_text_errors(path: str, text: str) -> list[str]:
     )
     return errors
 
+
 def verify_staged_csv_whitespace(root: Path) -> None:
     """Validate staged CSV whitespace without rejecting embedded newlines in quoted fields."""
+    git = _git_executable()
     completed = subprocess.run(
-        ["git", "diff", "--cached", "--name-only", "--diff-filter=ACMRTUXB", "--",
+        [git, "diff", "--cached", "--name-only", "--diff-filter=ACMRTUXB", "--",
          ":(glob)**/*.csv"],
         cwd=root,
         text=True,
@@ -193,12 +205,14 @@ def verify_staged_csv_whitespace(root: Path) -> None:
         raise RuntimeError(completed.stderr.strip() or "git_diff_cached_csv_list_failed")
     errors: list[str] = []
     for path in filter(None, completed.stdout.splitlines()):
-        blob = subprocess.run(["git", "show", f":{path}"], cwd=root, capture_output=True, check=False)
+        blob = subprocess.run([git, "show", f":{path}"], cwd=root, capture_output=True, check=False)
         if blob.returncode != 0:
             raise RuntimeError(blob.stderr.decode("utf-8", errors="replace").strip() or f"git_show_failed:{path}")
         errors.extend(_staged_csv_text_errors(path, blob.stdout.decode("utf-8")))
     if errors:
         raise ValueError("Invalid staged CSV whitespace: " + "; ".join(errors))
+
+
 def governed_keys(root: Path, registry_path: Path) -> tuple[list[str], list[str]]:
     entries = registry_entries(root=root, registry_path=registry_path)
     active = [str(entry["vehicle_key"]) for entry in entries if entry["enabled"]]
