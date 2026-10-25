@@ -358,7 +358,7 @@ class Phase1HealthIsolationGateTests(unittest.TestCase):
                 1,
             )
         self.assertIn(
-            "did not produce the requested isolation set",
+            "did not produce consistent outcomes",
             "".join(call.args[0] for call in stderr.write.call_args_list),
         )
 
