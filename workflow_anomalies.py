@@ -698,17 +698,25 @@ def _plan_single_entry_isolation(
     try:
         pair, moves = _plan_collection_moves(root, entry, report_run_id)
         if not moves:
+            quarantine_dir = root / "data" / vk / "quarantine" / src / report_run_id
+            already_quarantined = quarantine_dir.is_dir() and any(
+                path.is_file() for path in quarantine_dir.iterdir()
+            )
+            if already_quarantined:
+                return (pair, moves), None
+            report.setdefault("no_output_collections", []).append(pair)
             report.setdefault("anomalies", []).append(
                 _anomaly(
                     severity="info",
                     code="no_isolation_outputs_present",
                     vehicle_key=vk,
                     source=src,
-                    message=f"No output files found to quarantine for collection {vk}:{src}",
-                    current="no_outputs",
+                    message=f"No current-run output files found to quarantine for collection {vk}:{src}",
+                    current="no_current_run_outputs",
                     threshold="files_present",
                 )
             )
+            return None, None
         return (pair, moves), None
     except (ValueError, RuntimeError) as exc:
         report.setdefault("anomalies", []).append(
@@ -733,6 +741,7 @@ def _plan_phase1_isolation(
     combined_planned_moves: list[tuple[Path, Path]] = []
     validation_error: Exception | None = None
 
+    report["no_output_collections"] = []
     for entry in isolated:
         planned, exc = _plan_single_entry_isolation(root, entry, report_run_id, report)
         if exc is not None and validation_error is None:
@@ -744,6 +753,7 @@ def _plan_phase1_isolation(
 
     if validation_error is not None:
         report["isolated_collections"] = []
+        report["no_output_collections"] = []
         _recalculate_report_counts(report)
         raise validation_error
 
@@ -757,13 +767,21 @@ def isolate_anomalous_collections(root: Path, report: dict[str, Any]) -> list[di
     if not report_run_id or not IDENTIFIER_PATTERN.match(report_run_id):
         raise ValueError(f"Invalid or missing run_id in anomaly report: {report.get('run_id')!r}")
 
-    isolated = report.get("isolated_collections")
-    if not isinstance(isolated, list):
-        raise ValueError(f"isolated_collections must be a list: {isolated!r}")
+    requested = report.get("isolation_requested_collections")
+    if requested is None:
+        requested = report.get("isolated_collections")
+    if not isinstance(requested, list):
+        raise ValueError(f"isolation_requested_collections must be a list: {requested!r}")
+    report["isolation_requested_collections"] = [dict(item) for item in requested if isinstance(item, dict)]
+    if len(report["isolation_requested_collections"]) != len(requested):
+        raise ValueError("isolation_requested_collections must contain only objects")
+
+    # Keep the requested set distinct from the collections physically isolated.
+    report["no_output_collections"] = []
 
     # Phase 1: Validate and plan ALL requested collections with zero filesystem mutations
     planned_entries, combined_planned_moves = _plan_phase1_isolation(
-        root, isolated, report_run_id, report
+        root, requested, report_run_id, report
     )
 
     # Phase 2: Execute all planned moves under a single combined rollback boundary
@@ -784,6 +802,7 @@ def isolate_anomalous_collections(root: Path, report: dict[str, Any]) -> list[di
                 )
             )
         report["isolated_collections"] = []
+        report["no_output_collections"] = []
         _recalculate_report_counts(report)
         raise exc
 
