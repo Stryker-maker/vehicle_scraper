@@ -178,7 +178,7 @@ class Phase1HealthIsolationGateTests(unittest.TestCase):
 
 
     @staticmethod
-    def test_degraded_health_passes_when_unhealthy_source_has_no_current_run_output(self):
+    def test_degraded_health_passes_when_unhealthy_source_has_no_current_run_output():
         health = {
             "run_id": "run-123",
             "overall_status": "degraded",
