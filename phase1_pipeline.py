@@ -118,6 +118,18 @@ def _validate_isolation_for_health_gate(*, health: dict, anomaly: dict) -> None:
         raise RuntimeError("Isolation outcome contains collections classified as both isolated and no-output")
 
     classified = isolated | no_output
+    raw_requested = anomaly.get("isolation_requested_collections", raw_isolated)
+    if not isinstance(raw_requested, list) or any(
+        not isinstance(item, dict) for item in raw_requested
+    ):
+        raise RuntimeError("isolation_requested_collections must be a list of objects")
+    requested = {_source_key(entry) for entry in raw_requested}
+    if len(requested) != len(raw_requested):
+        raise RuntimeError("isolation_requested_collections contains duplicate collection identities")
+    if requested != classified:
+        raise RuntimeError(
+            "isolation_requested_collections does not match the classified isolation outcomes"
+        )
     if unhealthy != classified:
         missing = sorted(unhealthy - classified)
         unexpected = sorted(classified - unhealthy)
