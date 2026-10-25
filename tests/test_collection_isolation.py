@@ -1552,7 +1552,7 @@ class CollectionIsolationTests(unittest.TestCase):
             verify_staged_manifest(root=self.root, registry_path=Path("vehicle_registry.json"))
 
     def test_manifest_rejects_invalid_isolation_outcome_metadata(self):
-        from generated_data_publish import MANIFEST_PATH, prepare_manifest, verify_staged_manifest
+        from generated_data_publish import MANIFEST_PATH, verify_staged_manifest
 
         self._setup_git_repo()
         latest = self.root / "data" / "ford_f350" / "latest" / "ford_f350_autotrader_latest.csv"
@@ -1715,9 +1715,14 @@ class CollectionIsolationTests(unittest.TestCase):
                 {"vehicle_key": no_output_key[0], "source": no_output_key[1]},
             ],
         }
-        with patch("workflow_anomalies._execute_isolation_moves", side_effect=RuntimeError("simulated move failure")):
-            with self.assertRaisesRegex(RuntimeError, "simulated move failure"):
-                isolate_anomalous_collections(root=self.root, report=report)
+        with (
+            patch(
+                "workflow_anomalies._execute_isolation_moves",
+                side_effect=RuntimeError("simulated move failure"),
+            ),
+            self.assertRaisesRegex(RuntimeError, "simulated move failure"),
+        ):
+            isolate_anomalous_collections(root=self.root, report=report)
 
         self.assertEqual(report["isolated_collections"], [])
         self.assertEqual(
