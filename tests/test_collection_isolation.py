@@ -1404,6 +1404,11 @@ class CollectionIsolationTests(unittest.TestCase):
             "anomaly_schema_version": 1,
             "run_id": run_id,
             "isolated_collections": [{"vehicle_key": "ford_f150", "source": "autotrader"}],
+            "no_output_collections": [{"vehicle_key": "subaru_forester", "source": "kijiji"}],
+            "isolation_requested_collections": [
+                {"vehicle_key": "ford_f150", "source": "autotrader"},
+                {"vehicle_key": "subaru_forester", "source": "kijiji"},
+            ],
         }
         anomaly_path.write_text(json.dumps(report), encoding="utf-8")
 
@@ -1427,6 +1432,14 @@ class CollectionIsolationTests(unittest.TestCase):
         res = verify_staged_manifest(root=self.root, registry_path=Path("vehicle_registry.json"))
         self.assertEqual(res["verification_status"], "pass")
         self.assertEqual(res["isolated_collections"], [{"vehicle_key": "ford_f150", "source": "autotrader"}])
+        self.assertEqual(res["no_output_collections"], [{"vehicle_key": "subaru_forester", "source": "kijiji"}])
+        self.assertEqual(
+            res["isolation_requested_collections"],
+            [
+                {"vehicle_key": "ford_f150", "source": "autotrader"},
+                {"vehicle_key": "subaru_forester", "source": "kijiji"},
+            ],
+        )
 
     def test_verify_staged_manifest_mismatched_isolation_metadata_fails_closed(self):
         """
