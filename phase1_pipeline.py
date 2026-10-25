@@ -105,14 +105,22 @@ def _validate_isolation_for_health_gate(*, health: dict, anomaly: dict) -> None:
         for entry in health.get("sources", [])
         if isinstance(entry, dict) and not entry.get("healthy")
     }
-    isolated = {
-        _source_key(entry)
-        for entry in anomaly.get("isolated_collections", [])
-        if isinstance(entry, dict)
-    }
-    if unhealthy != isolated:
-        missing = sorted(unhealthy - isolated)
-        unexpected = sorted(isolated - unhealthy)
+    raw_isolated = anomaly.get("isolated_collections", [])
+    raw_no_output = anomaly.get("no_output_collections", [])
+    if not isinstance(raw_isolated, list) or any(not isinstance(item, dict) for item in raw_isolated):
+        raise RuntimeError("isolated_collections must be a list of objects")
+    if not isinstance(raw_no_output, list) or any(not isinstance(item, dict) for item in raw_no_output):
+        raise RuntimeError("no_output_collections must be a list of objects")
+
+    isolated = {_source_key(entry) for entry in raw_isolated}
+    no_output = {_source_key(entry) for entry in raw_no_output}
+    if isolated & no_output:
+        raise RuntimeError("Isolation outcome contains collections classified as both isolated and no-output")
+
+    classified = isolated | no_output
+    if unhealthy != classified:
+        missing = sorted(unhealthy - classified)
+        unexpected = sorted(classified - unhealthy)
         raise RuntimeError(
             "Unhealthy source isolation is incomplete: "
             f"missing={missing}, unexpected={unexpected}"
@@ -207,15 +215,11 @@ def _handle_check_health(args: argparse.Namespace, root: Path) -> int:
                 file=sys.stderr,
             )
             return 1
-        requested_isolation = [dict(item) for item in raw_isolated_collections]
-        anomaly_for_validation = dict(anomaly)
-        anomaly_for_validation["isolated_collections"] = requested_isolation
+        expected_isolated = [dict(item) for item in raw_isolated_collections]
         try:
-            _validate_isolation_for_health_gate(
-                health=report, anomaly=anomaly_for_validation
-            )
+            _validate_isolation_for_health_gate(health=report, anomaly=anomaly)
             isolated = isolate_anomalous_collections(root=root, report=anomaly)
-            if isolated != requested_isolation:
+            if isolated != expected_isolated:
                 raise RuntimeError(
                     "Collection anomaly isolation did not produce the requested isolation set"
                 )
@@ -225,7 +229,8 @@ def _handle_check_health(args: argparse.Namespace, root: Path) -> int:
         print(
             f"Run health is {report.get('overall_status', 'unknown')}, but all "
             f"{report.get('unhealthy_source_runs', 0)} unhealthy source run(s) "
-            "are explicitly isolated; healthy collections may continue."
+            "are either quarantined or confirmed to have no current-run output to quarantine; "
+            "healthy collections may continue."
         )
         return 0
     message = (
