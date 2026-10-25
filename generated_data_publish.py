@@ -244,8 +244,10 @@ def _parse_isolated_items(isolated: Any) -> list[dict[str, str]]:
     return parsed
 
 
-def _extract_isolated_collections(root: Path, run_id: str) -> list[dict[str, str]]:
-    """Extract and validate isolated collection identifiers from anomalies_latest.json if present."""
+def _extract_anomaly_collection_field(
+    root: Path, run_id: str, field: str, *, default: list[dict[str, str]] | None = None
+) -> list[dict[str, str]]:
+    """Extract and validate one collection classification from the same-run anomaly report."""
     anomaly_path = root / "data" / "run_status" / "anomalies_latest.json"
     if not anomaly_path.exists():
         return []
@@ -264,7 +266,31 @@ def _extract_isolated_collections(root: Path, run_id: str) -> list[dict[str, str
             f"Anomaly report run_id mismatch: expected {run_id!r}, found {report_run_id!r}"
         )
 
-    return _parse_isolated_items(anom_data.get("isolated_collections"))
+    value = anom_data.get(field, default if default is not None else [])
+    return _parse_isolated_items(value)
+
+
+def _extract_isolated_collections(root: Path, run_id: str) -> list[dict[str, str]]:
+    """Extract and validate actually isolated collection identifiers from the anomaly report."""
+    return _extract_anomaly_collection_field(root, run_id, "isolated_collections")
+
+
+def _extract_no_output_collections(root: Path, run_id: str) -> list[dict[str, str]]:
+    """Extract and validate collections that had no current-run outputs to quarantine."""
+    return _extract_anomaly_collection_field(root, run_id, "no_output_collections")
+
+
+def _extract_requested_isolation_collections(root: Path, run_id: str) -> list[dict[str, str]]:
+    """Extract the complete requested isolation set, with compatibility for older reports."""
+    requested = _extract_anomaly_collection_field(
+        root, run_id, "isolation_requested_collections", default=[]
+    )
+    if requested:
+        return requested
+    return (
+        _extract_isolated_collections(root, run_id)
+        + _extract_no_output_collections(root, run_id)
+    )
 
 
 def prepare_manifest(
@@ -294,6 +320,8 @@ def prepare_manifest(
         raise ValueError("Invalid generated-data paths: " + ", ".join(errors))
     counts = Counter(status[0] for status, _ in staged)
     isolated_collections = _extract_isolated_collections(root, run_id)
+    no_output_collections = _extract_no_output_collections(root, run_id)
+    isolation_requested_collections = _extract_requested_isolation_collections(root, run_id)
 
     manifest = {
         "publication_schema_version": PUBLICATION_SCHEMA_VERSION,
@@ -310,6 +338,8 @@ def prepare_manifest(
         "active_vehicle_keys": sorted(active),
         "paused_vehicle_keys": sorted(paused),
         "isolated_collections": isolated_collections,
+        "no_output_collections": no_output_collections,
+        "isolation_requested_collections": isolation_requested_collections,
     }
     write_json(root / MANIFEST_PATH, manifest)
     return manifest
@@ -330,16 +360,35 @@ def verify_staged_manifest(
     if not manifest_run_id:
         raise ValueError("Publication manifest missing run_id")
 
-    # Validate isolated_collections in the staged manifest itself
+    # Validate each isolation outcome in the staged manifest itself.
     staged_isolated = _parse_isolated_items(manifest.get("isolated_collections"))
+    staged_no_output = _parse_isolated_items(manifest.get("no_output_collections", []))
+    staged_requested = _parse_isolated_items(
+        manifest.get("isolation_requested_collections", staged_isolated + staged_no_output)
+    )
 
-    # Extract and validate expected isolated_collections from same-run anomaly report
+    # Each manifest classification must match the same-run anomaly report.
     expected_isolated = _extract_isolated_collections(root, manifest_run_id)
+    expected_no_output = _extract_no_output_collections(root, manifest_run_id)
+    expected_requested = _extract_requested_isolation_collections(root, manifest_run_id)
 
     if staged_isolated != expected_isolated:
         raise ValueError(
             "Staged publication manifest isolated_collections metadata mismatch with same-run anomaly report"
         )
+    if staged_no_output != expected_no_output:
+        raise ValueError(
+            "Staged publication manifest no_output_collections metadata mismatch with same-run anomaly report"
+        )
+    if staged_requested != expected_requested:
+        raise ValueError(
+            "Staged publication manifest isolation_requested_collections metadata mismatch with same-run anomaly report"
+        )
+    if set(map(tuple, (item["vehicle_key"], item["source"]) for item in staged_requested)) != (
+        set(map(tuple, (item["vehicle_key"], item["source"]) for item in staged_isolated))
+        | set(map(tuple, (item["vehicle_key"], item["source"]) for item in staged_no_output))
+    ):
+        raise ValueError("Publication manifest isolation outcome classifications do not cover the requested set")
 
     active, paused = governed_keys(root, registry_path)
     staged = staged_name_status(root)
