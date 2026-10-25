@@ -700,7 +700,7 @@ def _plan_single_entry_isolation(
         if not moves:
             quarantine_dir = root / "data" / vk / "quarantine" / src / report_run_id
             already_quarantined = quarantine_dir.is_dir() and any(
-                path.is_file() for path in quarantine_dir.iterdir()
+                path.is_file() for path in quarantine_dir.glob("*.csv")
             )
             if already_quarantined:
                 return (pair, moves), None
