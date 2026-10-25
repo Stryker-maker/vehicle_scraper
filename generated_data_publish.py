@@ -246,28 +246,32 @@ def _parse_isolated_items(
     return parsed
 
 
-def _extract_anomaly_collection_field(
-    root: Path, run_id: str, field: str, *, default: list[dict[str, str]] | None = None
-) -> list[dict[str, str]]:
-    """Extract and validate one collection classification from the same-run anomaly report."""
+def _load_same_run_anomaly_report(root: Path, run_id: str) -> dict[str, Any] | None:
+    """Load and validate the anomaly report once for a publication operation."""
     anomaly_path = root / "data" / "run_status" / "anomalies_latest.json"
     if not anomaly_path.exists():
-        return []
-
+        return None
     try:
         anom_data = json.loads(anomaly_path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
         raise ValueError(f"Unreadable or malformed anomaly report: {exc}") from exc
-
     if not isinstance(anom_data, dict) or anom_data.get("anomaly_schema_version") != 1:
         raise ValueError("Invalid anomaly report schema in anomalies_latest.json")
-
     report_run_id = str(anom_data.get("run_id") or "").strip()
     if report_run_id != run_id:
         raise ValueError(
             f"Anomaly report run_id mismatch: expected {run_id!r}, found {report_run_id!r}"
         )
+    return anom_data
 
+
+def _extract_anomaly_collection_field(
+    root: Path, run_id: str, field: str, *, default: list[dict[str, str]] | None = None
+) -> list[dict[str, str]]:
+    """Extract and validate one collection classification from the same-run anomaly report."""
+    anom_data = _load_same_run_anomaly_report(root, run_id)
+    if anom_data is None:
+        return []
     if field in anom_data:
         value = anom_data[field]
     elif default is not None:
@@ -288,25 +292,22 @@ def _extract_no_output_collections(root: Path, run_id: str) -> list[dict[str, st
 
 
 def _extract_requested_isolation_collections(root: Path, run_id: str) -> list[dict[str, str]]:
-    """Extract the complete requested isolation set, with compatibility for older reports."""
-    anomaly_path = root / "data" / "run_status" / "anomalies_latest.json"
-    if anomaly_path.exists():
-        try:
-            anomaly_data = json.loads(anomaly_path.read_text(encoding="utf-8"))
-        except (OSError, ValueError) as exc:
-            raise ValueError(f"Unreadable or malformed anomaly report: {exc}") from exc
-        if not isinstance(anomaly_data, dict) or anomaly_data.get("anomaly_schema_version") != 1:
-            raise ValueError("Invalid anomaly report schema in anomalies_latest.json")
-        if str(anomaly_data.get("run_id") or "").strip() != run_id:
-            raise ValueError("Anomaly report run_id does not match publication run_id")
-        if "isolation_requested_collections" in anomaly_data:
-            return _parse_isolated_items(
-                anomaly_data["isolation_requested_collections"],
-                field="isolation_requested_collections",
-            )
+    """Extract the complete requested set, falling back only for older reports."""
+    anomaly_data = _load_same_run_anomaly_report(root, run_id)
+    if anomaly_data is None:
+        return []
+    if "isolation_requested_collections" in anomaly_data:
+        return _parse_isolated_items(
+            anomaly_data["isolation_requested_collections"],
+            field="isolation_requested_collections",
+        )
     return (
-        _extract_isolated_collections(root, run_id)
-        + _extract_no_output_collections(root, run_id)
+        _parse_isolated_items(
+            anomaly_data.get("isolated_collections", []), field="isolated_collections"
+        )
+        + _parse_isolated_items(
+            anomaly_data.get("no_output_collections", []), field="no_output_collections"
+        )
     )
 
 
