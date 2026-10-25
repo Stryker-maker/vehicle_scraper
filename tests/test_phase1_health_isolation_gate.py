@@ -291,6 +291,46 @@ class Phase1HealthIsolationGateTests(unittest.TestCase):
                 0,
             )
 
+    def test_check_health_handler_accepts_valid_no_output_reclassification(self):
+        health = {
+            "run_id": "run-current",
+            "overall_status": "degraded",
+            "unhealthy_source_runs": 1,
+            "sources": [
+                {"vehicle_key": "ford_f150", "source": "kijiji", "healthy": False},
+            ],
+        }
+        pair = {"vehicle_key": "ford_f150", "source": "kijiji"}
+        anomaly = {
+            "run_id": "run-current",
+            "isolated_collections": [pair],
+            "no_output_collections": [],
+            "isolation_requested_collections": [pair],
+            "anomalies": [],
+        }
+
+        def classify_as_no_output(*, root, report):
+            report["isolated_collections"] = []
+            report["no_output_collections"] = [dict(pair)]
+            return []
+
+        with patch("phase1_pipeline.load_json", side_effect=[health, anomaly]), patch(
+            "phase1_pipeline.Path.exists", return_value=True
+        ), patch(
+            "phase1_pipeline.isolate_anomalous_collections",
+            side_effect=classify_as_no_output,
+        ), patch("builtins.print"):
+            self.assertEqual(
+                main([
+                    "check-health",
+                    "--report",
+                    "health.json",
+                    "--anomaly-report",
+                    "anomalies.json",
+                ]),
+                0,
+            )
+
     def test_check_health_handler_returns_one_when_isolation_result_mismatches(self):
         health = {
             "run_id": "run-current",
