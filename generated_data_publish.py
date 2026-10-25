@@ -384,10 +384,12 @@ def verify_staged_manifest(
         raise ValueError(
             "Staged publication manifest isolation_requested_collections metadata mismatch with same-run anomaly report"
         )
-    if set(map(tuple, (item["vehicle_key"], item["source"]) for item in staged_requested)) != (
-        set(map(tuple, (item["vehicle_key"], item["source"]) for item in staged_isolated))
-        | set(map(tuple, (item["vehicle_key"], item["source"]) for item in staged_no_output))
-    ):
+    isolated_keys = {(item["vehicle_key"], item["source"]) for item in staged_isolated}
+    no_output_keys = {(item["vehicle_key"], item["source"]) for item in staged_no_output}
+    requested_keys = {(item["vehicle_key"], item["source"]) for item in staged_requested}
+    if isolated_keys & no_output_keys:
+        raise ValueError("Publication manifest classifies a collection as both isolated and no-output")
+    if requested_keys != isolated_keys | no_output_keys:
         raise ValueError("Publication manifest isolation outcome classifications do not cover the requested set")
 
     active, paused = governed_keys(root, registry_path)
