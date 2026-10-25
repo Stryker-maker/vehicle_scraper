@@ -112,8 +112,16 @@ def _validate_isolation_for_health_gate(*, health: dict, anomaly: dict) -> None:
     if not isinstance(raw_no_output, list) or any(not isinstance(item, dict) for item in raw_no_output):
         raise RuntimeError("no_output_collections must be a list of objects")
 
-    isolated = {_source_key(entry) for entry in raw_isolated}
-    no_output = {_source_key(entry) for entry in raw_no_output}
+    def collection_keys(entries: list[dict], field: str) -> set[tuple[str, str]]:
+        keys = [_source_key(entry) for entry in entries]
+        if any(not vehicle_key.strip() or not source.strip() for vehicle_key, source in keys):
+            raise RuntimeError(f"{field} contains an empty collection identity")
+        if len(set(keys)) != len(keys):
+            raise RuntimeError(f"{field} contains duplicate collection identities")
+        return set(keys)
+
+    isolated = collection_keys(raw_isolated, "isolated_collections")
+    no_output = collection_keys(raw_no_output, "no_output_collections")
     if isolated & no_output:
         raise RuntimeError("Isolation outcome contains collections classified as both isolated and no-output")
 
@@ -123,9 +131,7 @@ def _validate_isolation_for_health_gate(*, health: dict, anomaly: dict) -> None:
         not isinstance(item, dict) for item in raw_requested
     ):
         raise RuntimeError("isolation_requested_collections must be a list of objects")
-    requested = {_source_key(entry) for entry in raw_requested}
-    if len(requested) != len(raw_requested):
-        raise RuntimeError("isolation_requested_collections contains duplicate collection identities")
+    requested = collection_keys(raw_requested, "isolation_requested_collections")
     if requested != classified:
         raise RuntimeError(
             "isolation_requested_collections does not match the classified isolation outcomes"
