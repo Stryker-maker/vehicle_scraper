@@ -1582,6 +1582,12 @@ class CollectionIsolationTests(unittest.TestCase):
                 {},
             ),
             (
+                "explicit_empty_requested_set",
+                {"isolated_collections": [], "no_output_collections": [pair_b], "isolation_requested_collections": []},
+                "do not cover the requested set",
+                {},
+            ),
+            (
                 "requested_union_mismatch",
                 {"isolated_collections": [pair_a], "no_output_collections": [pair_b], "isolation_requested_collections": [pair_a]},
                 "do not cover the requested set",
