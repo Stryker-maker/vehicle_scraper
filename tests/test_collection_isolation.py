@@ -151,18 +151,29 @@ class CollectionIsolationTests(unittest.TestCase):
         )
         status_file.parent.mkdir(parents=True, exist_ok=True)
         status_file.write_text(json.dumps(status), encoding="utf-8")
+        stale_latest = (
+            self.root
+            / "data"
+            / "ford_f150"
+            / "latest"
+            / "ford_f150_autotrader_latest.csv"
+        )
+        stale_latest.parent.mkdir(parents=True, exist_ok=True)
+        stale_latest.write_text("previous-run trusted data", encoding="utf-8")
 
         isolated = isolate_anomalous_collections(
             root=self.root,
             report=report,
         )
 
+        self.assertEqual(isolated, [])
+        self.assertEqual(report["isolated_collections"], [])
         self.assertEqual(
-            isolated,
+            report["no_output_collections"],
             [{"vehicle_key": "ford_f150", "source": "autotrader"}],
         )
         self.assertEqual(
-            report["isolated_collections"],
+            report["isolation_requested_collections"],
             [{"vehicle_key": "ford_f150", "source": "autotrader"}],
         )
 
@@ -181,6 +192,8 @@ class CollectionIsolationTests(unittest.TestCase):
             status_file.read_text(encoding="utf-8"),
             json.dumps(status),
         )
+        self.assertTrue(stale_latest.exists())
+        self.assertEqual(stale_latest.read_text(encoding="utf-8"), "previous-run trusted data")
 
         quarantine_root = (
             self.root
@@ -318,10 +331,11 @@ class CollectionIsolationTests(unittest.TestCase):
 
         self.assertEqual(
             isolated,
-            [
-                {"vehicle_key": "ford_f150", "source": "autotrader"},
-                {"vehicle_key": "subaru_forester", "source": "kijiji"},
-            ],
+            [{"vehicle_key": "ford_f150", "source": "autotrader"}],
+        )
+        self.assertEqual(
+            report["no_output_collections"],
+            [{"vehicle_key": "subaru_forester", "source": "kijiji"}],
         )
 
         self.assertFalse(f150_latest.exists())
@@ -339,9 +353,13 @@ class CollectionIsolationTests(unittest.TestCase):
             f150_archive_before,
         )
 
-        self.assertIn(
+        self.assertNotIn(
             {"vehicle_key": "subaru_forester", "source": "kijiji"},
             report["isolated_collections"],
+        )
+        self.assertIn(
+            {"vehicle_key": "subaru_forester", "source": "kijiji"},
+            report["no_output_collections"],
         )
 
         no_output_anomalies = [
