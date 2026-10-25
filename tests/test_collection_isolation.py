@@ -1596,6 +1596,64 @@ class CollectionIsolationTests(unittest.TestCase):
         self.assertTrue((q_dir / archive_csv.name).exists())
         self.assertFalse((q_dir / f"{vk}_{src}_latest_quarantined.csv").exists())
 
+    def test_no_output_classification_survives_atomic_isolation_failure(self):
+        from unittest.mock import patch
+
+        run_id = "run_mixed_failure_123"
+        no_output_key = ("ford_f150", "kijiji")
+        output_key = ("ford_f150", "autotrader")
+
+        no_output_status = self._source_entry(
+            no_output_key[0], no_output_key[1], healthy=False, accepted=0, fetched=0,
+            execution_status="failed",
+        )
+        no_output_status.update({
+            "run_id": run_id,
+            "started_at_utc": utc_now(),
+            "latest_output": None,
+            "archive_output": None,
+        })
+        output_status = self._source_entry(
+            output_key[0], output_key[1], healthy=False, accepted=1, fetched=1,
+            execution_status="failed",
+        )
+        output_status.update({
+            "run_id": run_id,
+            "started_at_utc": utc_now(),
+            "latest_output": f"data/{output_key[0]}/latest/{output_key[0]}_{output_key[1]}_latest.csv",
+            "archive_output": None,
+        })
+        for vehicle_key, source, status in (
+            (*no_output_key, no_output_status),
+            (*output_key, output_status),
+        ):
+            status_path = self.root / "data" / vehicle_key / "run_status" / f"{source}_latest.json"
+            status_path.parent.mkdir(parents=True, exist_ok=True)
+            status_path.write_text(json.dumps(status), encoding="utf-8")
+
+        latest = self.root / "data" / output_key[0] / "latest" / f"{output_key[0]}_{output_key[1]}_latest.csv"
+        latest.parent.mkdir(parents=True, exist_ok=True)
+        latest.write_text("current run output", encoding="utf-8")
+
+        report = {
+            "run_id": run_id,
+            "isolated_collections": [
+                {"vehicle_key": output_key[0], "source": output_key[1]},
+                {"vehicle_key": no_output_key[0], "source": no_output_key[1]},
+            ],
+        }
+        with patch("workflow_anomalies._execute_isolation_moves", side_effect=RuntimeError("simulated move failure")):
+            with self.assertRaisesRegex(RuntimeError, "simulated move failure"):
+                isolate_anomalous_collections(root=self.root, report=report)
+
+        self.assertEqual(report["isolated_collections"], [])
+        self.assertEqual(
+            report["no_output_collections"],
+            [{"vehicle_key": no_output_key[0], "source": no_output_key[1]}],
+        )
+        self.assertTrue(latest.exists())
+        self.assertEqual(latest.read_text(encoding="utf-8"), "current run output")
+
     def test_check_action_policy_enforce_fails_closed_when_critical_anomalies_exist_without_quarantined_files(self):
         """
         Prove that _run_check_action with --policy enforce fails closed (returns 1)
