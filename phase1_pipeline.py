@@ -256,6 +256,12 @@ def _handle_check_health(args: argparse.Namespace, root: Path) -> int:
                     "Collection anomaly isolation produced malformed outcome classifications"
                 )
 
+            if not isinstance(isolated, list) or any(
+                not isinstance(item, dict) for item in isolated
+            ):
+                raise RuntimeError(
+                    "Collection anomaly isolation returned a malformed isolated collection list"
+                )
             returned_keys = [_source_key(item) for item in isolated]
             isolated_keys = {_source_key(item) for item in reported_isolated}
             no_output_keys = {_source_key(item) for item in reported_no_output}
