@@ -177,5 +177,64 @@ class Phase1HealthIsolationGateTests(unittest.TestCase):
             isolate.assert_not_called()
 
 
+    def test_check_health_handler_returns_zero_for_valid_degraded_isolation(self):
+        health = {
+            "run_id": "run-current",
+            "overall_status": "degraded",
+            "unhealthy_source_runs": 1,
+            "sources": [
+                {"vehicle_key": "ford_f150", "source": "kijiji", "healthy": False},
+            ],
+        }
+        isolated = [{"vehicle_key": "ford_f150", "source": "kijiji"}]
+        anomaly = {
+            "run_id": "run-current",
+            "isolated_collections": isolated,
+            "no_output_collections": [],
+            "isolation_requested_collections": isolated,
+            "anomalies": [],
+        }
+        with patch("phase1_pipeline.load_json", side_effect=[health, anomaly]), patch(
+            "phase1_pipeline.Path.exists", return_value=True
+        ), patch(
+            "phase1_pipeline.isolate_anomalous_collections", return_value=isolated
+        ), patch("builtins.print"):
+            self.assertEqual(
+                main(["check-health", "--report", "health.json", "--anomaly-report", "anomalies.json"]),
+                0,
+            )
+
+    def test_check_health_handler_returns_one_when_isolation_result_mismatches(self):
+        health = {
+            "run_id": "run-current",
+            "overall_status": "degraded",
+            "unhealthy_source_runs": 1,
+            "sources": [
+                {"vehicle_key": "ford_f150", "source": "kijiji", "healthy": False},
+            ],
+        }
+        isolated = [{"vehicle_key": "ford_f150", "source": "kijiji"}]
+        anomaly = {
+            "run_id": "run-current",
+            "isolated_collections": isolated,
+            "no_output_collections": [],
+            "isolation_requested_collections": isolated,
+            "anomalies": [],
+        }
+        with patch("phase1_pipeline.load_json", side_effect=[health, anomaly]), patch(
+            "phase1_pipeline.Path.exists", return_value=True
+        ), patch(
+            "phase1_pipeline.isolate_anomalous_collections", return_value=[]
+        ), patch("sys.stderr") as stderr:
+            self.assertEqual(
+                main(["check-health", "--report", "health.json", "--anomaly-report", "anomalies.json"]),
+                1,
+            )
+        self.assertIn(
+            "did not produce the requested isolation set",
+            "".join(call.args[0] for call in stderr.write.call_args_list),
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
