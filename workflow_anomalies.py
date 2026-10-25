@@ -689,6 +689,31 @@ def _recalculate_report_counts(report: dict[str, Any]) -> None:
         report["anomaly_status"] = "warning"
 
 
+def _collection_outputs_already_quarantined(
+    root: Path, vehicle_key: str, source: str, run_id: str
+) -> bool:
+    """Return true only when every output recorded for this run exists in its quarantine."""
+    status_data = _validate_collection_provenance(root, vehicle_key, source, run_id)
+    quarantine_dir = root / "data" / vehicle_key / "quarantine" / source / run_id
+    expected_names: list[str] = []
+    if status_data.get("latest_output") is not None:
+        expected_names.append(f"{vehicle_key}_{source}_latest_quarantined.csv")
+    archive_output = status_data.get("archive_output")
+    if isinstance(archive_output, str) and archive_output.strip():
+        archive_path = (root / archive_output.strip()).resolve()
+        expected_dir = (root / "data" / vehicle_key / source).resolve()
+        try:
+            archive_path.relative_to(expected_dir)
+        except ValueError as exc:
+            raise ValueError(
+                f"Archive path {archive_output!r} escapes collection directory for {vehicle_key}:{source}"
+            ) from exc
+        expected_names.append(archive_path.name)
+    return bool(expected_names) and all(
+        (quarantine_dir / name).is_file() for name in expected_names
+    )
+
+
 def _plan_single_entry_isolation(
     root: Path, entry: Any, report_run_id: str, report: dict[str, Any]
 ) -> tuple[tuple[dict[str, str], list[tuple[Path, Path]]] | None, Exception | None]:
@@ -698,9 +723,8 @@ def _plan_single_entry_isolation(
     try:
         pair, moves = _plan_collection_moves(root, entry, report_run_id)
         if not moves:
-            quarantine_dir = root / "data" / vk / "quarantine" / src / report_run_id
-            already_quarantined = quarantine_dir.is_dir() and any(
-                path.is_file() for path in quarantine_dir.glob("*.csv")
+            already_quarantined = _collection_outputs_already_quarantined(
+                root, vk, src, report_run_id
             )
             if already_quarantined:
                 return (pair, moves), None
@@ -753,7 +777,6 @@ def _plan_phase1_isolation(
 
     if validation_error is not None:
         report["isolated_collections"] = []
-        report["no_output_collections"] = []
         _recalculate_report_counts(report)
         raise validation_error
 
@@ -802,7 +825,6 @@ def isolate_anomalous_collections(root: Path, report: dict[str, Any]) -> list[di
                 )
             )
         report["isolated_collections"] = []
-        report["no_output_collections"] = []
         _recalculate_report_counts(report)
         raise exc
 
