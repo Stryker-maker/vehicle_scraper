@@ -220,24 +220,26 @@ def governed_keys(root: Path, registry_path: Path) -> tuple[list[str], list[str]
     return active, paused
 
 
-def _parse_isolated_items(isolated: Any) -> list[dict[str, str]]:
-    """Validate and parse list of isolated collection entries, checking for duplicates."""
+def _parse_isolated_items(
+    isolated: Any, *, field: str = "isolated_collections"
+) -> list[dict[str, str]]:
+    """Validate and parse one collection-classification list, checking for duplicates."""
     if not isinstance(isolated, list):
-        raise ValueError("isolated_collections must be a list")
+        raise ValueError(f"{field} must be a list")
 
     pattern = __import__("re").compile(r"^[a-z0-9_]+$")
     parsed: list[dict[str, str]] = []
     seen: set[tuple[str, str]] = set()
     for item in isolated:
         if not isinstance(item, dict):
-            raise ValueError(f"Invalid entry in isolated_collections: {item!r}")
+            raise ValueError(f"Invalid entry in {field}: {item!r}")
         vk = str(item.get("vehicle_key") or "").strip()
         src = str(item.get("source") or "").strip()
         if not vk or not src or not pattern.match(vk) or not pattern.match(src):
-            raise ValueError(f"Invalid collection identifier in isolated_collections: {item!r}")
+            raise ValueError(f"Invalid collection identifier in {field}: {item!r}")
         pair = (vk, src)
         if pair in seen:
-            raise ValueError(f"Duplicate collection identity in isolated_collections: {vk}:{src}")
+            raise ValueError(f"Duplicate collection identity in {field}: {vk}:{src}")
         seen.add(pair)
         parsed.append({"vehicle_key": vk, "source": src})
 
@@ -266,8 +268,13 @@ def _extract_anomaly_collection_field(
             f"Anomaly report run_id mismatch: expected {run_id!r}, found {report_run_id!r}"
         )
 
-    value = anom_data.get(field, default if default is not None else [])
-    return _parse_isolated_items(value)
+    if field in anom_data:
+        value = anom_data[field]
+    elif default is not None:
+        value = default
+    else:
+        value = []
+    return _parse_isolated_items(value, field=field)
 
 
 def _extract_isolated_collections(root: Path, run_id: str) -> list[dict[str, str]]:
@@ -282,11 +289,21 @@ def _extract_no_output_collections(root: Path, run_id: str) -> list[dict[str, st
 
 def _extract_requested_isolation_collections(root: Path, run_id: str) -> list[dict[str, str]]:
     """Extract the complete requested isolation set, with compatibility for older reports."""
-    requested = _extract_anomaly_collection_field(
-        root, run_id, "isolation_requested_collections", default=[]
-    )
-    if requested:
-        return requested
+    anomaly_path = root / "data" / "run_status" / "anomalies_latest.json"
+    if anomaly_path.exists():
+        try:
+            anomaly_data = json.loads(anomaly_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            raise ValueError(f"Unreadable or malformed anomaly report: {exc}") from exc
+        if not isinstance(anomaly_data, dict) or anomaly_data.get("anomaly_schema_version") != 1:
+            raise ValueError("Invalid anomaly report schema in anomalies_latest.json")
+        if str(anomaly_data.get("run_id") or "").strip() != run_id:
+            raise ValueError("Anomaly report run_id does not match publication run_id")
+        if "isolation_requested_collections" in anomaly_data:
+            return _parse_isolated_items(
+                anomaly_data["isolation_requested_collections"],
+                field="isolation_requested_collections",
+            )
     return (
         _extract_isolated_collections(root, run_id)
         + _extract_no_output_collections(root, run_id)
@@ -362,9 +379,12 @@ def verify_staged_manifest(
 
     # Validate each isolation outcome in the staged manifest itself.
     staged_isolated = _parse_isolated_items(manifest.get("isolated_collections"))
-    staged_no_output = _parse_isolated_items(manifest.get("no_output_collections", []))
+    staged_no_output = _parse_isolated_items(
+        manifest.get("no_output_collections", []), field="no_output_collections"
+    )
     staged_requested = _parse_isolated_items(
-        manifest.get("isolation_requested_collections", staged_isolated + staged_no_output)
+        manifest.get("isolation_requested_collections", staged_isolated + staged_no_output),
+        field="isolation_requested_collections",
     )
 
     # Each manifest classification must match the same-run anomaly report.
