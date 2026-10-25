@@ -1551,6 +1551,73 @@ class CollectionIsolationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Duplicate collection identity in isolated_collections"):
             verify_staged_manifest(root=self.root, registry_path=Path("vehicle_registry.json"))
 
+    def test_manifest_rejects_invalid_isolation_outcome_metadata(self):
+        from generated_data_publish import MANIFEST_PATH, prepare_manifest, verify_staged_manifest
+
+        self._setup_git_repo()
+        latest = self.root / "data" / "ford_f350" / "latest" / "ford_f350_autotrader_latest.csv"
+        latest.parent.mkdir(parents=True, exist_ok=True)
+        latest.write_text("f350_data", encoding="utf-8")
+        subprocess.run(["git", "add", "data/"], cwd=self.root, check=True)
+
+        pair_a = {"vehicle_key": "ford_f150", "source": "autotrader"}
+        pair_b = {"vehicle_key": "subaru_forester", "source": "kijiji"}
+        cases = [
+            (
+                "malformed_no_output",
+                {"isolated_collections": [], "no_output_collections": [], "isolation_requested_collections": []},
+                "no_output_collections must be a list",
+                {"no_output_collections": None},
+            ),
+            (
+                "malformed_requested",
+                {"isolated_collections": [], "no_output_collections": [], "isolation_requested_collections": []},
+                "isolation_requested_collections must be a list",
+                {"isolation_requested_collections": None},
+            ),
+            (
+                "overlapping_outcomes",
+                {"isolated_collections": [pair_a], "no_output_collections": [pair_a], "isolation_requested_collections": [pair_a]},
+                "both isolated and no-output",
+                {},
+            ),
+            (
+                "requested_union_mismatch",
+                {"isolated_collections": [pair_a], "no_output_collections": [pair_b], "isolation_requested_collections": [pair_a]},
+                "do not cover the requested set",
+                {},
+            ),
+        ]
+
+        anomaly_path = self.root / "data" / "run_status" / "anomalies_latest.json"
+        anomaly_path.parent.mkdir(parents=True, exist_ok=True)
+        for case_name, classifications, expected_error, tampering in cases:
+            with self.subTest(case=case_name):
+                run_id = f"run_manifest_{case_name}"
+                anomaly = {
+                    "anomaly_schema_version": 1,
+                    "run_id": run_id,
+                    **classifications,
+                }
+                anomaly_path.write_text(json.dumps(anomaly), encoding="utf-8")
+                subprocess.run(["git", "add", "data/"], cwd=self.root, check=True)
+
+                manifest = prepare_manifest(
+                    root=self.root,
+                    registry_path=Path("vehicle_registry.json"),
+                    run_id=run_id,
+                    source_sha="a" * 40,
+                    event_name="schedule",
+                    ref_name="main",
+                )
+                manifest.update(tampering)
+                manifest_path = self.root / MANIFEST_PATH
+                manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+                subprocess.run(["git", "add", "data/"], cwd=self.root, check=True)
+
+                with self.assertRaisesRegex(ValueError, expected_error):
+                    verify_staged_manifest(root=self.root, registry_path=Path("vehicle_registry.json"))
+
     def test_stale_latest_csv_is_not_quarantined_when_current_run_latest_output_is_none(self):
         """
         Prove that a stale latest CSV from a previous run is NOT moved/quarantined
