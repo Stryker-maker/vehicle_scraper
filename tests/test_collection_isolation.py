@@ -1248,10 +1248,10 @@ class CollectionIsolationTests(unittest.TestCase):
         self.assertEqual(f350_latest.read_text(encoding="utf-8"), "f350_latest_data")
         self.assertEqual(f150_latest.read_text(encoding="utf-8"), "f150_latest_data")
 
-    def test_valid_provenance_with_no_output_files_included_in_isolated_collections(self):
+    def test_valid_provenance_with_no_output_files_is_not_reported_as_isolated(self):
         """
-        Prove that a collection with valid provenance but no latest CSV and no archive CSV
-        is included in isolated_collections and receives a no_isolation_outputs_present diagnostic.
+        Prove that valid provenance without current-run output is classified separately
+        from physical isolation and receives a no_isolation_outputs_present diagnostic.
         """
         vk = "ford_f150"
         src = "autotrader"
@@ -1273,8 +1273,10 @@ class CollectionIsolationTests(unittest.TestCase):
         isolated = isolate_anomalous_collections(root=self.root, report=report)
 
         expected = [{"vehicle_key": vk, "source": src}]
-        self.assertEqual(isolated, expected)
-        self.assertEqual(report["isolated_collections"], expected)
+        self.assertEqual(isolated, [])
+        self.assertEqual(report["isolated_collections"], [])
+        self.assertEqual(report["no_output_collections"], expected)
+        self.assertEqual(report["isolation_requested_collections"], expected)
 
         no_output_anomalies = [a for a in report["anomalies"] if a.get("code") == "no_isolation_outputs_present"]
         self.assertEqual(len(no_output_anomalies), 1)
