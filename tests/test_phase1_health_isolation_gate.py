@@ -177,6 +177,7 @@ class Phase1HealthIsolationGateTests(unittest.TestCase):
             isolate.assert_not_called()
 
 
+    @staticmethod
     def test_degraded_health_passes_when_unhealthy_source_has_no_current_run_output(self):
         health = {
             "run_id": "run-123",
