@@ -414,6 +414,8 @@ def verify_staged_manifest(
         "published_path_count": len(expected),
         "manifest_path": MANIFEST_PATH.as_posix(),
         "isolated_collections": staged_isolated,
+        "no_output_collections": staged_no_output,
+        "isolation_requested_collections": staged_requested,
     }
 
 
