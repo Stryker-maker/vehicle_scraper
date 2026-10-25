@@ -177,6 +177,93 @@ class Phase1HealthIsolationGateTests(unittest.TestCase):
             isolate.assert_not_called()
 
 
+    def test_degraded_health_passes_when_unhealthy_source_has_no_current_run_output(self):
+        health = {
+            "run_id": "run-123",
+            "overall_status": "degraded",
+            "unhealthy_source_runs": 1,
+            "sources": [
+                {"vehicle_key": "ford_f150", "source": "kijiji", "healthy": False},
+            ],
+        }
+        pair = {"vehicle_key": "ford_f150", "source": "kijiji"}
+        anomaly = {
+            "run_id": "run-123",
+            "isolated_collections": [],
+            "no_output_collections": [pair],
+            "isolation_requested_collections": [pair],
+            "anomalies": [],
+        }
+        _validate_isolation_for_health_gate(health=health, anomaly=anomaly)
+
+    def test_gate_rejects_collection_classified_as_isolated_and_no_output(self):
+        pair = {"vehicle_key": "ford_f150", "source": "kijiji"}
+        health = {
+            "run_id": "run-123",
+            "overall_status": "degraded",
+            "unhealthy_source_runs": 1,
+            "sources": [{"vehicle_key": "ford_f150", "source": "kijiji", "healthy": False}],
+        }
+        anomaly = {
+            "run_id": "run-123",
+            "isolated_collections": [pair],
+            "no_output_collections": [pair],
+            "isolation_requested_collections": [pair],
+            "anomalies": [],
+        }
+        with self.assertRaisesRegex(RuntimeError, "both isolated and no-output"):
+            _validate_isolation_for_health_gate(health=health, anomaly=anomaly)
+
+    def test_gate_rejects_malformed_no_output_collection_list(self):
+        pair = {"vehicle_key": "ford_f150", "source": "kijiji"}
+        health = {
+            "run_id": "run-123",
+            "overall_status": "degraded",
+            "unhealthy_source_runs": 1,
+            "sources": [{"vehicle_key": "ford_f150", "source": "kijiji", "healthy": False}],
+        }
+        anomaly = {
+            "run_id": "run-123",
+            "isolated_collections": [],
+            "no_output_collections": None,
+            "isolation_requested_collections": [pair],
+            "anomalies": [],
+        }
+        with self.assertRaisesRegex(RuntimeError, "no_output_collections must be a list of objects"):
+            _validate_isolation_for_health_gate(health=health, anomaly=anomaly)
+
+    def test_requested_set_mismatch_fails_before_isolation_mutation(self):
+        with patch("phase1_pipeline.load_json") as load_json, patch(
+            "phase1_pipeline.isolate_anomalous_collections"
+        ) as isolate:
+            load_json.side_effect = [
+                {
+                    "run_id": "run-current",
+                    "overall_status": "degraded",
+                    "unhealthy_source_runs": 1,
+                    "sources": [{"vehicle_key": "ford_f150", "source": "kijiji", "healthy": False}],
+                },
+                {
+                    "run_id": "run-current",
+                    "isolated_collections": [],
+                    "no_output_collections": [
+                        {"vehicle_key": "ford_f150", "source": "kijiji"}
+                    ],
+                    "isolation_requested_collections": [],
+                    "anomalies": [],
+                },
+            ]
+            with patch("phase1_pipeline.Path.exists", return_value=True), patch("sys.stderr") as stderr:
+                self.assertEqual(
+                    main(["check-health", "--report", "health.json", "--anomaly-report", "anomalies.json"]),
+                    1,
+                )
+            self.assertIn(
+                "isolation_requested_collections does not match",
+                "".join(call.args[0] for call in stderr.write.call_args_list),
+            )
+            isolate.assert_not_called()
+
     def test_check_health_handler_returns_zero_for_valid_degraded_isolation(self):
         health = {
             "run_id": "run-current",
