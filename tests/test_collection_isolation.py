@@ -151,18 +151,29 @@ class CollectionIsolationTests(unittest.TestCase):
         )
         status_file.parent.mkdir(parents=True, exist_ok=True)
         status_file.write_text(json.dumps(status), encoding="utf-8")
+        stale_latest = (
+            self.root
+            / "data"
+            / "ford_f150"
+            / "latest"
+            / "ford_f150_autotrader_latest.csv"
+        )
+        stale_latest.parent.mkdir(parents=True, exist_ok=True)
+        stale_latest.write_text("previous-run trusted data", encoding="utf-8")
 
         isolated = isolate_anomalous_collections(
             root=self.root,
             report=report,
         )
 
+        self.assertEqual(isolated, [])
+        self.assertEqual(report["isolated_collections"], [])
         self.assertEqual(
-            isolated,
+            report["no_output_collections"],
             [{"vehicle_key": "ford_f150", "source": "autotrader"}],
         )
         self.assertEqual(
-            report["isolated_collections"],
+            report["isolation_requested_collections"],
             [{"vehicle_key": "ford_f150", "source": "autotrader"}],
         )
 
@@ -181,6 +192,8 @@ class CollectionIsolationTests(unittest.TestCase):
             status_file.read_text(encoding="utf-8"),
             json.dumps(status),
         )
+        self.assertTrue(stale_latest.exists())
+        self.assertEqual(stale_latest.read_text(encoding="utf-8"), "previous-run trusted data")
 
         quarantine_root = (
             self.root
@@ -318,10 +331,11 @@ class CollectionIsolationTests(unittest.TestCase):
 
         self.assertEqual(
             isolated,
-            [
-                {"vehicle_key": "ford_f150", "source": "autotrader"},
-                {"vehicle_key": "subaru_forester", "source": "kijiji"},
-            ],
+            [{"vehicle_key": "ford_f150", "source": "autotrader"}],
+        )
+        self.assertEqual(
+            report["no_output_collections"],
+            [{"vehicle_key": "subaru_forester", "source": "kijiji"}],
         )
 
         self.assertFalse(f150_latest.exists())
@@ -339,9 +353,13 @@ class CollectionIsolationTests(unittest.TestCase):
             f150_archive_before,
         )
 
-        self.assertIn(
+        self.assertNotIn(
             {"vehicle_key": "subaru_forester", "source": "kijiji"},
             report["isolated_collections"],
+        )
+        self.assertIn(
+            {"vehicle_key": "subaru_forester", "source": "kijiji"},
+            report["no_output_collections"],
         )
 
         no_output_anomalies = [
@@ -1230,10 +1248,10 @@ class CollectionIsolationTests(unittest.TestCase):
         self.assertEqual(f350_latest.read_text(encoding="utf-8"), "f350_latest_data")
         self.assertEqual(f150_latest.read_text(encoding="utf-8"), "f150_latest_data")
 
-    def test_valid_provenance_with_no_output_files_included_in_isolated_collections(self):
+    def test_valid_provenance_with_no_output_files_is_not_reported_as_isolated(self):
         """
-        Prove that a collection with valid provenance but no latest CSV and no archive CSV
-        is included in isolated_collections and receives a no_isolation_outputs_present diagnostic.
+        Prove that valid provenance without current-run output is classified separately
+        from physical isolation and receives a no_isolation_outputs_present diagnostic.
         """
         vk = "ford_f150"
         src = "autotrader"
@@ -1255,8 +1273,10 @@ class CollectionIsolationTests(unittest.TestCase):
         isolated = isolate_anomalous_collections(root=self.root, report=report)
 
         expected = [{"vehicle_key": vk, "source": src}]
-        self.assertEqual(isolated, expected)
-        self.assertEqual(report["isolated_collections"], expected)
+        self.assertEqual(isolated, [])
+        self.assertEqual(report["isolated_collections"], [])
+        self.assertEqual(report["no_output_collections"], expected)
+        self.assertEqual(report["isolation_requested_collections"], expected)
 
         no_output_anomalies = [a for a in report["anomalies"] if a.get("code") == "no_isolation_outputs_present"]
         self.assertEqual(len(no_output_anomalies), 1)
@@ -1386,6 +1406,11 @@ class CollectionIsolationTests(unittest.TestCase):
             "anomaly_schema_version": 1,
             "run_id": run_id,
             "isolated_collections": [{"vehicle_key": "ford_f150", "source": "autotrader"}],
+            "no_output_collections": [{"vehicle_key": "subaru_forester", "source": "kijiji"}],
+            "isolation_requested_collections": [
+                {"vehicle_key": "ford_f150", "source": "autotrader"},
+                {"vehicle_key": "subaru_forester", "source": "kijiji"},
+            ],
         }
         anomaly_path.write_text(json.dumps(report), encoding="utf-8")
 
@@ -1409,6 +1434,14 @@ class CollectionIsolationTests(unittest.TestCase):
         res = verify_staged_manifest(root=self.root, registry_path=Path("vehicle_registry.json"))
         self.assertEqual(res["verification_status"], "pass")
         self.assertEqual(res["isolated_collections"], [{"vehicle_key": "ford_f150", "source": "autotrader"}])
+        self.assertEqual(res["no_output_collections"], [{"vehicle_key": "subaru_forester", "source": "kijiji"}])
+        self.assertEqual(
+            res["isolation_requested_collections"],
+            [
+                {"vehicle_key": "ford_f150", "source": "autotrader"},
+                {"vehicle_key": "subaru_forester", "source": "kijiji"},
+            ],
+        )
 
     def test_verify_staged_manifest_mismatched_isolation_metadata_fails_closed(self):
         """
@@ -1518,6 +1551,79 @@ class CollectionIsolationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Duplicate collection identity in isolated_collections"):
             verify_staged_manifest(root=self.root, registry_path=Path("vehicle_registry.json"))
 
+    def test_manifest_rejects_invalid_isolation_outcome_metadata(self):
+        from generated_data_publish import MANIFEST_PATH, verify_staged_manifest
+
+        self._setup_git_repo()
+        latest = self.root / "data" / "ford_f350" / "latest" / "ford_f350_autotrader_latest.csv"
+        latest.parent.mkdir(parents=True, exist_ok=True)
+        latest.write_text("f350_data", encoding="utf-8")
+        subprocess.run(["git", "add", "data/"], cwd=self.root, check=True)
+
+        pair_a = {"vehicle_key": "ford_f150", "source": "autotrader"}
+        pair_b = {"vehicle_key": "subaru_forester", "source": "kijiji"}
+        cases = [
+            (
+                "malformed_no_output",
+                {"isolated_collections": [], "no_output_collections": [], "isolation_requested_collections": []},
+                "no_output_collections must be a list",
+                {"no_output_collections": None},
+            ),
+            (
+                "malformed_requested",
+                {"isolated_collections": [], "no_output_collections": [], "isolation_requested_collections": []},
+                "isolation_requested_collections must be a list",
+                {"isolation_requested_collections": None},
+            ),
+            (
+                "overlapping_outcomes",
+                {"isolated_collections": [pair_a], "no_output_collections": [pair_a], "isolation_requested_collections": [pair_a]},
+                "both isolated and no-output",
+                {},
+            ),
+            (
+                "explicit_empty_requested_set",
+                {"isolated_collections": [], "no_output_collections": [pair_b], "isolation_requested_collections": []},
+                "do not cover the requested set",
+                {},
+            ),
+            (
+                "requested_union_mismatch",
+                {"isolated_collections": [pair_a], "no_output_collections": [pair_b], "isolation_requested_collections": [pair_a]},
+                "do not cover the requested set",
+                {},
+            ),
+        ]
+
+        anomaly_path = self.root / "data" / "run_status" / "anomalies_latest.json"
+        anomaly_path.parent.mkdir(parents=True, exist_ok=True)
+        for case_name, classifications, expected_error, tampering in cases:
+            with self.subTest(case=case_name):
+                run_id = f"run_manifest_{case_name}"
+                anomaly = {
+                    "anomaly_schema_version": 1,
+                    "run_id": run_id,
+                    **classifications,
+                }
+                anomaly_path.write_text(json.dumps(anomaly), encoding="utf-8")
+                subprocess.run(["git", "add", "data/"], cwd=self.root, check=True)
+
+                manifest = prepare_manifest(
+                    root=self.root,
+                    registry_path=Path("vehicle_registry.json"),
+                    run_id=run_id,
+                    source_sha="a" * 40,
+                    event_name="schedule",
+                    ref_name="main",
+                )
+                manifest.update(tampering)
+                manifest_path = self.root / MANIFEST_PATH
+                manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+                subprocess.run(["git", "add", "data/"], cwd=self.root, check=True)
+
+                with self.assertRaisesRegex(ValueError, expected_error):
+                    verify_staged_manifest(root=self.root, registry_path=Path("vehicle_registry.json"))
+
     def test_stale_latest_csv_is_not_quarantined_when_current_run_latest_output_is_none(self):
         """
         Prove that a stale latest CSV from a previous run is NOT moved/quarantined
@@ -1562,6 +1668,69 @@ class CollectionIsolationTests(unittest.TestCase):
         q_dir = self.root / "data" / vk / "quarantine" / src / run_id
         self.assertTrue((q_dir / archive_csv.name).exists())
         self.assertFalse((q_dir / f"{vk}_{src}_latest_quarantined.csv").exists())
+
+    def test_no_output_classification_survives_atomic_isolation_failure(self):
+        from unittest.mock import patch
+
+        run_id = "run_mixed_failure_123"
+        no_output_key = ("ford_f150", "kijiji")
+        output_key = ("ford_f150", "autotrader")
+
+        no_output_status = self._source_entry(
+            no_output_key[0], no_output_key[1], healthy=False, accepted=0, fetched=0,
+            execution_status="failed",
+        )
+        no_output_status.update({
+            "run_id": run_id,
+            "started_at_utc": utc_now(),
+            "latest_output": None,
+            "archive_output": None,
+        })
+        output_status = self._source_entry(
+            output_key[0], output_key[1], healthy=False, accepted=1, fetched=1,
+            execution_status="failed",
+        )
+        output_status.update({
+            "run_id": run_id,
+            "started_at_utc": utc_now(),
+            "latest_output": f"data/{output_key[0]}/latest/{output_key[0]}_{output_key[1]}_latest.csv",
+            "archive_output": None,
+        })
+        for vehicle_key, source, status in (
+            (*no_output_key, no_output_status),
+            (*output_key, output_status),
+        ):
+            status_path = self.root / "data" / vehicle_key / "run_status" / f"{source}_latest.json"
+            status_path.parent.mkdir(parents=True, exist_ok=True)
+            status_path.write_text(json.dumps(status), encoding="utf-8")
+
+        latest = self.root / "data" / output_key[0] / "latest" / f"{output_key[0]}_{output_key[1]}_latest.csv"
+        latest.parent.mkdir(parents=True, exist_ok=True)
+        latest.write_text("current run output", encoding="utf-8")
+
+        report = {
+            "run_id": run_id,
+            "isolated_collections": [
+                {"vehicle_key": output_key[0], "source": output_key[1]},
+                {"vehicle_key": no_output_key[0], "source": no_output_key[1]},
+            ],
+        }
+        with (
+            patch(
+                "workflow_anomalies._execute_isolation_moves",
+                side_effect=RuntimeError("simulated move failure"),
+            ),
+            self.assertRaisesRegex(RuntimeError, "simulated move failure"),
+        ):
+            isolate_anomalous_collections(root=self.root, report=report)
+
+        self.assertEqual(report["isolated_collections"], [])
+        self.assertEqual(
+            report["no_output_collections"],
+            [{"vehicle_key": no_output_key[0], "source": no_output_key[1]}],
+        )
+        self.assertTrue(latest.exists())
+        self.assertEqual(latest.read_text(encoding="utf-8"), "current run output")
 
     def test_check_action_policy_enforce_fails_closed_when_critical_anomalies_exist_without_quarantined_files(self):
         """
