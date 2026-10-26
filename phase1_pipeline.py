@@ -88,6 +88,16 @@ def _source_key(value: dict) -> tuple[str, str]:
     return str(value.get("vehicle_key") or ""), str(value.get("source") or "")
 
 
+def _collection_keys(entries: list[dict], field: str) -> set[tuple[str, str]]:
+    """Validate collection identities and return their unique keys."""
+    keys = [_source_key(entry) for entry in entries]
+    if any(not vehicle_key.strip() or not source.strip() for vehicle_key, source in keys):
+        raise RuntimeError(f"{field} contains an empty collection identity")
+    if len(set(keys)) != len(keys):
+        raise RuntimeError(f"{field} contains duplicate collection identities")
+    return set(keys)
+
+
 def _validate_isolation_for_health_gate(*, health: dict, anomaly: dict) -> None:
     """Fail closed unless every unhealthy source is explicitly and successfully isolated."""
     if anomaly.get("run_id") != health.get("run_id"):
@@ -112,16 +122,8 @@ def _validate_isolation_for_health_gate(*, health: dict, anomaly: dict) -> None:
     if not isinstance(raw_no_output, list) or any(not isinstance(item, dict) for item in raw_no_output):
         raise RuntimeError("no_output_collections must be a list of objects")
 
-    def collection_keys(entries: list[dict], field: str) -> set[tuple[str, str]]:
-        keys = [_source_key(entry) for entry in entries]
-        if any(not vehicle_key.strip() or not source.strip() for vehicle_key, source in keys):
-            raise RuntimeError(f"{field} contains an empty collection identity")
-        if len(set(keys)) != len(keys):
-            raise RuntimeError(f"{field} contains duplicate collection identities")
-        return set(keys)
-
-    isolated = collection_keys(raw_isolated, "isolated_collections")
-    no_output = collection_keys(raw_no_output, "no_output_collections")
+    isolated = _collection_keys(raw_isolated, "isolated_collections")
+    no_output = _collection_keys(raw_no_output, "no_output_collections")
     if isolated & no_output:
         raise RuntimeError("Isolation outcome contains collections classified as both isolated and no-output")
 
@@ -131,7 +133,7 @@ def _validate_isolation_for_health_gate(*, health: dict, anomaly: dict) -> None:
         not isinstance(item, dict) for item in raw_requested
     ):
         raise RuntimeError("isolation_requested_collections must be a list of objects")
-    requested = collection_keys(raw_requested, "isolation_requested_collections")
+    requested = _collection_keys(raw_requested, "isolation_requested_collections")
     if requested != classified:
         raise RuntimeError(
             "isolation_requested_collections does not match the classified isolation outcomes"
@@ -142,6 +144,41 @@ def _validate_isolation_for_health_gate(*, health: dict, anomaly: dict) -> None:
         raise RuntimeError(
             "Unhealthy source isolation is incomplete: "
             f"missing={missing}, unexpected={unexpected}"
+        )
+
+
+def _validate_post_isolation_outcomes(
+    *, result: object, anomaly: dict, requested_keys: set[tuple[str, str]]
+) -> None:
+    """Check the isolator return value against its post-mutation outcome report."""
+    reported_isolated = anomaly.get("isolated_collections", [])
+    reported_no_output = anomaly.get("no_output_collections", [])
+    if (
+        not isinstance(reported_isolated, list)
+        or any(not isinstance(item, dict) for item in reported_isolated)
+        or not isinstance(reported_no_output, list)
+        or any(not isinstance(item, dict) for item in reported_no_output)
+    ):
+        raise RuntimeError(
+            "Collection anomaly isolation produced malformed outcome classifications"
+        )
+
+    if not isinstance(result, list) or any(not isinstance(item, dict) for item in result):
+        raise RuntimeError(
+            "Collection anomaly isolation returned a malformed isolated collection list"
+        )
+    returned_keys = [_source_key(item) for item in result]
+    isolated_keys = _collection_keys(reported_isolated, "isolated_collections")
+    no_output_keys = _collection_keys(reported_no_output, "no_output_collections")
+    if (
+        len(returned_keys) != len(set(returned_keys))
+        or set(returned_keys) != isolated_keys
+        or isolated_keys & no_output_keys
+        or isolated_keys | no_output_keys != requested_keys
+    ):
+        raise RuntimeError(
+            "Collection anomaly isolation did not produce consistent outcomes "
+            "for the requested isolation set"
         )
 
 
@@ -241,42 +278,11 @@ def _handle_check_health(args: argparse.Namespace, root: Path) -> int:
             requested_keys = {_source_key(item) for item in requested_entries}
             isolated = isolate_anomalous_collections(root=root, report=anomaly)
 
-            # Isolation reclassifies the requested set into actual quarantine outcomes
-            # and verified no-output outcomes. Validate the post-call report, not the
-            # pre-call isolated list, which may legitimately shrink.
-            reported_isolated = anomaly.get("isolated_collections", [])
-            reported_no_output = anomaly.get("no_output_collections", [])
-            if (
-                not isinstance(reported_isolated, list)
-                or any(not isinstance(item, dict) for item in reported_isolated)
-                or not isinstance(reported_no_output, list)
-                or any(not isinstance(item, dict) for item in reported_no_output)
-            ):
-                raise RuntimeError(
-                    "Collection anomaly isolation produced malformed outcome classifications"
-                )
-
-            if not isinstance(isolated, list) or any(
-                not isinstance(item, dict) for item in isolated
-            ):
-                raise RuntimeError(
-                    "Collection anomaly isolation returned a malformed isolated collection list"
-                )
-            returned_keys = [_source_key(item) for item in isolated]
-            isolated_keys = {_source_key(item) for item in reported_isolated}
-            no_output_keys = {_source_key(item) for item in reported_no_output}
-            if (
-                len(returned_keys) != len(set(returned_keys))
-                or set(returned_keys) != isolated_keys
-                or len(isolated_keys) != len(reported_isolated)
-                or len(no_output_keys) != len(reported_no_output)
-                or isolated_keys & no_output_keys
-                or isolated_keys | no_output_keys != requested_keys
-            ):
-                raise RuntimeError(
-                    "Collection anomaly isolation did not produce consistent outcomes "
-                    "for the requested isolation set"
-                )
+            # Isolation may reclassify entries as no-output, so validate the
+            # post-call report rather than comparing against the pre-call isolated list.
+            _validate_post_isolation_outcomes(
+                result=isolated, anomaly=anomaly, requested_keys=requested_keys
+            )
         except (OSError, ValueError, RuntimeError) as exc:
             print(f"Collection anomaly isolation failed: {exc}", file=sys.stderr)
             return 1
