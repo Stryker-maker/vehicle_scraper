@@ -98,8 +98,8 @@ def _collection_keys(entries: list[dict], field: str) -> set[tuple[str, str]]:
     return set(keys)
 
 
-def _validate_isolation_for_health_gate(*, health: dict, anomaly: dict) -> None:
-    """Fail closed unless every unhealthy source is explicitly and successfully isolated."""
+def _validate_isolation_report_identity(*, health: dict, anomaly: dict) -> None:
+    """Reject stale anomaly reports and any recorded isolation failure."""
     if anomaly.get("run_id") != health.get("run_id"):
         raise RuntimeError("Anomaly report run_id does not match the current health report")
 
@@ -110,34 +110,56 @@ def _validate_isolation_for_health_gate(*, health: dict, anomaly: dict) -> None:
     if isolation_failures:
         raise RuntimeError("Collection isolation reported one or more failures")
 
+
+def _classification_entries(anomaly: dict, field: str) -> list[dict]:
+    """Return a well-formed collection classification list or fail closed."""
+    entries = anomaly.get(field, [])
+    if not isinstance(entries, list) or any(not isinstance(item, dict) for item in entries):
+        raise RuntimeError(f"{field} must be a list of objects")
+    return entries
+
+
+def _validate_requested_isolation_set(
+    anomaly: dict, classified: set[tuple[str, str]], fallback: list[dict]
+) -> None:
+    """Require the explicit requested set to match all reported outcomes."""
+    requested_entries = anomaly.get("isolation_requested_collections", fallback)
+    if not isinstance(requested_entries, list) or any(
+        not isinstance(item, dict) for item in requested_entries
+    ):
+        raise RuntimeError("isolation_requested_collections must be a list of objects")
+    requested = _collection_keys(
+        requested_entries, "isolation_requested_collections"
+    )
+    if requested != classified:
+        raise RuntimeError(
+            "isolation_requested_collections does not match the classified isolation outcomes"
+        )
+
+
+def _validate_isolation_outcomes(anomaly: dict) -> set[tuple[str, str]]:
+    """Validate isolation classifications and return their combined identity set."""
+    raw_isolated = _classification_entries(anomaly, "isolated_collections")
+    raw_no_output = _classification_entries(anomaly, "no_output_collections")
+    isolated = _collection_keys(raw_isolated, "isolated_collections")
+    no_output = _collection_keys(raw_no_output, "no_output_collections")
+    if isolated & no_output:
+        raise RuntimeError(
+            "Isolation outcome contains collections classified as both isolated and no-output"
+        )
+
+    classified = isolated | no_output
+    _validate_requested_isolation_set(anomaly, classified, raw_isolated)
+    return classified
+
+
+def _validate_unhealthy_sources(health: dict, classified: set[tuple[str, str]]) -> None:
+    """Require every unhealthy source, and no healthy source, in the outcome set."""
     unhealthy = {
         _source_key(entry)
         for entry in health.get("sources", [])
         if isinstance(entry, dict) and not entry.get("healthy")
     }
-    raw_isolated = anomaly.get("isolated_collections", [])
-    raw_no_output = anomaly.get("no_output_collections", [])
-    if not isinstance(raw_isolated, list) or any(not isinstance(item, dict) for item in raw_isolated):
-        raise RuntimeError("isolated_collections must be a list of objects")
-    if not isinstance(raw_no_output, list) or any(not isinstance(item, dict) for item in raw_no_output):
-        raise RuntimeError("no_output_collections must be a list of objects")
-
-    isolated = _collection_keys(raw_isolated, "isolated_collections")
-    no_output = _collection_keys(raw_no_output, "no_output_collections")
-    if isolated & no_output:
-        raise RuntimeError("Isolation outcome contains collections classified as both isolated and no-output")
-
-    classified = isolated | no_output
-    raw_requested = anomaly.get("isolation_requested_collections", raw_isolated)
-    if not isinstance(raw_requested, list) or any(
-        not isinstance(item, dict) for item in raw_requested
-    ):
-        raise RuntimeError("isolation_requested_collections must be a list of objects")
-    requested = _collection_keys(raw_requested, "isolation_requested_collections")
-    if requested != classified:
-        raise RuntimeError(
-            "isolation_requested_collections does not match the classified isolation outcomes"
-        )
     if unhealthy != classified:
         missing = sorted(unhealthy - classified)
         unexpected = sorted(classified - unhealthy)
@@ -145,6 +167,13 @@ def _validate_isolation_for_health_gate(*, health: dict, anomaly: dict) -> None:
             "Unhealthy source isolation is incomplete: "
             f"missing={missing}, unexpected={unexpected}"
         )
+
+
+def _validate_isolation_for_health_gate(*, health: dict, anomaly: dict) -> None:
+    """Fail closed unless every unhealthy source is explicitly and successfully isolated."""
+    _validate_isolation_report_identity(health=health, anomaly=anomaly)
+    classified = _validate_isolation_outcomes(anomaly)
+    _validate_unhealthy_sources(health, classified)
 
 
 def _validate_post_isolation_outcomes(
