@@ -221,6 +221,42 @@ class ReportingTests(unittest.TestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual({row["source"] for row in rows}, {"autotrader"})
 
+    def test_stale_anomaly_report_does_not_exclude_current_run_source(self):
+        self.success("autotrader")
+        self.success("kijiji")
+        anomaly_path = self.root / "data/run_status/anomalies_latest.json"
+        anomaly_path.parent.mkdir(parents=True, exist_ok=True)
+        write_json(anomaly_path, {
+            "run_id": "previous-run",
+            "isolated_collections": [
+                {"vehicle_key": "test_vehicle", "source": "kijiji"}
+            ],
+            "anomalies": [
+                {
+                    "severity": "critical",
+                    "code": "accepted_record_count_collapse",
+                    "vehicle_key": "test_vehicle",
+                    "source": "kijiji",
+                }
+            ],
+        })
+
+        result = build_manual_review(
+            root=self.root, config_paths=[self.config_path], run_id="run-1"
+        )["vehicles"][0]
+
+        self.assertEqual(result["included_sources"], ["autotrader", "kijiji"])
+        self.assertNotIn("kijiji", result["excluded_sources"])
+        self.assertEqual(result["row_count"], 2)
+        with (self.root / result["latest_output"]).open(
+            newline="", encoding="utf-8"
+        ) as handle:
+            rows = list(csv.DictReader(handle))
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(
+            {row["source"] for row in rows}, {"autotrader", "kijiji"}
+        )
+
     def test_quality_warnings_do_not_fail_collection(self):
         self.success("autotrader"); self.success("kijiji")
         report = collect_health(
