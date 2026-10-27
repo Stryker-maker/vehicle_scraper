@@ -184,6 +184,43 @@ class ReportingTests(unittest.TestCase):
         self.assertEqual(stale["stale_row_count"], 1)
         self.assertEqual(stale["identity_lifecycle_status"], "not_updated")
 
+    def test_manual_review_excludes_current_run_critically_isolated_source(self):
+        self.success("autotrader")
+        self.success("kijiji")
+        anomaly_path = self.root / "data/run_status/anomalies_latest.json"
+        anomaly_path.parent.mkdir(parents=True, exist_ok=True)
+        write_json(anomaly_path, {
+            "run_id": "run-1",
+            "isolated_collections": [
+                {"vehicle_key": "test_vehicle", "source": "kijiji"}
+            ],
+            "anomalies": [
+                {
+                    "severity": "critical",
+                    "code": "accepted_record_count_collapse",
+                    "vehicle_key": "test_vehicle",
+                    "source": "kijiji",
+                }
+            ],
+        })
+
+        result = build_manual_review(
+            root=self.root, config_paths=[self.config_path], run_id="run-1"
+        )["vehicles"][0]
+
+        self.assertEqual(result["included_sources"], ["autotrader"])
+        self.assertEqual(
+            result["excluded_sources"]["kijiji"],
+            "isolated_due_to_critical_anomaly",
+        )
+        self.assertEqual(result["row_count"], 1)
+        with (self.root / result["latest_output"]).open(
+            newline="", encoding="utf-8"
+        ) as handle:
+            rows = list(csv.DictReader(handle))
+        self.assertEqual(len(rows), 1)
+        self.assertEqual({row["source"] for row in rows}, {"autotrader"})
+
     def test_quality_warnings_do_not_fail_collection(self):
         self.success("autotrader"); self.success("kijiji")
         report = collect_health(
