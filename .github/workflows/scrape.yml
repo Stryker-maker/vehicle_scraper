@@ -205,10 +205,6 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-      - name: Build evidence-backed manual-review files
-        if: env.COLLECTION_SCOPE == 'full'
-        run: python phase1_pipeline.py build-manual-review --registry vehicle_registry.json
-
       - name: Write consolidated reconciliation and run-health report
         if: env.COLLECTION_SCOPE == 'full'
         run: |
@@ -236,6 +232,10 @@ jobs:
             --current data/run_status/latest.json \
             --run-id "$GITHUB_RUN_ID"
           cat data/run_status/anomalies_latest.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Build evidence-backed manual-review files
+        if: env.COLLECTION_SCOPE == 'full'
+        run: python phase1_pipeline.py build-manual-review --registry vehicle_registry.json
 
       - name: Fail visibly on unhealthy source evidence
         if: env.COLLECTION_SCOPE == 'full'
