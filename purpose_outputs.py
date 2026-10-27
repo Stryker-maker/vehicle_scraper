@@ -11,7 +11,14 @@ from typing import Any, Iterable, Sequence
 
 from canonical_evidence import read_jsonl, write_jsonl
 from identity_lifecycle import IDENTITY_LIFECYCLE_SCHEMA_VERSION, load_current_identity_records
-from phase1_common import load_json, source_status_path, status_is_current_success, utc_now, write_json
+from phase1_common import (
+    check_source_anomalously_isolated,
+    load_json,
+    source_status_path,
+    status_is_current_success,
+    utc_now,
+    write_json,
+)
 from vehicle_config import load_vehicle_config
 
 PURPOSE_OUTPUT_SCHEMA_VERSION = 1
@@ -265,17 +272,37 @@ def _raw_payloads(root: Path, status: dict[str, Any], source: str, run_id: str) 
     return result
 
 
-def load_source_bundles(root: Path, config: dict[str, Any], source: str, run_id: str) -> list[dict[str, Any]]:
+class SourceUnavailableError(ValueError):
+    """Raised when a source collection is missing or not current success for the requested run."""
+
+
+def _load_and_validate_source_status(root: Path, config: dict[str, Any], source: str, run_id: str) -> dict[str, Any]:
+    """Validate status existence, schema, and current success state for a source run."""
     if source not in SUPPORTED_SOURCES:
         raise ValueError(f"Unsupported source: {source}")
+    vk = str(config.get("vehicle_key") or "").strip()
+    if check_source_anomalously_isolated(root, vk, source, run_id):
+        raise SourceUnavailableError(
+            f"{source}: collection for {vk} is isolated due to critical anomaly"
+        )
     status_path = source_status_path(root, config, source)
     if not status_path.exists():
-        raise ValueError(f"{source}: source status missing")
+        raise SourceUnavailableError(f"{source}: source status missing")
     status = load_json(status_path)
-    if status.get("schema_version") != SOURCE_STATUS_SCHEMA_VERSION or not status_is_current_success(status, run_id):
-        raise ValueError(f"{source}: source status is not current schema-v8 success")
+    if not isinstance(status, dict):
+        raise ValueError(f"{source}: source status is not a JSON object")
+    if status.get("schema_version") != SOURCE_STATUS_SCHEMA_VERSION:
+        raise ValueError(f"{source}: status schema_version mismatch ({status.get('schema_version')!r}), expected schema-v8 success")
+    if not status_is_current_success(status, run_id):
+        raise SourceUnavailableError(f"{source}: source status is not current-run success")
     if status.get("identity_lifecycle_schema_version") != IDENTITY_LIFECYCLE_SCHEMA_VERSION:
         raise ValueError(f"{source}: identity lifecycle schema mismatch")
+    return status
+
+
+def load_source_bundles(root: Path, config: dict[str, Any], source: str, run_id: str) -> list[dict[str, Any]]:
+    """Load accepted evidence, identity lifecycle, and adapter payload bundles for a source run."""
+    status = _load_and_validate_source_status(root, config, source, run_id)
     accepted_path = status.get("canonical_evidence_artifacts", {}).get("accepted")
     if not accepted_path:
         raise ValueError(f"{source}: accepted canonical artifact missing")
@@ -929,6 +956,24 @@ def _owned_markdown(summary: dict[str, Any]) -> str:
     )
 
 
+def _collect_available_purpose_source_bundles(
+    root: Path, config: dict[str, Any], sources: Sequence[str], vehicle_key: str, run_id: str
+) -> tuple[list[dict[str, Any]], list[str]]:
+    """Collect valid source bundles and sources, handling missing/failed runs gracefully."""
+    bundles: list[dict[str, Any]] = []
+    valid_sources: list[str] = []
+    for source in sources:
+        try:
+            loaded = load_source_bundles(root, config, source, run_id)
+            bundles.extend(loaded)
+            valid_sources.append(source)
+        except SourceUnavailableError:
+            pass
+    if not valid_sources:
+        raise ValueError(f"No valid source collections available for {vehicle_key}")
+    return bundles, valid_sources
+
+
 def _family_markdown(summary: dict[str, Any]) -> str:
     return "\n".join(
         [
@@ -954,6 +999,7 @@ def build(
     sources: Sequence[str],
     inputs_path: Path = Path("purpose_inputs.json"),
 ) -> dict[str, Any]:
+    """Build governed secondary-purpose vehicle analysis outputs for a vehicle configuration."""
     root = root.resolve()
     config_path = config_path if config_path.is_absolute() else root / config_path
     inputs_path = inputs_path if inputs_path.is_absolute() else root / inputs_path
@@ -968,55 +1014,82 @@ def build(
         raise ValueError(f"{vehicle_key}: unsupported analysis profile")
     if len(sources) != len(set(sources)) or not sources or any(source not in SUPPORTED_SOURCES for source in sources):
         raise ValueError("Source scope must contain unique supported sources")
-    scope = "single_source" if len(sources) == 1 else "combined_sources"
-    bundles: list[dict[str, Any]] = []
-    for source in sources:
-        bundles.extend(load_source_bundles(root, config, source, run_id))
+    bundles, valid_sources = _collect_available_purpose_source_bundles(root, config, sources, vehicle_key, run_id)
+    effective_sources = valid_sources
+    effective_scope = "single_source" if len(effective_sources) == 1 else "combined_sources"
     paths = artifact_paths(root, config, profile)
 
     if profile == "owned_vehicle_value":
-        subject = entry["subject_profile"]
-        records = [_owned_record(bundle, subject, scope) for bundle in bundles]
-        summary = _owned_summary(config, run_id, sources, scope, records, entry, paths, root)
-        input_gaps = {
-            "purpose_output_schema_version": PURPOSE_OUTPUT_SCHEMA_VERSION,
-            "purpose_input_schema_version": PURPOSE_INPUT_SCHEMA_VERSION,
-            "run_id": run_id,
-            "vehicle_key": vehicle_key,
-            "analysis_profile": profile,
-            "subject_profile_missing_fields": summary["subject_profile_missing_fields"],
-            "required_owner_actions": [
-                {"field": field_name, "action": f"Record current owner input for {field_name}."}
-                for field_name in summary["subject_profile_missing_fields"]
-            ],
-            "meaning": "missing_owner_inputs_limit_personalized_subject_context",
-        }
-        write_jsonl(paths["records_jsonl"], records)
-        _write_csv(paths["records_csv"], OWNED_CSV_FIELDS, records)
-        write_json(paths["input_gaps"], input_gaps)
-        write_json(paths["summary_json"], summary)
-        paths["summary_markdown"].parent.mkdir(parents=True, exist_ok=True)
-        paths["summary_markdown"].write_text(_owned_markdown(summary), encoding="utf-8")
-    else:
-        preferences = entry["preferences"]
-        record_pairs = [
-            _family_record(
-                bundle,
-                preferences,
-                scope,
-                paths["questions_jsonl"].relative_to(root),
-            )
-            for bundle in bundles
-        ]
-        records = [pair[0] for pair in record_pairs]
-        questions = [pair[1] for pair in record_pairs]
-        summary = _family_summary(config, run_id, sources, scope, records, preferences, paths, root)
-        write_jsonl(paths["records_jsonl"], records)
-        _write_csv(paths["records_csv"], FAMILY_CSV_FIELDS, records)
-        write_jsonl(paths["questions_jsonl"], questions)
-        write_json(paths["summary_json"], summary)
-        paths["summary_markdown"].parent.mkdir(parents=True, exist_ok=True)
-        paths["summary_markdown"].write_text(_family_markdown(summary), encoding="utf-8")
+        return _build_owned_purpose_outputs(config, run_id, effective_sources, effective_scope, bundles, entry, paths, root)
+    return _build_family_purpose_outputs(config, run_id, effective_sources, effective_scope, bundles, entry, paths, root)
+
+
+def _build_owned_purpose_outputs(
+    config: dict[str, Any],
+    run_id: str,
+    effective_sources: list[str],
+    effective_scope: str,
+    bundles: list[dict[str, Any]],
+    entry: dict[str, Any],
+    paths: dict[str, Path],
+    root: Path,
+) -> dict[str, Any]:
+    """Build and write artifacts for owned vehicle value monitor profile."""
+    subject = entry["subject_profile"]
+    records = [_owned_record(bundle, subject, effective_scope) for bundle in bundles]
+    summary = _owned_summary(config, run_id, effective_sources, effective_scope, records, entry, paths, root)
+    input_gaps = {
+        "purpose_output_schema_version": PURPOSE_OUTPUT_SCHEMA_VERSION,
+        "purpose_input_schema_version": PURPOSE_INPUT_SCHEMA_VERSION,
+        "run_id": run_id,
+        "vehicle_key": config["vehicle_key"],
+        "analysis_profile": "owned_vehicle_value",
+        "subject_profile_missing_fields": summary["subject_profile_missing_fields"],
+        "required_owner_actions": [
+            {"field": field_name, "action": f"Record current owner input for {field_name}."}
+            for field_name in summary["subject_profile_missing_fields"]
+        ],
+        "meaning": "missing_owner_inputs_limit_personalized_subject_context",
+    }
+    write_jsonl(paths["records_jsonl"], records)
+    _write_csv(paths["records_csv"], OWNED_CSV_FIELDS, records)
+    write_json(paths["input_gaps"], input_gaps)
+    write_json(paths["summary_json"], summary)
+    paths["summary_markdown"].parent.mkdir(parents=True, exist_ok=True)
+    paths["summary_markdown"].write_text(_owned_markdown(summary), encoding="utf-8")
+    return summary
+
+
+def _build_family_purpose_outputs(
+    config: dict[str, Any],
+    run_id: str,
+    effective_sources: list[str],
+    effective_scope: str,
+    bundles: list[dict[str, Any]],
+    entry: dict[str, Any],
+    paths: dict[str, Path],
+    root: Path,
+) -> dict[str, Any]:
+    """Build and write artifacts for family friend purchase candidate profile."""
+    preferences = entry["preferences"]
+    record_pairs = [
+        _family_record(
+            bundle,
+            preferences,
+            effective_scope,
+            paths["questions_jsonl"].relative_to(root),
+        )
+        for bundle in bundles
+    ]
+    records = [pair[0] for pair in record_pairs]
+    questions = [pair[1] for pair in record_pairs]
+    summary = _family_summary(config, run_id, effective_sources, effective_scope, records, preferences, paths, root)
+    write_jsonl(paths["records_jsonl"], records)
+    _write_csv(paths["records_csv"], FAMILY_CSV_FIELDS, records)
+    write_jsonl(paths["questions_jsonl"], questions)
+    write_json(paths["summary_json"], summary)
+    paths["summary_markdown"].parent.mkdir(parents=True, exist_ok=True)
+    paths["summary_markdown"].write_text(_family_markdown(summary), encoding="utf-8")
     return summary
 
 

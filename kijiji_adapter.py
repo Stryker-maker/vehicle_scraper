@@ -356,12 +356,12 @@ def parse_listing(
     if year is None:
         match = re.search(r"\b(?:19|20)\d{2}\b", title)
         year = int(match.group(0)) if match else None
-    parse_failures = [
-        name
-        for name, value in (("invalid_price", price), ("invalid_year", year))
-        if value is None
-    ]
-    if parse_failures:
+    if price is None or year is None:
+        parse_failures: list[str] = []
+        if price is None:
+            parse_failures.append("invalid_price")
+        if year is None:
+            parse_failures.append("invalid_year")
         return None, [], parse_failures
 
     mileage = clean_int(item.get("mileageFromOdometer"))
@@ -377,9 +377,12 @@ def parse_listing(
         rejections.append("missing_source_listing_id")
     if not url:
         rejections.append("missing_listing_url")
-    if not criteria["min_year"] <= year <= criteria["max_year"]:
+    min_year: int = criteria["min_year"]
+    max_year: int = criteria["max_year"]
+    max_price: int = criteria["max_price_cad"]
+    if not min_year <= year <= max_year:
         rejections.append("year_out_of_range")
-    if not 0 < price <= criteria["max_price_cad"]:
+    if not 0 < price <= max_price:
         rejections.append("price_out_of_range")
     required_fuel = str(criteria.get("fuel") or "").strip()
     if required_fuel and required_fuel.casefold() not in fuel.casefold():

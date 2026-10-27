@@ -283,7 +283,7 @@ def build_canonical_evidence(
                     accepted_records.append(record)
         except csv.Error as exc:
             index = len(raw_records)
-            failure = {
+            failure: dict[str, Any] = {
                 "evidence_schema_version": EVIDENCE_SCHEMA_VERSION,
                 "record_stage": "parse_failure",
                 "vehicle_key": str(config["vehicle_key"]),
