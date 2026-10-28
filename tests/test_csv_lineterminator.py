@@ -11,14 +11,14 @@ from pathlib import Path
 from unittest import mock
 
 from autotrader_history import write_csv_outputs as write_autotrader_csv_outputs
-from kijiji_history import write_csv_outputs as write_kijiji_csv_outputs
-from purpose_outputs import _write_csv as write_purpose_csv
 from generated_data_publish import (
     _git_executable,
     _staged_csv_text_errors,
     staged_name_status,
     verify_staged_csv_whitespace,
 )
+from kijiji_history import write_csv_outputs as write_kijiji_csv_outputs
+from purpose_outputs import _write_csv as write_purpose_csv
 
 
 class CsvLineTerminatorTests(unittest.TestCase):
@@ -259,7 +259,7 @@ class CsvLineTerminatorTests(unittest.TestCase):
 
     def test_staged_csv_whitespace_rejects_unresolved_conflict_markers(self):
         """Reject Git conflict-marker lines outside quoted CSV fields."""
-        for marker in (b"<<<<<<< HEAD", b"=======", b">>>>>>> branch"):
+        for marker in (b"<<<<<<< HEAD", b"||||||| base", b"=======", b">>>>>>> branch"):
             with self.subTest(marker=marker):
                 self._assert_staged_csv_bytes(
                     b'"location"\n' + marker + b'\n',
