@@ -257,6 +257,21 @@ class CsvLineTerminatorTests(unittest.TestCase):
             b'"location"\n"Calgary\rAB"\n',
         )
 
+    def test_staged_csv_whitespace_rejects_unresolved_conflict_markers(self):
+        """Reject Git conflict-marker lines outside quoted CSV fields."""
+        for marker in (b"<<<<<<< HEAD", b"=======", b">>>>>>> branch"):
+            with self.subTest(marker=marker):
+                self._assert_staged_csv_bytes(
+                    b'"location"\n' + marker + b'\n',
+                    "unresolved merge conflict marker",
+                )
+
+    def test_staged_csv_whitespace_allows_conflict_marker_text_inside_quoted_field(self):
+        """Allow marker-like listing text inside a multiline quoted CSV field."""
+        self._assert_staged_csv_bytes(
+            b'"description"\n"first line\n<<<<<<< HEAD\n=======\n>>>>>>> branch\nlast line"\n',
+        )
+
     def test_staged_csv_whitespace_rejects_crlf_record_terminators(self):
         """Reject CRLF record terminators in staged CSV files."""
         self._assert_staged_csv_bytes(
