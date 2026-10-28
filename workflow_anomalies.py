@@ -810,12 +810,12 @@ def _plan_phase1_isolation(
             "Duplicate quarantine destination planned; refusing to execute "
             "combined isolation plan: " + "; ".join(duplicate_messages)
         )
+        duplicate_paths = {
+            destination for _first_source, _second_source, destination in duplicate_destinations
+        }
         failed_pairs: set[tuple[str, str]] = set()
         for pair, moves in planned_entries:
-            if any(
-                destination in {dst for _src, _dst in moves}
-                for _first_source, _second_source, destination in duplicate_destinations
-            ):
+            if any(dst_path in duplicate_paths for _src_path, dst_path in moves):
                 identity = (pair["vehicle_key"], pair["source"])
                 if identity not in failed_pairs:
                     report.setdefault("anomalies", []).append(
