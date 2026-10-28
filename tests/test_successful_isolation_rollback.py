@@ -171,6 +171,63 @@ class SuccessfulIsolationRollbackTests(unittest.TestCase):
         self.assertEqual(failures[0]["severity"], "critical")
         self.assertIn("Quarantine destination already exists", failures[0]["message"])
 
+    def test_duplicate_destinations_in_combined_plan_fail_before_any_move(self):
+        """Duplicate collection requests must not schedule the same quarantine path twice."""
+        run_id = "run_duplicate_destination_123"
+        temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(temp_dir.cleanup)
+        root = Path(temp_dir.name)
+
+        vehicle_key = "ford_f150"
+        source = "autotrader"
+        latest = (
+            root / "data" / vehicle_key / "latest"
+            / f"{vehicle_key}_{source}_latest.csv"
+        )
+        archive = (
+            root / "data" / vehicle_key / source
+            / f"{vehicle_key}_{source}_2026-08-01_00-00-00.csv"
+        )
+        status_path = (
+            root / "data" / vehicle_key / "run_status" / f"{source}_latest.json"
+        )
+        for path in (latest, archive, status_path):
+            path.parent.mkdir(parents=True, exist_ok=True)
+
+        latest.write_text("latest_content", encoding="utf-8")
+        archive.write_text("archive_content", encoding="utf-8")
+        status_path.write_text(
+            json.dumps({
+                "run_id": run_id,
+                "started_at_utc": utc_now(),
+                "latest_output": str(latest.relative_to(root)),
+                "archive_output": str(archive.relative_to(root)),
+            }),
+            encoding="utf-8",
+        )
+        collection = {"vehicle_key": vehicle_key, "source": source}
+        report = {
+            "run_id": run_id,
+            "isolated_collections": [collection.copy(), collection.copy()],
+        }
+
+        with self.assertRaisesRegex(ValueError, "Duplicate quarantine destination planned"):
+            isolate_anomalous_collections(root=root, report=report)
+
+        self.assertEqual(latest.read_text(encoding="utf-8"), "latest_content")
+        self.assertEqual(archive.read_text(encoding="utf-8"), "archive_content")
+        quarantine_dir = root / "data" / vehicle_key / "quarantine" / source / run_id
+        self.assertFalse(quarantine_dir.exists())
+        self.assertEqual(report["isolated_collections"], [])
+        failures = [
+            anomaly for anomaly in report.get("anomalies", [])
+            if anomaly.get("code") == "collection_isolation_failed"
+        ]
+        self.assertEqual(len(failures), 1)
+        self.assertEqual(failures[0]["severity"], "critical")
+        self.assertIn("Duplicate quarantine destination planned", failures[0]["message"])
+        self.assertIn(str(latest), failures[0]["message"])
+
     def test_rollback_failure_reports_unrestored_paths_and_does_not_claim_isolation(self):
         """If both a move and its rollback fail, report the evidence's actual locations."""
         run_id = "run_rollback_failure_123"
