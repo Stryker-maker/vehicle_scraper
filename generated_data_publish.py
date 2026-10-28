@@ -144,15 +144,15 @@ def _csv_scan_quote_character(
     """Update quote state only for quotes at valid CSV field boundaries."""
     if not in_quotes and not at_field_start:
         physical.append('"')
-        return index + 1, in_quotes, quoted_field_start_line, False
+        return index, in_quotes, quoted_field_start_line, False
 
     index, in_quotes, quoted_field_start_line, escaped_quote = _csv_consume_quote(
         text, index, physical, in_quotes, quoted_field_start_line, line_start
     )
     if escaped_quote:
-        return index, in_quotes, quoted_field_start_line, False
+        return index + 1, in_quotes, quoted_field_start_line, False
     physical.append('"')
-    return index + 1, in_quotes, quoted_field_start_line, False
+    return index, in_quotes, quoted_field_start_line, False
 
 
 def _csv_scan_character(
