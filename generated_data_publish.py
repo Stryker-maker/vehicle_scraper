@@ -144,15 +144,15 @@ def _csv_scan_quote_character(
     """Update quote state only for quotes at valid CSV field boundaries."""
     if not in_quotes and not at_field_start:
         physical.append('"')
-        return index, in_quotes, quoted_field_start_line, False
+        return index + 1, in_quotes, quoted_field_start_line, False
 
     index, in_quotes, quoted_field_start_line, escaped_quote = _csv_consume_quote(
         text, index, physical, in_quotes, quoted_field_start_line, line_start
     )
     if escaped_quote:
-        return index + 1, in_quotes, quoted_field_start_line, False
+        return index, in_quotes, quoted_field_start_line, False
     physical.append('"')
-    return index, in_quotes, quoted_field_start_line, False
+    return index + 1, in_quotes, quoted_field_start_line, False
 
 
 def _csv_scan_character(
@@ -168,8 +168,9 @@ def _csv_scan_character(
 ) -> tuple[int, int, list[str], bool, int | None, bool]:
     """Process one CSV character while tracking valid quoted-field boundaries."""
     char = text[index]
+    next_index = index + 1
     if char == '"':
-        index, in_quotes, quoted_field_start_line, at_field_start = (
+        next_index, in_quotes, quoted_field_start_line, at_field_start = (
             _csv_scan_quote_character(
                 text,
                 index,
@@ -180,13 +181,13 @@ def _csv_scan_character(
                 at_field_start,
             )
         )
-    elif char == "\\r":
+    elif char == "\r":
         _csv_handle_carriage_return(
             path, text, index, line_start, physical, errors, in_quotes
         )
         if not in_quotes:
             at_field_start = False
-    elif char == "\\n":
+    elif char == "\n":
         line_start, physical = _csv_handle_line_feed(
             path, line_start, physical, errors, in_quotes
         )
@@ -200,7 +201,7 @@ def _csv_scan_character(
         if not in_quotes:
             at_field_start = False
     return (
-        index + 1,
+        next_index,
         line_start,
         physical,
         in_quotes,
