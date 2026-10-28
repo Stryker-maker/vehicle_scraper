@@ -58,6 +58,7 @@ class SuccessfulIsolationRollbackTests(unittest.TestCase):
         def fail_second_move_then_allow_rollback(
             path: Path, target: Path
         ) -> Path:
+            """Fail the second move while allowing the rollback move to succeed."""
             nonlocal replace_calls
             replace_calls += 1
             if replace_calls == 2:
