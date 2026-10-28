@@ -275,7 +275,7 @@ class CsvLineTerminatorTests(unittest.TestCase):
     def test_staged_csv_whitespace_allows_conflict_marker_text_inside_quoted_field(self):
         """Allow marker-like listing text inside a multiline quoted CSV field."""
         self._assert_staged_csv_bytes(
-            b'"description"\n"first line\n<<<<<<< HEAD\n=======\n>>>>>>> branch\nlast line"\n',
+            b'"description"\n"first line\n<<<<<<< HEAD\n||||||| base\n=======\n>>>>>>> branch\nlast line"\n',
         )
 
     def test_staged_csv_whitespace_rejects_crlf_record_terminators(self):
