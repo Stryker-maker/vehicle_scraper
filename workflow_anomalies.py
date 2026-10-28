@@ -648,6 +648,16 @@ def _plan_collection_moves(
         _plan_archive_moves(root, status_data, vk, src, quarantine_dir)
     )
 
+    # Validate every destination during Phase 1, before any collection is moved.
+    # A retry may reuse the same run ID; never let Path.replace overwrite evidence
+    # already present in that run's quarantine directory.
+    for src_path, dst_path in planned_moves:
+        if dst_path.exists():
+            raise ValueError(
+                f"Quarantine destination already exists; refusing to overwrite "
+                f"existing evidence: {dst_path} (source: {src_path})"
+            )
+
     return {"vehicle_key": vk, "source": src}, planned_moves
 
 
