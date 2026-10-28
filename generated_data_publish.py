@@ -141,27 +141,58 @@ def _csv_scan_character(
     errors: list[str],
     in_quotes: bool,
     quoted_field_start_line: int | None,
-) -> tuple[int, int, list[str], bool, int | None]:
-    """Process one CSV character and return the updated scanner state."""
+    at_field_start: bool,
+) -> tuple[int, int, list[str], bool, int | None, bool]:
+    """Process one CSV character while tracking valid quoted-field boundaries."""
     char = text[index]
-    if char == '"':
+    if char == '"' and (in_quotes or at_field_start):
+        was_in_quotes = in_quotes
         index, in_quotes, quoted_field_start_line, escaped_quote = _csv_consume_quote(
             text, index, physical, in_quotes, quoted_field_start_line, line_start
         )
         if escaped_quote:
-            return index, line_start, physical, in_quotes, quoted_field_start_line
+            return (
+                index,
+                line_start,
+                physical,
+                in_quotes,
+                quoted_field_start_line,
+                False,
+            )
         physical.append(char)
+        if not was_in_quotes:
+            at_field_start = False
+    elif char == '"':
+        # A quote inside an unquoted field is ordinary data, not a quote-state change.
+        physical.append(char)
+        at_field_start = False
     elif char == "\r":
         _csv_handle_carriage_return(
             path, text, index, line_start, physical, errors, in_quotes
         )
+        if not in_quotes:
+            at_field_start = False
     elif char == "\n":
         line_start, physical = _csv_handle_line_feed(
             path, line_start, physical, errors, in_quotes
         )
+        if not in_quotes:
+            at_field_start = True
+    elif char == "," and not in_quotes:
+        physical.append(char)
+        at_field_start = True
     else:
         physical.append(char)
-    return index + 1, line_start, physical, in_quotes, quoted_field_start_line
+        if not in_quotes:
+            at_field_start = False
+    return (
+        index + 1,
+        line_start,
+        physical,
+        in_quotes,
+        quoted_field_start_line,
+        at_field_start,
+    )
 
 
 def _staged_csv_text_errors(path: str, text: str) -> list[str]:
@@ -175,10 +206,18 @@ def _scan_csv_text_errors(path: str, text: str) -> list[str]:
     in_quotes = False
     line_start = 1
     quoted_field_start_line: int | None = None
+    at_field_start = True
     physical: list[str] = []
     index = 0
     while index < len(text):
-        index, line_start, physical, in_quotes, quoted_field_start_line = _csv_scan_character(
+        (
+            index,
+            line_start,
+            physical,
+            in_quotes,
+            quoted_field_start_line,
+            at_field_start,
+        ) = _csv_scan_character(
             path,
             text,
             index,
@@ -187,6 +226,7 @@ def _scan_csv_text_errors(path: str, text: str) -> list[str]:
             errors,
             in_quotes,
             quoted_field_start_line,
+            at_field_start,
         )
     errors.extend(
         _csv_final_text_errors(path, line_start, physical, in_quotes, quoted_field_start_line)
