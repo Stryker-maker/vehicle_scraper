@@ -132,6 +132,28 @@ def _csv_final_text_errors(
     return errors
 
 
+def _csv_scan_quote_character(
+    text: str,
+    index: int,
+    physical: list[str],
+    line_start: int,
+    in_quotes: bool,
+    quoted_field_start_line: int | None,
+    at_field_start: bool,
+) -> tuple[int, bool, int | None, bool]:
+    """Update quote state only for quotes at valid CSV field boundaries."""
+    if not in_quotes and not at_field_start:
+        physical.append('"')
+        return index + 1, in_quotes, quoted_field_start_line, False
+
+    index, in_quotes, quoted_field_start_line, escaped_quote = _csv_consume_quote(
+        text, index, physical, in_quotes, quoted_field_start_line, line_start
+    )
+    if not escaped_quote:
+        physical.append('"')
+    return index + (not escaped_quote), in_quotes, quoted_field_start_line, False
+
+
 def _csv_scan_character(
     path: str,
     text: str,
@@ -145,34 +167,25 @@ def _csv_scan_character(
 ) -> tuple[int, int, list[str], bool, int | None, bool]:
     """Process one CSV character while tracking valid quoted-field boundaries."""
     char = text[index]
-    if char == '"' and (in_quotes or at_field_start):
-        was_in_quotes = in_quotes
-        index, in_quotes, quoted_field_start_line, escaped_quote = _csv_consume_quote(
-            text, index, physical, in_quotes, quoted_field_start_line, line_start
-        )
-        if escaped_quote:
-            return (
+    if char == '"':
+        index, in_quotes, quoted_field_start_line, at_field_start = (
+            _csv_scan_quote_character(
+                text,
                 index,
-                line_start,
                 physical,
+                line_start,
                 in_quotes,
                 quoted_field_start_line,
-                False,
+                at_field_start,
             )
-        physical.append(char)
-        if not was_in_quotes:
-            at_field_start = False
-    elif char == '"':
-        # A quote inside an unquoted field is ordinary data, not a quote-state change.
-        physical.append(char)
-        at_field_start = False
-    elif char == "\r":
+        )
+    elif char == "\\r":
         _csv_handle_carriage_return(
             path, text, index, line_start, physical, errors, in_quotes
         )
         if not in_quotes:
             at_field_start = False
-    elif char == "\n":
+    elif char == "\\n":
         line_start, physical = _csv_handle_line_feed(
             path, line_start, physical, errors, in_quotes
         )
