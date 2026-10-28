@@ -278,6 +278,13 @@ class CsvLineTerminatorTests(unittest.TestCase):
             b'"description"\n"first line\n<<<<<<< HEAD\n||||||| base\n=======\n>>>>>>> branch\nlast line"\n',
         )
 
+    def test_staged_csv_whitespace_rejects_conflict_markers_after_quotes_in_unquoted_fields(self):
+        """Reject conflict markers even when stray quotes occur inside unquoted field values."""
+        self._assert_staged_csv_bytes(
+            b'"value"\n6" bed\n<<<<<<< HEAD\nx\n=======\ny\n>>>>>>> branch\n7" bed\n',
+            "unresolved merge conflict marker",
+        )
+
     def test_staged_csv_whitespace_rejects_crlf_record_terminators(self):
         """Reject CRLF record terminators in staged CSV files."""
         self._assert_staged_csv_bytes(
