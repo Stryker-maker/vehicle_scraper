@@ -790,6 +790,50 @@ def _plan_phase1_isolation(
         _recalculate_report_counts(report)
         raise validation_error
 
+    # A single Phase 1 plan must not target the same quarantine path twice.
+    # This can happen when the same collection is requested more than once.
+    destinations: dict[Path, Path] = {}
+    duplicate_destinations: list[tuple[Path, Path, Path]] = []
+    for src_path, dst_path in combined_planned_moves:
+        previous_source = destinations.get(dst_path)
+        if previous_source is not None:
+            duplicate_destinations.append((previous_source, src_path, dst_path))
+        else:
+            destinations[dst_path] = src_path
+
+    if duplicate_destinations:
+        duplicate_messages = [
+            f"{destination} (sources: {first_source}, {second_source})"
+            for first_source, second_source, destination in duplicate_destinations
+        ]
+        message = (
+            "Duplicate quarantine destination planned; refusing to execute "
+            "combined isolation plan: " + "; ".join(duplicate_messages)
+        )
+        failed_pairs: set[tuple[str, str]] = set()
+        for pair, moves in planned_entries:
+            if any(
+                destination in {dst for _src, _dst in moves}
+                for _first_source, _second_source, destination in duplicate_destinations
+            ):
+                identity = (pair["vehicle_key"], pair["source"])
+                if identity not in failed_pairs:
+                    report.setdefault("anomalies", []).append(
+                        _anomaly(
+                            severity="critical",
+                            code="collection_isolation_failed",
+                            vehicle_key=pair["vehicle_key"],
+                            source=pair["source"],
+                            message=f"Collection isolation failed: {message}",
+                            current="failed",
+                            threshold="isolated",
+                        )
+                    )
+                    failed_pairs.add(identity)
+        report["isolated_collections"] = []
+        _recalculate_report_counts(report)
+        raise ValueError(message)
+
     return planned_entries, combined_planned_moves
 
 
