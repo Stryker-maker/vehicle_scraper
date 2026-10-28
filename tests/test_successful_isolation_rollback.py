@@ -64,13 +64,15 @@ class SuccessfulIsolationRollbackTests(unittest.TestCase):
                 raise OSError("Simulated second move failure")
             return original_replace(path, target)
 
-        with patch.object(
-            Path, "replace", new=fail_second_move_then_allow_rollback
-        ):
-            with self.assertRaisesRegex(
+        with (
+            patch.object(
+                Path, "replace", new=fail_second_move_then_allow_rollback
+            ),
+            self.assertRaisesRegex(
                 RuntimeError, "Atomic anomaly isolation failed during file movement"
-            ) as error:
-                isolate_anomalous_collections(root=root, report=report)
+            ) as error,
+        ):
+            isolate_anomalous_collections(root=root, report=report)
 
         self.assertNotIn("Rollback failed to restore paths", str(error.exception))
         self.assertEqual(
@@ -88,7 +90,11 @@ class SuccessfulIsolationRollbackTests(unittest.TestCase):
         quarantine_dir = (
             root / "data" / vehicle_key / "quarantine" / source / run_id
         )
-        quarantined_files = list(quarantine_dir.glob("*")) if quarantine_dir.exists() else []
+        quarantined_files = (
+            [path for path in quarantine_dir.rglob("*") if path.is_file()]
+            if quarantine_dir.exists()
+            else []
+        )
         self.assertEqual(quarantined_files, [])
         self.assertEqual(report["isolated_collections"], [])
         failures = [
