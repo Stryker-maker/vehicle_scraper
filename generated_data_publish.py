@@ -149,9 +149,10 @@ def _csv_scan_quote_character(
     index, in_quotes, quoted_field_start_line, escaped_quote = _csv_consume_quote(
         text, index, physical, in_quotes, quoted_field_start_line, line_start
     )
-    if not escaped_quote:
-        physical.append('"')
-    return index + (not escaped_quote), in_quotes, quoted_field_start_line, False
+    if escaped_quote:
+        return index, in_quotes, quoted_field_start_line, False
+    physical.append('"')
+    return index + 1, in_quotes, quoted_field_start_line, False
 
 
 def _csv_scan_character(
