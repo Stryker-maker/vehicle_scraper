@@ -58,6 +58,10 @@ def _csv_physical_line_errors(
 ) -> list[str]:
     """Return formatting errors detected on one physical CSV line."""
     errors: list[str] = []
+    line = "".join(physical)
+    is_conflict_marker = line.startswith(("<<<<<<< ", "||||||| ", ">>>>>>> ")) or line == "======="
+    if is_conflict_marker:
+        errors.append(f"{path}:{line_number}: unresolved merge conflict marker")
     if physical and physical[-1] in {" ", "\t"}:
         errors.append(f"{path}:{line_number}: trailing whitespace")
     if check_line_ending and physical and physical[-1] == "\r":
@@ -128,6 +132,29 @@ def _csv_final_text_errors(
     return errors
 
 
+def _csv_scan_quote_character(
+    text: str,
+    index: int,
+    physical: list[str],
+    line_start: int,
+    in_quotes: bool,
+    quoted_field_start_line: int | None,
+    at_field_start: bool,
+) -> tuple[int, bool, int | None, bool]:
+    """Update quote state only for quotes at valid CSV field boundaries."""
+    if not in_quotes and not at_field_start:
+        physical.append('"')
+        return index + 1, in_quotes, quoted_field_start_line, False
+
+    index, in_quotes, quoted_field_start_line, escaped_quote = _csv_consume_quote(
+        text, index, physical, in_quotes, quoted_field_start_line, line_start
+    )
+    if escaped_quote:
+        return index, in_quotes, quoted_field_start_line, False
+    physical.append('"')
+    return index + 1, in_quotes, quoted_field_start_line, False
+
+
 def _csv_scan_character(
     path: str,
     text: str,
@@ -137,27 +164,50 @@ def _csv_scan_character(
     errors: list[str],
     in_quotes: bool,
     quoted_field_start_line: int | None,
-) -> tuple[int, int, list[str], bool, int | None]:
-    """Process one CSV character and return the updated scanner state."""
+    at_field_start: bool,
+) -> tuple[int, int, list[str], bool, int | None, bool]:
+    """Process one CSV character while tracking valid quoted-field boundaries."""
     char = text[index]
+    next_index = index + 1
     if char == '"':
-        index, in_quotes, quoted_field_start_line, escaped_quote = _csv_consume_quote(
-            text, index, physical, in_quotes, quoted_field_start_line, line_start
+        next_index, in_quotes, quoted_field_start_line, at_field_start = (
+            _csv_scan_quote_character(
+                text,
+                index,
+                physical,
+                line_start,
+                in_quotes,
+                quoted_field_start_line,
+                at_field_start,
+            )
         )
-        if escaped_quote:
-            return index, line_start, physical, in_quotes, quoted_field_start_line
-        physical.append(char)
     elif char == "\r":
         _csv_handle_carriage_return(
             path, text, index, line_start, physical, errors, in_quotes
         )
+        if not in_quotes:
+            at_field_start = False
     elif char == "\n":
         line_start, physical = _csv_handle_line_feed(
             path, line_start, physical, errors, in_quotes
         )
+        if not in_quotes:
+            at_field_start = True
+    elif char == "," and not in_quotes:
+        physical.append(char)
+        at_field_start = True
     else:
         physical.append(char)
-    return index + 1, line_start, physical, in_quotes, quoted_field_start_line
+        if not in_quotes:
+            at_field_start = False
+    return (
+        next_index,
+        line_start,
+        physical,
+        in_quotes,
+        quoted_field_start_line,
+        at_field_start,
+    )
 
 
 def _staged_csv_text_errors(path: str, text: str) -> list[str]:
@@ -171,10 +221,18 @@ def _scan_csv_text_errors(path: str, text: str) -> list[str]:
     in_quotes = False
     line_start = 1
     quoted_field_start_line: int | None = None
+    at_field_start = True
     physical: list[str] = []
     index = 0
     while index < len(text):
-        index, line_start, physical, in_quotes, quoted_field_start_line = _csv_scan_character(
+        (
+            index,
+            line_start,
+            physical,
+            in_quotes,
+            quoted_field_start_line,
+            at_field_start,
+        ) = _csv_scan_character(
             path,
             text,
             index,
@@ -183,6 +241,7 @@ def _scan_csv_text_errors(path: str, text: str) -> list[str]:
             errors,
             in_quotes,
             quoted_field_start_line,
+            at_field_start,
         )
     errors.extend(
         _csv_final_text_errors(path, line_start, physical, in_quotes, quoted_field_start_line)

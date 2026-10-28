@@ -11,14 +11,14 @@ from pathlib import Path
 from unittest import mock
 
 from autotrader_history import write_csv_outputs as write_autotrader_csv_outputs
-from kijiji_history import write_csv_outputs as write_kijiji_csv_outputs
-from purpose_outputs import _write_csv as write_purpose_csv
 from generated_data_publish import (
     _git_executable,
     _staged_csv_text_errors,
     staged_name_status,
     verify_staged_csv_whitespace,
 )
+from kijiji_history import write_csv_outputs as write_kijiji_csv_outputs
+from purpose_outputs import _write_csv as write_purpose_csv
 
 
 class CsvLineTerminatorTests(unittest.TestCase):
@@ -255,6 +255,34 @@ class CsvLineTerminatorTests(unittest.TestCase):
         """Allow carriage returns embedded inside quoted fields."""
         self._assert_staged_csv_bytes(
             b'"location"\n"Calgary\rAB"\n',
+        )
+
+    def test_staged_csv_whitespace_rejects_unresolved_conflict_markers(self):
+        """Reject Git conflict-marker lines outside quoted CSV fields."""
+        for marker in (b"<<<<<<< HEAD", b"||||||| base", b"=======", b">>>>>>> branch"):
+            with self.subTest(marker=marker):
+                self._assert_staged_csv_bytes(
+                    b'"location"\n' + marker + b'\n',
+                    "unresolved merge conflict marker",
+                )
+
+    def test_staged_csv_whitespace_allows_conflict_marker_like_values(self):
+        """Allow unquoted values that resemble but do not match conflict-marker syntax."""
+        self._assert_staged_csv_bytes(
+            b'"value"\n<<<<<<<not-a-marker\n=======not-a-separator\n>>>>>>>not-a-marker\n',
+        )
+
+    def test_staged_csv_whitespace_allows_conflict_marker_text_inside_quoted_field(self):
+        """Allow marker-like listing text inside a multiline quoted CSV field."""
+        self._assert_staged_csv_bytes(
+            b'"description"\n"first line\n<<<<<<< HEAD\n||||||| base\n=======\n>>>>>>> branch\nlast line"\n',
+        )
+
+    def test_staged_csv_whitespace_rejects_conflict_markers_after_quotes_in_unquoted_fields(self):
+        """Reject conflict markers even when stray quotes occur inside unquoted field values."""
+        self._assert_staged_csv_bytes(
+            b'"value"\n6" bed\n<<<<<<< HEAD\nx\n=======\ny\n>>>>>>> branch\n7" bed\n',
+            "unresolved merge conflict marker",
         )
 
     def test_staged_csv_whitespace_rejects_crlf_record_terminators(self):
