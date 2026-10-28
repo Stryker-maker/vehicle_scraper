@@ -251,6 +251,7 @@ class SuccessfulIsolationRollbackTests(unittest.TestCase):
         self.assertEqual(len(failures), 1)
         self.assertEqual(failures[0]["severity"], "critical")
         self.assertIn("Rollback failed to restore paths", failures[0]["message"])
+        self.assertIn(f"{quarantined_latest} -> {latest}", failures[0]["message"])
 
 
 if __name__ == "__main__":
