@@ -266,6 +266,12 @@ class CsvLineTerminatorTests(unittest.TestCase):
                     "unresolved merge conflict marker",
                 )
 
+    def test_staged_csv_whitespace_allows_conflict_marker_like_values(self):
+        """Allow unquoted values that resemble but do not match conflict-marker syntax."""
+        self._assert_staged_csv_bytes(
+            b'"value"\n<<<<<<<not-a-marker\n=======not-a-separator\n>>>>>>>not-a-marker\n',
+        )
+
     def test_staged_csv_whitespace_allows_conflict_marker_text_inside_quoted_field(self):
         """Allow marker-like listing text inside a multiline quoted CSV field."""
         self._assert_staged_csv_bytes(
