@@ -105,7 +105,6 @@ class SuccessfulIsolationRollbackTests(unittest.TestCase):
         self.assertEqual(len(failures), 1)
         self.assertEqual(failures[0]["severity"], "critical")
 
-
     def test_existing_quarantine_destination_is_not_overwritten(self):
         """A same-run retry must preserve existing quarantine evidence and fail preflight."""
         run_id = "run_collision_123"
@@ -126,7 +125,9 @@ class SuccessfulIsolationRollbackTests(unittest.TestCase):
         status_path = (
             root / "data" / vehicle_key / "run_status" / f"{source}_latest.json"
         )
-        quarantine_dir = root / "data" / vehicle_key / "quarantine" / source / run_id
+        quarantine_dir = (
+            root / "data" / vehicle_key / "quarantine" / source / run_id
+        )
         existing_quarantine = (
             quarantine_dir / f"{vehicle_key}_{source}_latest_quarantined.csv"
         )
@@ -173,14 +174,23 @@ class SuccessfulIsolationRollbackTests(unittest.TestCase):
     def test_rollback_failure_reports_unrestored_paths_and_does_not_claim_isolation(self):
         """If both a move and its rollback fail, report the evidence's actual locations."""
         run_id = "run_rollback_failure_123"
-        root = Path(tempfile.mkdtemp())
-        self.addCleanup(lambda: __import__("shutil").rmtree(root, ignore_errors=True))
+        temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(temp_dir.cleanup)
+        root = Path(temp_dir.name)
 
         vehicle_key = "ford_f150"
         source = "autotrader"
-        latest = root / "data" / vehicle_key / "latest" / f"{vehicle_key}_{source}_latest.csv"
-        archive = root / "data" / vehicle_key / source / f"{vehicle_key}_{source}_2026-08-01_00-00-00.csv"
-        status_path = root / "data" / vehicle_key / "run_status" / f"{source}_latest.json"
+        latest = (
+            root / "data" / vehicle_key / "latest"
+            / f"{vehicle_key}_{source}_latest.csv"
+        )
+        archive = (
+            root / "data" / vehicle_key / source
+            / f"{vehicle_key}_{source}_2026-08-01_00-00-00.csv"
+        )
+        status_path = (
+            root / "data" / vehicle_key / "run_status" / f"{source}_latest.json"
+        )
         for path in (latest, archive, status_path):
             path.parent.mkdir(parents=True, exist_ok=True)
         latest.write_text("latest_content", encoding="utf-8")
@@ -229,7 +239,9 @@ class SuccessfulIsolationRollbackTests(unittest.TestCase):
         self.assertEqual(replace_calls, 3)
         # Rollback failed: latest evidence remains in quarantine; archive move never completed.
         self.assertFalse(latest.exists())
-        self.assertEqual(quarantined_latest.read_text(encoding="utf-8"), "latest_content")
+        self.assertEqual(
+            quarantined_latest.read_text(encoding="utf-8"), "latest_content"
+        )
         self.assertEqual(archive.read_text(encoding="utf-8"), "archive_content")
         self.assertEqual(report["isolated_collections"], [])
         failures = [
