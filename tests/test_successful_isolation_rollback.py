@@ -109,22 +109,35 @@ class SuccessfulIsolationRollbackTests(unittest.TestCase):
     def test_existing_quarantine_destination_is_not_overwritten(self):
         """A same-run retry must preserve existing quarantine evidence and fail preflight."""
         run_id = "run_collision_123"
-        root = Path(tempfile.mkdtemp())
-        self.addCleanup(lambda: __import__("shutil").rmtree(root, ignore_errors=True))
+        temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(temp_dir.cleanup)
+        root = Path(temp_dir.name)
 
         vehicle_key = "ford_f150"
         source = "autotrader"
-        latest = root / "data" / vehicle_key / "latest" / f"{vehicle_key}_{source}_latest.csv"
-        archive = root / "data" / vehicle_key / source / f"{vehicle_key}_{source}_2026-08-01_00-00-00.csv"
-        status_path = root / "data" / vehicle_key / "run_status" / f"{source}_latest.json"
+        latest = (
+            root / "data" / vehicle_key / "latest"
+            / f"{vehicle_key}_{source}_latest.csv"
+        )
+        archive = (
+            root / "data" / vehicle_key / source
+            / f"{vehicle_key}_{source}_2026-08-01_00-00-00.csv"
+        )
+        status_path = (
+            root / "data" / vehicle_key / "run_status" / f"{source}_latest.json"
+        )
         quarantine_dir = root / "data" / vehicle_key / "quarantine" / source / run_id
-        existing_quarantine = quarantine_dir / f"{vehicle_key}_{source}_latest_quarantined.csv"
+        existing_quarantine = (
+            quarantine_dir / f"{vehicle_key}_{source}_latest_quarantined.csv"
+        )
         for path in (latest, archive, status_path, existing_quarantine):
             path.parent.mkdir(parents=True, exist_ok=True)
 
         latest.write_text("new_latest_content", encoding="utf-8")
         archive.write_text("archive_content", encoding="utf-8")
-        existing_quarantine.write_text("prior_quarantine_evidence", encoding="utf-8")
+        existing_quarantine.write_text(
+            "prior_quarantine_evidence", encoding="utf-8"
+        )
         status_path.write_text(
             json.dumps({
                 "run_id": run_id,
@@ -144,7 +157,10 @@ class SuccessfulIsolationRollbackTests(unittest.TestCase):
 
         self.assertEqual(latest.read_text(encoding="utf-8"), "new_latest_content")
         self.assertEqual(archive.read_text(encoding="utf-8"), "archive_content")
-        self.assertEqual(existing_quarantine.read_text(encoding="utf-8"), "prior_quarantine_evidence")
+        self.assertEqual(
+            existing_quarantine.read_text(encoding="utf-8"),
+            "prior_quarantine_evidence",
+        )
         self.assertEqual(report["isolated_collections"], [])
         failures = [
             anomaly for anomaly in report.get("anomalies", [])
@@ -185,7 +201,9 @@ class SuccessfulIsolationRollbackTests(unittest.TestCase):
 
         original_replace = Path.replace
         replace_calls = 0
-        def fail_second_move_and_rollback(path: Path, target: Path) -> Path:
+        def fail_second_move_and_rollback(
+            path: Path, target: Path
+        ) -> Path:
             nonlocal replace_calls
             replace_calls += 1
             if replace_calls in (2, 3):
@@ -204,7 +222,9 @@ class SuccessfulIsolationRollbackTests(unittest.TestCase):
             isolate_anomalous_collections(root=root, report=report)
 
         quarantine_dir = root / "data" / vehicle_key / "quarantine" / source / run_id
-        quarantined_latest = quarantine_dir / f"{vehicle_key}_{source}_latest_quarantined.csv"
+        quarantined_latest = (
+            quarantine_dir / f"{vehicle_key}_{source}_latest_quarantined.csv"
+        )
         self.assertIn(f"{quarantined_latest} -> {latest}", str(error.exception))
         self.assertEqual(replace_calls, 3)
         # Rollback failed: latest evidence remains in quarantine; archive move never completed.
