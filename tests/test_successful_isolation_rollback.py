@@ -14,12 +14,16 @@ class SuccessfulIsolationRollbackTests(unittest.TestCase):
     def test_later_move_failure_restores_prior_moves_without_partial_quarantine(self):
         """A failed batch must restore moved files when rollback itself succeeds."""
         run_id = "run_rollback_success_123"
-        root = Path(tempfile.mkdtemp())
-        self.addCleanup(lambda: __import__("shutil").rmtree(root, ignore_errors=True))
+        temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(temp_dir.cleanup)
+        root = Path(temp_dir.name)
 
         vehicle_key = "ford_f150"
         source = "autotrader"
-        latest = root / "data" / vehicle_key / "latest" / f"{vehicle_key}_{source}_latest.csv"
+        latest = (
+            root / "data" / vehicle_key / "latest"
+            / f"{vehicle_key}_{source}_latest.csv"
+        )
         archive = (
             root / "data" / vehicle_key / source
             / f"{vehicle_key}_{source}_2026-08-01_00-00-00.csv"
@@ -51,7 +55,9 @@ class SuccessfulIsolationRollbackTests(unittest.TestCase):
         original_replace = Path.replace
         replace_calls = 0
 
-        def fail_second_move_then_allow_rollback(path: Path, target: Path) -> Path:
+        def fail_second_move_then_allow_rollback(
+            path: Path, target: Path
+        ) -> Path:
             nonlocal replace_calls
             replace_calls += 1
             if replace_calls == 2:
@@ -67,7 +73,10 @@ class SuccessfulIsolationRollbackTests(unittest.TestCase):
                 isolate_anomalous_collections(root=root, report=report)
 
         self.assertNotIn("Rollback failed to restore paths", str(error.exception))
-        self.assertEqual(replace_calls, 3, "expected first move, failed second move, successful rollback")
+        self.assertEqual(
+            replace_calls, 3,
+            "expected first move, failed second move, successful rollback",
+        )
 
         # Both original files must be restored byte-for-byte at their original paths.
         self.assertTrue(latest.is_file())
@@ -75,11 +84,12 @@ class SuccessfulIsolationRollbackTests(unittest.TestCase):
         self.assertTrue(archive.is_file())
         self.assertEqual(archive.read_text(encoding="utf-8"), "archive_content")
 
-        # The quarantine directory may have been created, but no partial quarantine file may remain.
+        # The quarantine directory may exist, but no partial quarantine file may remain.
         quarantine_dir = (
             root / "data" / vehicle_key / "quarantine" / source / run_id
         )
-        self.assertEqual(list(quarantine_dir.glob("*")) if quarantine_dir.exists() else [], [])
+        quarantined_files = list(quarantine_dir.glob("*")) if quarantine_dir.exists() else []
+        self.assertEqual(quarantined_files, [])
         self.assertEqual(report["isolated_collections"], [])
         failures = [
             anomaly for anomaly in report.get("anomalies", [])
