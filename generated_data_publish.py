@@ -58,6 +58,9 @@ def _csv_physical_line_errors(
 ) -> list[str]:
     """Return formatting errors detected on one physical CSV line."""
     errors: list[str] = []
+    line = "".join(physical)
+    if line.startswith(("<<<<<<<", "=======", ">>>>>>>")):
+        errors.append(f"{path}:{line_number}: unresolved merge conflict marker")
     if physical and physical[-1] in {" ", "\t"}:
         errors.append(f"{path}:{line_number}: trailing whitespace")
     if check_line_ending and physical and physical[-1] == "\r":
