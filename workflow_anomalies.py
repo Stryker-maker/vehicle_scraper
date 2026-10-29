@@ -652,7 +652,7 @@ def _plan_collection_moves(
     # A retry may reuse the same run ID; never let Path.replace overwrite evidence
     # already present in that run's quarantine directory.
     for src_path, dst_path in planned_moves:
-        if dst_path.exists():
+        if dst_path.exists() or dst_path.is_symlink():
             raise ValueError(
                 f"Quarantine destination already exists; refusing to overwrite "
                 f"existing evidence: {dst_path} (source: {src_path})"
