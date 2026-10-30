@@ -648,6 +648,16 @@ def _plan_collection_moves(
         _plan_archive_moves(root, status_data, vk, src, quarantine_dir)
     )
 
+    # Validate every destination during Phase 1, before any collection is moved.
+    # A retry may reuse the same run ID; never let Path.replace overwrite evidence
+    # already present in that run's quarantine directory.
+    for src_path, dst_path in planned_moves:
+        if dst_path.exists() or dst_path.is_symlink():
+            raise ValueError(
+                f"Quarantine destination already exists; refusing to overwrite "
+                f"existing evidence: {dst_path} (source: {src_path})"
+            )
+
     return {"vehicle_key": vk, "source": src}, planned_moves
 
 
@@ -757,6 +767,79 @@ def _plan_single_entry_isolation(
         return None, exc
 
 
+def _find_duplicate_quarantine_destinations(
+    planned_moves: list[tuple[Path, Path]],
+) -> list[tuple[Path, Path, Path]]:
+    """Return every repeated destination and the two source paths targeting it."""
+    destinations: dict[Path, Path] = {}
+    duplicates: list[tuple[Path, Path, Path]] = []
+    for source_path, destination_path in planned_moves:
+        previous_source = destinations.get(destination_path)
+        if previous_source is None:
+            destinations[destination_path] = source_path
+        else:
+            duplicates.append((previous_source, source_path, destination_path))
+    return duplicates
+
+
+def _record_duplicate_destination_failures(
+    planned_entries: list[tuple[dict[str, str], list[tuple[Path, Path]]]],
+    duplicate_destinations: list[tuple[Path, Path, Path]],
+    report: dict[str, Any],
+    message: str,
+) -> None:
+    """Record one critical isolation failure for each affected collection."""
+    duplicate_paths = {
+        destination
+        for _first_source, _second_source, destination in duplicate_destinations
+    }
+    failed_pairs: set[tuple[str, str]] = set()
+    for pair, moves in planned_entries:
+        targets_duplicate = any(
+            destination_path in duplicate_paths
+            for _source_path, destination_path in moves
+        )
+        if not targets_duplicate:
+            continue
+        identity = (pair["vehicle_key"], pair["source"])
+        if identity in failed_pairs:
+            continue
+        report.setdefault("anomalies", []).append(
+            _anomaly(
+                severity="critical",
+                code="collection_isolation_failed",
+                vehicle_key=pair["vehicle_key"],
+                source=pair["source"],
+                message=f"Collection isolation failed: {message}",
+                current="failed",
+                threshold="isolated",
+            )
+        )
+        failed_pairs.add(identity)
+
+
+def _raise_for_duplicate_quarantine_destinations(
+    planned_entries: list[tuple[dict[str, str], list[tuple[Path, Path]]]],
+    duplicate_destinations: list[tuple[Path, Path, Path]],
+    report: dict[str, Any],
+) -> None:
+    """Fail preflight and report every collection affected by duplicate destinations."""
+    duplicate_messages = [
+        f"{destination} (sources: {first_source}, {second_source})"
+        for first_source, second_source, destination in duplicate_destinations
+    ]
+    message = (
+        "Duplicate quarantine destination planned; refusing to execute "
+        "combined isolation plan: " + "; ".join(duplicate_messages)
+    )
+    _record_duplicate_destination_failures(
+        planned_entries, duplicate_destinations, report, message
+    )
+    report["isolated_collections"] = []
+    _recalculate_report_counts(report)
+    raise ValueError(message)
+
+
 def _plan_phase1_isolation(
     root: Path, isolated: list[Any], report_run_id: str, report: dict[str, Any]
 ) -> tuple[list[tuple[dict[str, str], list[tuple[Path, Path]]]], list[tuple[Path, Path]]]:
@@ -779,6 +862,14 @@ def _plan_phase1_isolation(
         report["isolated_collections"] = []
         _recalculate_report_counts(report)
         raise validation_error
+
+    duplicate_destinations = _find_duplicate_quarantine_destinations(
+        combined_planned_moves
+    )
+    if duplicate_destinations:
+        _raise_for_duplicate_quarantine_destinations(
+            planned_entries, duplicate_destinations, report
+        )
 
     return planned_entries, combined_planned_moves
 

@@ -16,7 +16,7 @@ class SuccessfulIsolationRollbackTests(unittest.TestCase):
         run_id = "run_rollback_success_123"
         temp_dir = tempfile.TemporaryDirectory()
         self.addCleanup(temp_dir.cleanup)
-        root = Path(temp_dir.name)
+        root = Path(temp_dir.name).resolve()
 
         vehicle_key = "ford_f150"
         source = "autotrader"
@@ -104,6 +104,346 @@ class SuccessfulIsolationRollbackTests(unittest.TestCase):
         ]
         self.assertEqual(len(failures), 1)
         self.assertEqual(failures[0]["severity"], "critical")
+
+    def test_existing_quarantine_destination_is_not_overwritten(self):
+        """A same-run retry must preserve existing quarantine evidence and fail preflight."""
+        run_id = "run_collision_123"
+        temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(temp_dir.cleanup)
+        root = Path(temp_dir.name).resolve()
+
+        vehicle_key = "ford_f150"
+        source = "autotrader"
+        latest = (
+            root / "data" / vehicle_key / "latest"
+            / f"{vehicle_key}_{source}_latest.csv"
+        )
+        archive = (
+            root / "data" / vehicle_key / source
+            / f"{vehicle_key}_{source}_2026-08-01_00-00-00.csv"
+        )
+        status_path = (
+            root / "data" / vehicle_key / "run_status" / f"{source}_latest.json"
+        )
+        quarantine_dir = (
+            root / "data" / vehicle_key / "quarantine" / source / run_id
+        )
+        existing_quarantine = (
+            quarantine_dir / f"{vehicle_key}_{source}_latest_quarantined.csv"
+        )
+        for path in (latest, archive, status_path, existing_quarantine):
+            path.parent.mkdir(parents=True, exist_ok=True)
+
+        latest.write_text("new_latest_content", encoding="utf-8")
+        archive.write_text("archive_content", encoding="utf-8")
+        existing_quarantine.write_text(
+            "prior_quarantine_evidence", encoding="utf-8"
+        )
+        status_path.write_text(
+            json.dumps({
+                "run_id": run_id,
+                "started_at_utc": utc_now(),
+                "latest_output": str(latest.relative_to(root)),
+                "archive_output": str(archive.relative_to(root)),
+            }),
+            encoding="utf-8",
+        )
+        report = {
+            "run_id": run_id,
+            "isolated_collections": [{"vehicle_key": vehicle_key, "source": source}],
+        }
+
+        with self.assertRaisesRegex(ValueError, "Quarantine destination already exists"):
+            isolate_anomalous_collections(root=root, report=report)
+
+        self.assertEqual(latest.read_text(encoding="utf-8"), "new_latest_content")
+        self.assertEqual(archive.read_text(encoding="utf-8"), "archive_content")
+        self.assertEqual(
+            existing_quarantine.read_text(encoding="utf-8"),
+            "prior_quarantine_evidence",
+        )
+        self.assertEqual(report["isolated_collections"], [])
+        failures = [
+            anomaly for anomaly in report.get("anomalies", [])
+            if anomaly.get("code") == "collection_isolation_failed"
+        ]
+        self.assertEqual(len(failures), 1)
+        self.assertEqual(failures[0]["severity"], "critical")
+        self.assertIn("Quarantine destination already exists", failures[0]["message"])
+
+    def test_dangling_symlink_quarantine_destination_is_not_replaced(self):
+        """A dangling symlink is existing evidence and must fail preflight."""
+        run_id = "run_dangling_symlink_collision_123"
+        temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(temp_dir.cleanup)
+        root = Path(temp_dir.name).resolve()
+
+        vehicle_key = "ford_f150"
+        source = "autotrader"
+        latest = (
+            root / "data" / vehicle_key / "latest"
+            / f"{vehicle_key}_{source}_latest.csv"
+        )
+        archive = (
+            root / "data" / vehicle_key / source
+            / f"{vehicle_key}_{source}_2026-08-01_00-00-00.csv"
+        )
+        status_path = (
+            root / "data" / vehicle_key / "run_status" / f"{source}_latest.json"
+        )
+        quarantine_dir = (
+            root / "data" / vehicle_key / "quarantine" / source / run_id
+        )
+        dangling_destination = (
+            quarantine_dir / f"{vehicle_key}_{source}_latest_quarantined.csv"
+        )
+        for path in (latest, archive, status_path):
+            path.parent.mkdir(parents=True, exist_ok=True)
+
+        latest.write_text("latest_content", encoding="utf-8")
+        archive.write_text("archive_content", encoding="utf-8")
+        status_path.write_text(
+            json.dumps({
+                "run_id": run_id,
+                "started_at_utc": utc_now(),
+                "latest_output": str(latest.relative_to(root)),
+                "archive_output": str(archive.relative_to(root)),
+            }),
+            encoding="utf-8",
+        )
+        dangling_destination.parent.mkdir(parents=True, exist_ok=True)
+        missing_target = quarantine_dir / "missing_prior_evidence.csv"
+        dangling_destination.symlink_to(missing_target)
+        self.assertTrue(dangling_destination.is_symlink())
+        self.assertFalse(dangling_destination.exists())
+
+        report = {
+            "run_id": run_id,
+            "isolated_collections": [
+                {"vehicle_key": vehicle_key, "source": source}
+            ],
+        }
+
+        with self.assertRaisesRegex(
+            ValueError, "Quarantine destination already exists"
+        ):
+            isolate_anomalous_collections(root=root, report=report)
+
+        self.assertTrue(dangling_destination.is_symlink())
+        self.assertEqual(dangling_destination.readlink(), missing_target)
+        self.assertFalse(missing_target.exists())
+        self.assertEqual(latest.read_text(encoding="utf-8"), "latest_content")
+        self.assertEqual(archive.read_text(encoding="utf-8"), "archive_content")
+        self.assertEqual(report["isolated_collections"], [])
+        failures = [
+            anomaly for anomaly in report.get("anomalies", [])
+            if anomaly.get("code") == "collection_isolation_failed"
+        ]
+        self.assertEqual(len(failures), 1)
+        self.assertEqual(failures[0]["severity"], "critical")
+        self.assertIn(
+            "Quarantine destination already exists", failures[0]["message"]
+        )
+
+    def test_latest_and_archive_destination_collision_fails_before_any_move(self):
+        """Latest and archive outputs mapping to one quarantine path must fail preflight."""
+        run_id = "run_single_collection_collision_123"
+        temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(temp_dir.cleanup)
+        root = Path(temp_dir.name).resolve()
+
+        vehicle_key = "ford_f150"
+        source = "autotrader"
+        latest = (
+            root / "data" / vehicle_key / "latest"
+            / f"{vehicle_key}_{source}_latest.csv"
+        )
+        # The archive basename intentionally matches the latest output's quarantine
+        # basename, creating a collision within one collection's planned moves.
+        archive = (
+            root / "data" / vehicle_key / source
+            / f"{vehicle_key}_{source}_latest_quarantined.csv"
+        )
+        status_path = (
+            root / "data" / vehicle_key / "run_status" / f"{source}_latest.json"
+        )
+        for path in (latest, archive, status_path):
+            path.parent.mkdir(parents=True, exist_ok=True)
+
+        latest.write_text("latest_content", encoding="utf-8")
+        archive.write_text("archive_content", encoding="utf-8")
+        status_path.write_text(
+            json.dumps({
+                "run_id": run_id,
+                "started_at_utc": utc_now(),
+                "latest_output": str(latest.relative_to(root)),
+                "archive_output": str(archive.relative_to(root)),
+            }),
+            encoding="utf-8",
+        )
+        report = {
+            "run_id": run_id,
+            "isolated_collections": [{"vehicle_key": vehicle_key, "source": source}],
+        }
+
+        with self.assertRaisesRegex(
+            ValueError, "Duplicate quarantine destination planned"
+        ) as error:
+            isolate_anomalous_collections(root=root, report=report)
+
+        self.assertIn(str(latest), str(error.exception))
+        self.assertIn(str(archive), str(error.exception))
+        self.assertEqual(latest.read_text(encoding="utf-8"), "latest_content")
+        self.assertEqual(archive.read_text(encoding="utf-8"), "archive_content")
+        quarantine_dir = root / "data" / vehicle_key / "quarantine" / source / run_id
+        self.assertFalse(quarantine_dir.exists())
+        self.assertEqual(report["isolated_collections"], [])
+        failures = [
+            anomaly for anomaly in report.get("anomalies", [])
+            if anomaly.get("code") == "collection_isolation_failed"
+        ]
+        self.assertEqual(len(failures), 1)
+        self.assertEqual(failures[0]["severity"], "critical")
+        self.assertIn("Duplicate quarantine destination planned", failures[0]["message"])
+
+    def test_duplicate_destinations_in_combined_plan_fail_before_any_move(self):
+        """Duplicate collection requests must not schedule the same quarantine path twice."""
+        run_id = "run_duplicate_destination_123"
+        temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(temp_dir.cleanup)
+        root = Path(temp_dir.name).resolve()
+
+        vehicle_key = "ford_f150"
+        source = "autotrader"
+        latest = (
+            root / "data" / vehicle_key / "latest"
+            / f"{vehicle_key}_{source}_latest.csv"
+        )
+        archive = (
+            root / "data" / vehicle_key / source
+            / f"{vehicle_key}_{source}_2026-08-01_00-00-00.csv"
+        )
+        status_path = (
+            root / "data" / vehicle_key / "run_status" / f"{source}_latest.json"
+        )
+        for path in (latest, archive, status_path):
+            path.parent.mkdir(parents=True, exist_ok=True)
+
+        latest.write_text("latest_content", encoding="utf-8")
+        archive.write_text("archive_content", encoding="utf-8")
+        status_path.write_text(
+            json.dumps({
+                "run_id": run_id,
+                "started_at_utc": utc_now(),
+                "latest_output": str(latest.relative_to(root)),
+                "archive_output": str(archive.relative_to(root)),
+            }),
+            encoding="utf-8",
+        )
+        collection = {"vehicle_key": vehicle_key, "source": source}
+        report = {
+            "run_id": run_id,
+            "isolated_collections": [collection.copy(), collection.copy()],
+        }
+
+        with self.assertRaisesRegex(ValueError, "Duplicate quarantine destination planned"):
+            isolate_anomalous_collections(root=root, report=report)
+
+        self.assertEqual(latest.read_text(encoding="utf-8"), "latest_content")
+        self.assertEqual(archive.read_text(encoding="utf-8"), "archive_content")
+        quarantine_dir = root / "data" / vehicle_key / "quarantine" / source / run_id
+        self.assertFalse(quarantine_dir.exists())
+        self.assertEqual(report["isolated_collections"], [])
+        failures = [
+            anomaly for anomaly in report.get("anomalies", [])
+            if anomaly.get("code") == "collection_isolation_failed"
+        ]
+        self.assertEqual(len(failures), 1)
+        self.assertEqual(failures[0]["severity"], "critical")
+        self.assertIn("Duplicate quarantine destination planned", failures[0]["message"])
+        self.assertIn(str(latest), failures[0]["message"])
+
+    def test_rollback_failure_reports_unrestored_paths_and_does_not_claim_isolation(self):
+        """If both a move and its rollback fail, report the evidence's actual locations."""
+        run_id = "run_rollback_failure_123"
+        temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(temp_dir.cleanup)
+        root = Path(temp_dir.name).resolve()
+
+        vehicle_key = "ford_f150"
+        source = "autotrader"
+        latest = (
+            root / "data" / vehicle_key / "latest"
+            / f"{vehicle_key}_{source}_latest.csv"
+        )
+        archive = (
+            root / "data" / vehicle_key / source
+            / f"{vehicle_key}_{source}_2026-08-01_00-00-00.csv"
+        )
+        status_path = (
+            root / "data" / vehicle_key / "run_status" / f"{source}_latest.json"
+        )
+        for path in (latest, archive, status_path):
+            path.parent.mkdir(parents=True, exist_ok=True)
+        latest.write_text("latest_content", encoding="utf-8")
+        archive.write_text("archive_content", encoding="utf-8")
+        status_path.write_text(
+            json.dumps({
+                "run_id": run_id,
+                "started_at_utc": utc_now(),
+                "latest_output": str(latest.relative_to(root)),
+                "archive_output": str(archive.relative_to(root)),
+            }),
+            encoding="utf-8",
+        )
+        report = {
+            "run_id": run_id,
+            "isolated_collections": [{"vehicle_key": vehicle_key, "source": source}],
+        }
+
+        original_replace = Path.replace
+        replace_calls = 0
+        def fail_second_move_and_rollback(
+            path: Path, target: Path
+        ) -> Path:
+            nonlocal replace_calls
+            replace_calls += 1
+            if replace_calls in (2, 3):
+                raise OSError(
+                    "Simulated second move failure" if replace_calls == 2
+                    else "Simulated rollback failure"
+                )
+            return original_replace(path, target)
+
+        with (
+            patch.object(Path, "replace", new=fail_second_move_and_rollback),
+            self.assertRaisesRegex(
+                RuntimeError, "Rollback failed to restore paths"
+            ) as error,
+        ):
+            isolate_anomalous_collections(root=root, report=report)
+
+        quarantine_dir = root / "data" / vehicle_key / "quarantine" / source / run_id
+        quarantined_latest = (
+            quarantine_dir / f"{vehicle_key}_{source}_latest_quarantined.csv"
+        )
+        self.assertIn(f"{quarantined_latest} -> {latest}", str(error.exception))
+        self.assertEqual(replace_calls, 3)
+        # Rollback failed: latest evidence remains in quarantine; archive move never completed.
+        self.assertFalse(latest.exists())
+        self.assertEqual(
+            quarantined_latest.read_text(encoding="utf-8"), "latest_content"
+        )
+        self.assertEqual(archive.read_text(encoding="utf-8"), "archive_content")
+        self.assertEqual(report["isolated_collections"], [])
+        failures = [
+            anomaly for anomaly in report.get("anomalies", [])
+            if anomaly.get("code") == "collection_isolation_failed"
+        ]
+        self.assertEqual(len(failures), 1)
+        self.assertEqual(failures[0]["severity"], "critical")
+        self.assertIn("Rollback failed to restore paths", failures[0]["message"])
+        self.assertIn(f"{quarantined_latest} -> {latest}", failures[0]["message"])
 
 
 if __name__ == "__main__":
