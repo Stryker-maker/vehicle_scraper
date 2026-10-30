@@ -1823,5 +1823,52 @@ class CollectionIsolationTests(unittest.TestCase):
             _load_and_validate_source_status(self.root, config, src, run_id)
 
 
+    def test_build_report_never_claims_requested_collections_were_isolated_after_preflight_failure(self):
+        import argparse
+        from unittest import mock
+        from workflow_anomalies import _run_build_action
+
+        run_id = "run-isolation-preflight-failure"
+        pair = {"vehicle_key": "ford_f150", "source": "autotrader"}
+        report = {
+            "run_id": run_id,
+            "isolated_collections": [pair],
+            "isolation_requested_collections": [pair],
+            "anomalies": [],
+        }
+        saved_reports = []
+
+        def capture_report(root, report):
+            saved_reports.append(json.loads(json.dumps(report)))
+            return []
+
+        args = argparse.Namespace(
+            baseline="baseline.json",
+            current="current.json",
+            run_id=run_id,
+        )
+        with mock.patch("workflow_anomalies.load_optional_json", side_effect=[None, {"run_id": run_id}]), mock.patch(
+            "workflow_anomalies.compare_health_reports", return_value=report
+        ), mock.patch(
+            "workflow_anomalies.isolate_anomalous_collections",
+            side_effect=ValueError("invalid isolation request"),
+        ), mock.patch(
+            "workflow_anomalies.write_anomaly_report", side_effect=capture_report
+        ):
+            with self.assertRaisesRegex(ValueError, "invalid isolation request"):
+                _run_build_action(self.root, args)
+
+        self.assertEqual(len(saved_reports), 1)
+        self.assertEqual(saved_reports[0]["isolated_collections"], [])
+        self.assertEqual(saved_reports[0]["isolation_requested_collections"], [pair])
+        self.assertEqual(
+            saved_reports[0]["isolation_failure"],
+            {
+                "error_type": "ValueError",
+                "message": "invalid isolation request",
+            },
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
