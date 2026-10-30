@@ -1870,5 +1870,51 @@ class CollectionIsolationTests(unittest.TestCase):
         )
 
 
+    def test_build_report_persists_unrecovered_rollback_paths_after_isolation_failure(self):
+        import argparse
+        from unittest import mock
+        from workflow_anomalies import _run_build_action
+
+        run_id = "run-isolation-rollback-failure"
+        pair = {"vehicle_key": "ford_f150", "source": "autotrader"}
+        report = {
+            "run_id": run_id,
+            "isolated_collections": [pair],
+            "isolation_requested_collections": [pair],
+            "anomalies": [],
+        }
+        unrecovered = (
+            "Atomic anomaly isolation failed during file movement: move failed. "
+            "Rollback failed to restore paths: /quarantine/latest.csv -> /latest/latest.csv"
+        )
+        saved_reports = []
+
+        def capture_report(root, report):
+            saved_reports.append(json.loads(json.dumps(report)))
+            return []
+
+        args = argparse.Namespace(
+            baseline="baseline.json",
+            current="current.json",
+            run_id=run_id,
+        )
+        with mock.patch("workflow_anomalies.load_optional_json", side_effect=[None, {"run_id": run_id}]), mock.patch(
+            "workflow_anomalies.compare_health_reports", return_value=report
+        ), mock.patch(
+            "workflow_anomalies.isolate_anomalous_collections",
+            side_effect=RuntimeError(unrecovered),
+        ), mock.patch(
+            "workflow_anomalies.write_anomaly_report", side_effect=capture_report
+        ):
+            with self.assertRaisesRegex(RuntimeError, "Rollback failed to restore paths"):
+                _run_build_action(self.root, args)
+
+        self.assertEqual(saved_reports[0]["isolated_collections"], [])
+        self.assertIn(
+            "/quarantine/latest.csv -> /latest/latest.csv",
+            saved_reports[0]["isolation_failure"]["message"],
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
