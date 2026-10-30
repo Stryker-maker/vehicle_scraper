@@ -940,7 +940,13 @@ def _run_build_action(root: Path, args: argparse.Namespace) -> int:
         actually_isolated = isolate_anomalous_collections(root=root, report=report)
     except (ValueError, RuntimeError) as exc:
         isolation_exc = exc
-        actually_isolated = report.get("isolated_collections", [])
+        # Requested collections are not proof that any files were successfully isolated.
+        # The exception message retains rollback details, including paths that could not be restored.
+        actually_isolated = []
+        report["isolation_failure"] = {
+            "error_type": type(exc).__name__,
+            "message": str(exc),
+        }
 
     report["isolated_collections"] = actually_isolated
     paths = write_anomaly_report(root=root, report=report)
