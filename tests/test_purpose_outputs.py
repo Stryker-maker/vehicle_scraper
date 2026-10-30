@@ -371,5 +371,70 @@ class PurposeBuildTests(PurposeBehaviorTests):
             self.assertTrue(all(record["questions"] for record in questions))
 
 
+class PurposeOutputAvailabilityTests(unittest.TestCase):
+    def test_all_unavailable_sources_are_a_skip_outcome_without_overwriting_prior_artifacts(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            config = {"vehicle_key": "ram_3500"}
+            inputs = {
+                "vehicles": {
+                    "ram_3500": {"analysis_profile": "owned_vehicle_value"}
+                }
+            }
+            stale_csv = purpose.artifact_paths(
+                root, config, "owned_vehicle_value"
+            )["records_csv"]
+            stale_csv.parent.mkdir(parents=True, exist_ok=True)
+            stale_csv.write_text("previous-run-output", encoding="utf-8")
+
+            with mock.patch.object(purpose, "load_vehicle_config", return_value=config), mock.patch.object(
+                purpose, "load_purpose_inputs", return_value=inputs
+            ), mock.patch.object(
+                purpose,
+                "load_source_bundles",
+                side_effect=purpose.SourceUnavailableError("source unavailable"),
+            ):
+                with self.assertRaises(purpose.NoPurposeSourcesAvailableError):
+                    purpose.build(
+                        root=root,
+                        config_path=Path("config_ram3500.json"),
+                        run_id="run-current",
+                        sources=["autotrader", "kijiji"],
+                        inputs_path=Path("purpose_inputs.json"),
+                    )
+
+            self.assertEqual(
+                stale_csv.read_text(encoding="utf-8"),
+                "previous-run-output",
+            )
+
+    def test_cli_returns_dedicated_unavailable_status_but_does_not_swallow_integrity_errors(self):
+        arguments = [
+            "build",
+            "--config", "config_ram3500.json",
+            "--run-id", "run-current",
+            "--source", "autotrader",
+            "--source", "kijiji",
+        ]
+        with tempfile.TemporaryDirectory() as temp:
+            with mock.patch.object(purpose.Path, "cwd", return_value=Path(temp)), mock.patch.object(
+                purpose,
+                "build",
+                side_effect=purpose.NoPurposeSourcesAvailableError("no valid source collections"),
+            ):
+                self.assertEqual(
+                    purpose.main(arguments),
+                    purpose.PURPOSE_OUTPUT_UNAVAILABLE_EXIT_CODE,
+                )
+
+            with mock.patch.object(purpose.Path, "cwd", return_value=Path(temp)), mock.patch.object(
+                purpose,
+                "build",
+                side_effect=ValueError("accepted/identity count mismatch"),
+            ):
+                with self.assertRaisesRegex(ValueError, "accepted/identity count mismatch"):
+                    purpose.main(arguments)
+
+
 if __name__ == "__main__":
     unittest.main()
