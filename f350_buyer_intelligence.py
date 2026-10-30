@@ -197,7 +197,8 @@ def extract_configuration_evidence(normalized: dict[str, Any], raw_payload: Any)
     service: str | None
     service_match: str | None
     if re.search(r"\b(?:no|without)\s+(?:service|maintenance)\s+records?\b", lowered):
-        service, service_match = "records_not_available_claim", "no service records"    else:
+        service, service_match = "records_not_available_claim", "no service records"
+    else:
         service, service_match = _match(text, (("records_available_claim", (
             r"\bfull\s+service\s+history\b", r"\bservice\s+records?\s+(?:available|included)\b",
             r"\bmaintenance\s+records?\s+(?:available|included)\b", r"\bdealer[-\s]+maintained\b",
@@ -397,6 +398,7 @@ def hour_context(mileage: int | None, engine_hours: int | None, idle_hours: int 
     return {"km_per_engine_hour": km_per_hour, "idle_hour_percent": idle_percent,
             "warnings": warnings, "meaning": "usage_context_only_not_condition_proof"}
 
+
 def classify(year_fit_value: str, completeness: str, market: dict[str, Any], accident: str) -> tuple[str, list[str]]:
     reasons = [f"year_fit:{year_fit_value}", f"evidence_completeness:{completeness}"]
     if any(term in accident.casefold() for term in ("salvage", "rebuilt", "structural")):
@@ -595,7 +597,8 @@ def _listing(bundle: dict[str, Any], market_rows: Sequence[dict[str, Any]], over
     owner = owner_annotation(str(base["canonical_listing_id"]), overrides, computed)
     questions = seller_questions(base["normalized"], configuration, missing)
     projected_min = base["mileage_km"] + OWNER_ANNUAL_KM_MIN * PROJECTION_YEARS if isinstance(base["mileage_km"], int) else None
-    projected_max = base["mileage_km"] + OWNER_ANNUAL_KM_MAX * PROJECTION_YEARS if isinstance(base["mileage_km"], int) else None    rich = {**{key: value for key, value in base.items() if key != "normalized"},
+    projected_max = base["mileage_km"] + OWNER_ANNUAL_KM_MAX * PROJECTION_YEARS if isinstance(base["mileage_km"], int) else None
+    rich = {**{key: value for key, value in base.items() if key != "normalized"},
             "year_fit": fit, "configuration_evidence": configuration, "derived_hour_context": hours,
             "evidence_completeness": completeness, "missing_investigation_fields": missing,
             "market_context": market,
@@ -793,6 +796,7 @@ def build(root: Path, config_path: Path, run_id: str, sources: Sequence[str] | N
     write_summary_markdown(paths["market_summary_markdown"], summary)
     print(f"[ford_f350:buyer_intelligence] scope={effective_scope} | listings={len(listings)} | sources={','.join(valid_sources)}")
     return summary
+
 
 def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(description="Build transparent F-350 buyer-investigation outputs")
