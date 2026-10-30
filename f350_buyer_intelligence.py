@@ -657,7 +657,7 @@ def csv_row(value: dict[str, Any]) -> dict[str, Any]:
 
 def _compute_quantiles(values: Sequence[int], quantile_map: dict[str, float]) -> dict[str, Any]:
     if not values:
-        return {label: None for label in quantile_map}
+        return dict.fromkeys(quantile_map, None)
     return {label: round(percentile(values, q) or 0) for label, q in quantile_map.items()}
 
 
