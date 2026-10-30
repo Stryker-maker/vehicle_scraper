@@ -56,7 +56,8 @@ jobs:
     name: Collect governed vehicle data
     needs: preflight
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    # Provisional headroom for sequential 75-minute source limits plus analysis and publication.
+    timeout-minutes: 180
     permissions:
       contents: write
     env:
@@ -260,21 +261,28 @@ jobs:
         run: |
           set -euo pipefail
           for config in config_ram3500.json config_forester.json config_odyssey.json config_carnival.json; do
-            python purpose_outputs.py build \
+            vehicle_key=$(python -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["vehicle_key"])' "$config")
+            if python purpose_outputs.py build \
               --config "$config" \
               --run-id "$GITHUB_RUN_ID" \
               --source autotrader \
               --source kijiji \
-              --inputs purpose_inputs.json
-            python purpose_output_validation.py \
-              --config "$config" \
-              --run-id "$GITHUB_RUN_ID" \
-              --source autotrader \
-              --source kijiji \
-              --inputs purpose_inputs.json
+              --inputs purpose_inputs.json; then
+              python purpose_output_validation.py \
+                --config "$config" \
+                --run-id "$GITHUB_RUN_ID" \
+                --source autotrader \
+                --source kijiji \
+                --inputs purpose_inputs.json
+              find "data/$vehicle_key/purpose_output" -name '*_latest.md' -type f -print -exec cat {} \; >> "$GITHUB_STEP_SUMMARY"
+            else
+              build_status=$?
+              if [[ "$build_status" -ne 10 ]]; then
+                exit "$build_status"
+              fi
+              echo "- Skipped \${vehicle_key}: no valid current-run source collections; prior-run artifacts were left unchanged and are not presented as current-run output." >> "$GITHUB_STEP_SUMMARY"
+            fi
           done
-          find data/ram_3500/purpose_output data/subaru_forester/purpose_output data/honda_odyssey/purpose_output data/kia_carnival/purpose_output \
-            -name '*_latest.md' -type f -print -exec cat {} \; >> "$GITHUB_STEP_SUMMARY"
 
       - name: Enforce critical anomaly policy
         if: env.COLLECTION_SCOPE == 'full'
