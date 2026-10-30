@@ -280,7 +280,7 @@ jobs:
               if [[ "$build_status" -ne 10 ]]; then
                 exit "$build_status"
               fi
-              echo "- Skipped \${vehicle_key}: no valid current-run source collections; prior-run artifacts were left unchanged and are not presented as current-run output." >> "$GITHUB_STEP_SUMMARY"
+              echo "- Skipped $vehicle_key: no valid current-run source collections; prior-run artifacts were left unchanged and are not presented as current-run output." >> "$GITHUB_STEP_SUMMARY"
             fi
           done
 
