@@ -22,6 +22,7 @@ from phase1_common import (
 from vehicle_config import load_vehicle_config
 
 PURPOSE_OUTPUT_SCHEMA_VERSION = 1
+PURPOSE_OUTPUT_UNAVAILABLE_EXIT_CODE = 10
 PURPOSE_INPUT_SCHEMA_VERSION = 1
 SOURCE_STATUS_SCHEMA_VERSION = 8
 SUPPORTED_SOURCES = ("autotrader", "kijiji")
@@ -280,6 +281,10 @@ def _raw_payloads(root: Path, status: dict[str, Any], source: str, run_id: str) 
 
 class SourceUnavailableError(ValueError):
     """Raised when a source collection is missing or not current success for the requested run."""
+
+
+class NoPurposeSourcesAvailableError(ValueError):
+    """Raised when every requested source is unavailable for a secondary-purpose build."""
 
 
 def _load_and_validate_source_status(root: Path, config: dict[str, Any], source: str, run_id: str) -> dict[str, Any]:
@@ -1000,7 +1005,9 @@ def _collect_available_purpose_source_bundles(
         except SourceUnavailableError:
             pass
     if not valid_sources:
-        raise ValueError(f"No valid source collections available for {vehicle_key}")
+        raise NoPurposeSourcesAvailableError(
+            f"No valid source collections available for {vehicle_key}"
+        )
     return bundles, valid_sources
 
 
@@ -1137,13 +1144,26 @@ def parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
     if args.command == "build":
-        summary = build(
-            root=Path.cwd(),
-            config_path=Path(args.config),
-            run_id=args.run_id,
-            sources=args.source,
-            inputs_path=Path(args.inputs),
-        )
+        try:
+            summary = build(
+                root=Path.cwd(),
+                config_path=Path(args.config),
+                run_id=args.run_id,
+                sources=args.source,
+                inputs_path=Path(args.inputs),
+            )
+        except NoPurposeSourcesAvailableError as exc:
+            print(
+                json.dumps(
+                    {
+                        "output_status": "unavailable_no_current_sources",
+                        "reason": str(exc),
+                    },
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+            return PURPOSE_OUTPUT_UNAVAILABLE_EXIT_CODE
         print(json.dumps(summary, indent=2, sort_keys=True))
         return 0
     raise AssertionError(args.command)
