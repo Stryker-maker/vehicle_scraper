@@ -66,7 +66,8 @@ class PurposeInputTests(unittest.TestCase):
 
 
 class PurposeBehaviorTests(unittest.TestCase):
-    def owned_subject(self):
+    @staticmethod
+    def owned_subject():
         return {
             "year": {"value": 2013, "evidence_status": "owner_reported_historical_unverified"},
             "trim": {"value": "Laramie", "evidence_status": "owner_reported_historical_unverified"},
@@ -77,7 +78,8 @@ class PurposeBehaviorTests(unittest.TestCase):
             "odometer_context": {"value": "historical", "evidence_status": "owner_reported_historical_unverified"},
         }
 
-    def bundle(self, vehicle_key: str, index: int = 0, source: str = "autotrader"):
+    @staticmethod
+    def bundle(vehicle_key: str, index: int = 0, source: str = "autotrader"):
         canonical_id = f"{source}:{vehicle_key}:{index}"
         return {
             "record": {
@@ -116,7 +118,8 @@ class PurposeBehaviorTests(unittest.TestCase):
             },
         }
 
-    def incomplete_preferences(self):
+    @staticmethod
+    def incomplete_preferences():
         list_fields = {
             "cargo_requirements",
             "acceptable_seller_types",
@@ -270,7 +273,8 @@ class PurposeBehaviorTests(unittest.TestCase):
 
 
 class PurposeBuildTests(PurposeBehaviorTests):
-    def config(self, vehicle_key: str):
+    @staticmethod
+    def config(vehicle_key: str):
         make_model = {
             "ram_3500": ("RAM", "3500"),
             "honda_odyssey": ("Honda", "Odyssey"),
@@ -307,7 +311,8 @@ class PurposeBuildTests(PurposeBehaviorTests):
             },
         }
 
-    def copy_inputs(self, root: Path):
+    @staticmethod
+    def copy_inputs(root: Path):
         repository_root = Path(__file__).resolve().parents[1]
         (root / "purpose_inputs.json").write_text(
             (repository_root / "purpose_inputs.json").read_text(encoding="utf-8"),
