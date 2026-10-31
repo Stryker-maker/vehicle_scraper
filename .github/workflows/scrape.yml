@@ -169,9 +169,6 @@ jobs:
           test -f "$summary_path"
           printf '%s\n' "$summary_path" >> "$GITHUB_STEP_SUMMARY"
           cat "$summary_path" >> "$GITHUB_STEP_SUMMARY"
-            --source "$SELECTED_SOURCE" \
-            --inputs purpose_inputs.json
-          find "data/$VEHICLE_KEY/purpose_output" -name '*_latest.md' -type f -print -exec cat {} \; >> "$GITHUB_STEP_SUMMARY"
 
       - name: Prepare single-pair validation artifact
         if: always() && env.COLLECTION_SCOPE == 'single_pair'
