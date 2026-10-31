@@ -1,0 +1,103 @@
+{
+  "analysis_profile": "owned_vehicle_value",
+  "artifacts": {
+    "input_gaps": "data/ram_3500/purpose_output/value_monitor/owner_input_gaps_latest.json",
+    "records_csv": "data/ram_3500/purpose_output/value_monitor/comparables_latest.csv",
+    "records_jsonl": "data/ram_3500/purpose_output/value_monitor/comparables_latest.jsonl",
+    "summary_json": "data/ram_3500/purpose_output/value_monitor/market_snapshot_latest.json",
+    "summary_markdown": "data/ram_3500/purpose_output/value_monitor/market_snapshot_latest.md"
+  },
+  "asking_price_distribution_cad": {
+    "count": 5,
+    "maximum": 49500,
+    "median": 33709,
+    "minimum": 16888,
+    "q1": 17000,
+    "q3": 36599
+  },
+  "cohort_basis": "all_configured_query_accepted_listings",
+  "cohort_count": 5,
+  "competitive_asking_context": {
+    "lower_observed_asking_bound_cad": 17000,
+    "meaning": "lower_observed_asking_band_not_verified_faster_sale_range_or_sale_probability",
+    "upper_observed_asking_bound_cad": 33709
+  },
+  "generated_at_utc": "2026-10-31T17:34:43+00:00",
+  "interpretation_contract": "asking_price_context_not_appraisal_not_transaction_price_not_sale_probability",
+  "market_scope": "configured_query_accepted_listing_claims_not_complete_market",
+  "mileage_distribution_km": {
+    "count": 5,
+    "maximum": 368890,
+    "median": 232627,
+    "minimum": 100000,
+    "q1": 172846,
+    "q3": 270125
+  },
+  "multi_run_direction": {
+    "asking_price_decrease_count": 0,
+    "asking_price_increase_count": 0,
+    "asking_price_unchanged_count": 0,
+    "listings_with_previous_price_observation": 0,
+    "meaning": "listing_asking_price_changes_only_not_market_value_trend_or_sale_evidence",
+    "median_change_from_previous_observation_cad": null,
+    "status": "insufficient_multi_run_history"
+  },
+  "purpose_input_schema_version": 1,
+  "purpose_output_schema_version": 1,
+  "record_count": 5,
+  "run_id": "41223293350",
+  "sale_goal": "support_sale_to_help_fund_f350_purchase",
+  "scope": "combined_sources",
+  "source_record_counts": {
+    "autotrader": 2,
+    "kijiji": 3
+  },
+  "sources": [
+    "autotrader",
+    "kijiji"
+  ],
+  "subject_comparability_counts": {
+    "broad_market_context": 4,
+    "partial_subject_comparable": 1
+  },
+  "subject_market_context_status": "unavailable_current_odometer_required",
+  "subject_profile": {
+    "current_odometer_km": {
+      "evidence_status": "owner_input_required",
+      "value": null
+    },
+    "drivetrain": {
+      "evidence_status": "owner_reported_historical_unverified",
+      "value": "4wd"
+    },
+    "engine": {
+      "evidence_status": "owner_reported_historical_unverified",
+      "value": "6.7 Cummins diesel"
+    },
+    "fuel": {
+      "evidence_status": "owner_reported_historical_unverified",
+      "value": "Diesel"
+    },
+    "odometer_context": {
+      "evidence_status": "owner_reported_historical_unverified",
+      "value": "Just over 400,000 km when this vehicle purpose was recorded."
+    },
+    "trim": {
+      "evidence_status": "owner_reported_historical_unverified",
+      "value": "Laramie"
+    },
+    "year": {
+      "evidence_status": "owner_reported_historical_unverified",
+      "value": 2013
+    }
+  },
+  "subject_profile_missing_fields": [
+    "current_odometer_km"
+  ],
+  "vehicle_key": "ram_3500",
+  "year_counts": {
+    "2012": 1,
+    "2013": 1,
+    "2014": 3
+  }
+}

@@ -1,0 +1,111 @@
+{
+  "analysis_profile": "owned_vehicle_value",
+  "artifacts": {
+    "input_gaps": "data/subaru_forester/purpose_output/value_monitor/owner_input_gaps_latest.json",
+    "records_csv": "data/subaru_forester/purpose_output/value_monitor/comparables_latest.csv",
+    "records_jsonl": "data/subaru_forester/purpose_output/value_monitor/comparables_latest.jsonl",
+    "summary_json": "data/subaru_forester/purpose_output/value_monitor/market_snapshot_latest.json",
+    "summary_markdown": "data/subaru_forester/purpose_output/value_monitor/market_snapshot_latest.md"
+  },
+  "asking_price_distribution_cad": {
+    "count": 39,
+    "maximum": 38499,
+    "median": 30500,
+    "minimum": 18988,
+    "q1": 26988,
+    "q3": 32999
+  },
+  "cohort_basis": "all_configured_query_accepted_listings",
+  "cohort_count": 39,
+  "competitive_asking_context": {
+    "lower_observed_asking_bound_cad": 26988,
+    "meaning": "lower_observed_asking_band_not_verified_faster_sale_range_or_sale_probability",
+    "upper_observed_asking_bound_cad": 30500
+  },
+  "generated_at_utc": "2026-10-31T17:34:44+00:00",
+  "interpretation_contract": "asking_price_context_not_appraisal_not_transaction_price_not_sale_probability",
+  "market_scope": "configured_query_accepted_listing_claims_not_complete_market",
+  "mileage_distribution_km": {
+    "count": 39,
+    "maximum": 185482,
+    "median": 77994,
+    "minimum": 10,
+    "q1": 35530,
+    "q3": 126207
+  },
+  "multi_run_direction": {
+    "asking_price_decrease_count": 0,
+    "asking_price_increase_count": 0,
+    "asking_price_unchanged_count": 0,
+    "listings_with_previous_price_observation": 0,
+    "meaning": "listing_asking_price_changes_only_not_market_value_trend_or_sale_evidence",
+    "median_change_from_previous_observation_cad": null,
+    "status": "insufficient_multi_run_history"
+  },
+  "purpose_input_schema_version": 1,
+  "purpose_output_schema_version": 1,
+  "record_count": 39,
+  "run_id": "41223293350",
+  "sale_goal": "approximate_current_market_value_monitoring",
+  "scope": "combined_sources",
+  "source_record_counts": {
+    "autotrader": 22,
+    "kijiji": 17
+  },
+  "sources": [
+    "autotrader",
+    "kijiji"
+  ],
+  "subject_comparability_counts": {
+    "subject_profile_incomplete": 39
+  },
+  "subject_market_context_status": "unavailable_current_odometer_required",
+  "subject_profile": {
+    "current_odometer_km": {
+      "evidence_status": "owner_input_required",
+      "value": null
+    },
+    "drivetrain": {
+      "evidence_status": "owner_input_required",
+      "value": null
+    },
+    "engine": {
+      "evidence_status": "owner_input_required",
+      "value": null
+    },
+    "fuel": {
+      "evidence_status": "owner_input_required",
+      "value": null
+    },
+    "odometer_context": {
+      "evidence_status": "owner_input_required",
+      "value": null
+    },
+    "trim": {
+      "evidence_status": "owner_input_required",
+      "value": null
+    },
+    "year": {
+      "evidence_status": "owner_input_required",
+      "value": null
+    }
+  },
+  "subject_profile_missing_fields": [
+    "current_odometer_km",
+    "drivetrain",
+    "engine",
+    "fuel",
+    "odometer_context",
+    "trim",
+    "year"
+  ],
+  "vehicle_key": "subaru_forester",
+  "year_counts": {
+    "2019": 5,
+    "2020": 2,
+    "2021": 4,
+    "2022": 7,
+    "2023": 12,
+    "2024": 9
+  }
+}

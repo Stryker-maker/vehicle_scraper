@@ -14,8 +14,8 @@ from identity_lifecycle import (
     load_current_identity_records,
 )
 from phase1_common import (
-    MANUAL_REVIEW_FIELDS, SOURCES, load_json, source_status_path,
-    status_is_current_success, utc_now, write_json,
+    MANUAL_REVIEW_FIELDS, SOURCES, check_source_anomalously_isolated, load_json,
+    source_status_path, status_is_current_success, utc_now, write_json,
 )
 
 SourcePlan = Iterable[tuple[Path, Sequence[str]]]
@@ -246,6 +246,9 @@ def build_manual_review(
         bundles: list[tuple[dict[str, Any], dict[str, Any], dict[str, Any]]] = []
         identities: list[dict[str, Any]] = []
         for source in enabled_sources:
+            if check_source_anomalously_isolated(root, key, source, active_run):
+                excluded[source] = "isolated_due_to_critical_anomaly"
+                continue
             status_path = source_status_path(root, config, source)
             if not status_path.exists():
                 excluded[source] = "missing_status"
@@ -318,7 +321,11 @@ def build_manual_review(
         for output in (archive, latest):
             with output.open("w", encoding="utf-8", newline="") as handle:
                 writer = csv.DictWriter(
-                    handle, fieldnames=MANUAL_REVIEW_FIELDS, extrasaction="ignore"
+                    handle,
+                    fieldnames=MANUAL_REVIEW_FIELDS,
+                    extrasaction="ignore",
+                    lineterminator="\n",
+                    quoting=csv.QUOTE_ALL,
                 )
                 writer.writeheader()
                 writer.writerows(rows)

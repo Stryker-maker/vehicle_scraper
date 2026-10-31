@@ -1,0 +1,212 @@
+{
+  "deleted_bytes_total": 169137,
+  "deleted_file_count_total": 20,
+  "deletion_chain_sha256": "1501eb4451d17a24eb15b59677bc3e400bc700d210e6d78485b69e02d398baaa",
+  "last_updated_at_utc": "2026-10-31T17:34:45+00:00",
+  "last_updated_run_id": "41223293350",
+  "recent_deletion_limit": 100,
+  "recent_deletions": [
+    {
+      "category": "autotrader_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/kia_carnival/autotrader/kia_carnival_autotrader_2026-07-13_11-40.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "c178f071940f75f92beb9d96d2727b675fc8b3179745731ff2838d9fa9553be2",
+      "size_bytes": 3566,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "autotrader_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/kia_carnival/autotrader/kia_carnival_autotrader_2026-07-06_12-33.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "e05a5d7ac1d05c9c34405fb7dd94dba38badeb30d3267ec01e997a7f52f3f600",
+      "size_bytes": 3866,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "autotrader_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/kia_carnival/autotrader/kia_carnival_autotrader_2026-06-29_13-15.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "b3c27f77224d68adbdd5dd478c4ca7bc54799c82ab4f7e04022b36fa23b6e0d6",
+      "size_bytes": 2585,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "autotrader_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/kia_carnival/autotrader/kia_carnival_autotrader_2026-06-22_20-41.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "97e7213b5ee1b3736831656e40f667edae101ff58b9e2048a77c905bcf09f633",
+      "size_bytes": 2182,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "autotrader_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/kia_carnival/autotrader/kia_carnival_autotrader_2026-06-18_01-33.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "6797bf839eb55a7cfe005836099b3c0a39c41aa578a2484a8ad47739aca21ed5",
+      "size_bytes": 3487,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "kijiji_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/kia_carnival/kijiji/kia_carnival_kijiji_2026-07-06_15-01.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "3930ab06a2f1c79fa88d68b9151f585a417bb4846fec334fa91aa5efbbc83a4c",
+      "size_bytes": 6530,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "kijiji_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/kia_carnival/kijiji/kia_carnival_kijiji_2026-06-29_15-43.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "8739d95e220d85fed8e56f9670cbbc0479c10a17d9768a7756f17b98a6fd622f",
+      "size_bytes": 4714,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "kijiji_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/kia_carnival/kijiji/kia_carnival_kijiji_2026-06-22_22-53.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "9a5b49754bd1a1a1b3c52bf1443664eedab7a538659869caec5f2a887e6e1d32",
+      "size_bytes": 5568,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "kijiji_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/kia_carnival/kijiji/kia_carnival_kijiji_2026-06-18_04-17.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "52022d723d0fa48294df45a478527d10102a69e5649671700de9e486753c2e1c",
+      "size_bytes": 5535,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "manual_review_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/kia_carnival/manual_review/kia_carnival_manual_review_2026-07-21_22-41-49.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "e8b4f881b277a62d6adf2489643c8e6248545252aa6ef56aaeee4e99ca571479",
+      "size_bytes": 16115,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "manual_review_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/kia_carnival/manual_review/kia_carnival_manual_review_2026-07-21_20-58-14.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "798a0a38074452300f4b42728ef5eef40f3d8aad75b260b266c7b08e87e1572f",
+      "size_bytes": 18481,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "manual_review_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/kia_carnival/manual_review/kia_carnival_manual_review_2026-07-21_17-20-38.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "f12baf1e7503bfd2c9fae89a443d96a4fcfba686a08f977c36e384ccd307b3e4",
+      "size_bytes": 17699,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "legacy_price_history",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/kia_carnival/price_history_autotrader.json",
+      "reason": "retired_unsupported_history",
+      "run_id": "41223293350",
+      "sha256": "0ceac22239ab72d80a2ce30b88e956675cf8f204ae2837fbe74bca4ab67dab0f",
+      "size_bytes": 6515,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "legacy_price_history",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/kia_carnival/price_history_kijiji.json",
+      "reason": "retired_unsupported_history",
+      "run_id": "41223293350",
+      "sha256": "ec3d3398f913a7f920e943328c5c6f4d1164b292da18fd5a13aea6a8d0d09e61",
+      "size_bytes": 13332,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "legacy_merged_csv",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/kia_carnival/merged/kia_carnival_merged_2026-06-18_04-17.csv",
+      "reason": "disabled_misleading_legacy_output",
+      "run_id": "41223293350",
+      "sha256": "4cb36771699da2e7279b958bbc4c9d97c1f69872f6c7d3cf4163274b6212a353",
+      "size_bytes": 8362,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "legacy_merged_csv",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/kia_carnival/merged/kia_carnival_merged_2026-06-22_22-53.csv",
+      "reason": "disabled_misleading_legacy_output",
+      "run_id": "41223293350",
+      "sha256": "df2751cb0e87d2d9138d5fcd6f1a718d6538311212e7751cd9c5b7b2d307eb31",
+      "size_bytes": 7259,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "legacy_merged_csv",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/kia_carnival/merged/kia_carnival_merged_2026-06-29_15-43.csv",
+      "reason": "disabled_misleading_legacy_output",
+      "run_id": "41223293350",
+      "sha256": "5e3afa1f2b8c496fbdc60fa265aaf852aa3f75e28672764eacc998b01a635a8e",
+      "size_bytes": 6982,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "legacy_merged_csv",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/kia_carnival/merged/kia_carnival_merged_2026-07-06_15-01.csv",
+      "reason": "disabled_misleading_legacy_output",
+      "run_id": "41223293350",
+      "sha256": "e3f9a76bc30914a9039e4daaea55fd9e56bebda73ffc80c271e68e4673113313",
+      "size_bytes": 10139,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "legacy_merged_csv",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/kia_carnival/merged/kia_carnival_merged_2026-07-13_13-55.csv",
+      "reason": "disabled_misleading_legacy_output",
+      "run_id": "41223293350",
+      "sha256": "47e206e4a737dcbe7a0ea716900fc0c29b53a7da42aaee139f3e2aa1fde5fd56",
+      "size_bytes": 12847,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "legacy_merged_csv",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/kia_carnival/merged/kia_carnival_merged_2026-07-20_12-10.csv",
+      "reason": "disabled_misleading_legacy_output",
+      "run_id": "41223293350",
+      "sha256": "1b6f702e6c4a53c3007ad26700e4e60e995a981c8961501a0e89a5a8aa9d56ba",
+      "size_bytes": 13373,
+      "storage_retention_schema_version": 1
+    }
+  ],
+  "storage_retention_schema_version": 1,
+  "vehicle_key": "kia_carnival"
+}

@@ -1,0 +1,164 @@
+{
+  "artifacts": {
+    "investigation_csv": "data/ford_f350/buyer_intelligence/investigation_latest.csv",
+    "investigation_jsonl": "data/ford_f350/buyer_intelligence/investigation_latest.jsonl",
+    "market_summary_json": "data/ford_f350/buyer_intelligence/market_summary_latest.json",
+    "market_summary_markdown": "data/ford_f350/buyer_intelligence/market_summary_latest.md",
+    "seller_questions": "data/ford_f350/buyer_intelligence/seller_questions_latest.jsonl"
+  },
+  "buyer_intelligence_schema_version": 1,
+  "classification_contract": "explainable_no_rank_no_score_manual_override_preserves_computed_result",
+  "effective_classification_counts": {
+    "investigate_price_concern": 4,
+    "investigate_priority": 4,
+    "investigate_with_evidence_gaps": 3,
+    "market_context_only": 17
+  },
+  "field_coverage": {
+    "accident_title": {
+      "coverage_percent": 7.14,
+      "known_listing_count": 2,
+      "total_listing_count": 28
+    },
+    "box_configuration": {
+      "coverage_percent": 14.29,
+      "known_listing_count": 4,
+      "total_listing_count": 28
+    },
+    "cab_configuration": {
+      "coverage_percent": 64.29,
+      "known_listing_count": 18,
+      "total_listing_count": 28
+    },
+    "drivetrain": {
+      "coverage_percent": 75.0,
+      "known_listing_count": 21,
+      "total_listing_count": 28
+    },
+    "engine_hours": {
+      "coverage_percent": 0.0,
+      "known_listing_count": 0,
+      "total_listing_count": 28
+    },
+    "idle_hours": {
+      "coverage_percent": 0.0,
+      "known_listing_count": 0,
+      "total_listing_count": 28
+    },
+    "prior_use_claims": {
+      "coverage_percent": 35.71,
+      "known_listing_count": 10,
+      "total_listing_count": 28
+    },
+    "rear_wheel_configuration": {
+      "coverage_percent": 35.71,
+      "known_listing_count": 10,
+      "total_listing_count": 28
+    },
+    "service_history": {
+      "coverage_percent": 0.0,
+      "known_listing_count": 0,
+      "total_listing_count": 28
+    },
+    "trim": {
+      "coverage_percent": 100.0,
+      "known_listing_count": 28,
+      "total_listing_count": 28
+    }
+  },
+  "generated_at_utc": "2026-10-31T17:34:43+00:00",
+  "limitations": [
+    "source claims are not independently verified",
+    "duplicate candidates remain separate listing claims",
+    "missing engine, idle, service, history, and configuration evidence is not inferred",
+    "asking-price bands do not establish sale price or fair value",
+    "mileage-adjusted projections are descriptive regression context, not appraisal",
+    "five-year mileage projection uses the owner's 5000-8000 km annual-use scenario"
+  ],
+  "listing_claim_count": 28,
+  "market_scope": "configured_query_accepted_listing_claims_not_complete_market",
+  "owner_override_digest_sha256": "d1e306db5c0ceee39df2163553c876664c345ee3eacdf2327a86ee85a0bf1cb5",
+  "owner_usage_projection": {
+    "annual_km_max": 8000,
+    "annual_km_min": 5000,
+    "projection_years": 5
+  },
+  "price_band_contract": "observed_quartiles_not_appraisal",
+  "projection_contract": "mileage_adjusted_asking_price_context_and_owner_mileage_scenario_not_future_value",
+  "run_id": "41223293350",
+  "scope": "full_sources",
+  "source_listing_claim_counts": {
+    "autotrader": 16,
+    "kijiji": 12
+  },
+  "sources": [
+    "autotrader",
+    "kijiji"
+  ],
+  "vehicle_key": "ford_f350",
+  "year_groups": {
+    "2016": {
+      "listing_claim_count": 2,
+      "mileage_median_km": 547782,
+      "mileage_q1_km": 411672,
+      "mileage_q3_km": 683891,
+      "price_median_cad": 19825,
+      "price_q1_cad": 15412,
+      "price_q3_cad": 24238
+    },
+    "2017": {
+      "listing_claim_count": 4,
+      "mileage_median_km": 269434,
+      "mileage_q1_km": 219308,
+      "mileage_q3_km": 321780,
+      "price_median_cad": 39974,
+      "price_q1_cad": 29245,
+      "price_q3_cad": 49962
+    },
+    "2018": {
+      "listing_claim_count": 4,
+      "mileage_median_km": 138424,
+      "mileage_q1_km": 138175,
+      "mileage_q3_km": 157063,
+      "price_median_cad": 49945,
+      "price_q1_cad": 47209,
+      "price_q3_cad": 51203
+    },
+    "2019": {
+      "listing_claim_count": 7,
+      "mileage_median_km": 206071,
+      "mileage_q1_km": 162093,
+      "mileage_q3_km": 220018,
+      "price_median_cad": 47000,
+      "price_q1_cad": 44397,
+      "price_q3_cad": 48216
+    },
+    "2020": {
+      "listing_claim_count": 2,
+      "mileage_median_km": 204993,
+      "mileage_q1_km": 192490,
+      "mileage_q3_km": 217496,
+      "price_median_cad": 52490,
+      "price_q1_cad": 49736,
+      "price_q3_cad": 55245
+    },
+    "2021": {
+      "listing_claim_count": 1,
+      "mileage_median_km": 139100,
+      "mileage_q1_km": 139100,
+      "mileage_q3_km": 139100,
+      "price_median_cad": 58800,
+      "price_q1_cad": 58800,
+      "price_q3_cad": 58800
+    },
+    "2022": {
+      "listing_claim_count": 8,
+      "mileage_median_km": 168580,
+      "mileage_q1_km": 142000,
+      "mileage_q3_km": 217124,
+      "price_median_cad": 53000,
+      "price_q1_cad": 52248,
+      "price_q3_cad": 53924
+    }
+  }
+}

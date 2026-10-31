@@ -7,6 +7,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+import purpose_output_validation as purpose_validation
 import purpose_outputs as purpose
 
 
@@ -43,9 +44,30 @@ class PurposeInputTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "field set mismatch"):
                 purpose.load_purpose_inputs(path)
 
+    def test_family_preferences_validation_fails_closed(self):
+        root = Path(__file__).resolve().parents[1]
+        original = json.loads((root / "purpose_inputs.json").read_text(encoding="utf-8"))
+        for mutation in ("missing_preferences", "extra_field", "missing_field", "invalid_status"):
+            with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as temp:
+                value = copy.deepcopy(original)
+                entry = value["vehicles"]["honda_odyssey"]
+                if mutation == "missing_preferences":
+                    del entry["preferences"]
+                elif mutation == "extra_field":
+                    entry["preferences"]["invented"] = {}
+                elif mutation == "missing_field":
+                    del entry["preferences"]["min_year"]
+                else:
+                    entry["preferences"]["min_year"]["evidence_status"] = "verified"
+                path = Path(temp) / "inputs.json"
+                path.write_text(json.dumps(value), encoding="utf-8")
+                with self.assertRaises(ValueError):
+                    purpose.load_purpose_inputs(path)
+
 
 class PurposeBehaviorTests(unittest.TestCase):
-    def owned_subject(self):
+    @staticmethod
+    def owned_subject():
         return {
             "year": {"value": 2013, "evidence_status": "owner_reported_historical_unverified"},
             "trim": {"value": "Laramie", "evidence_status": "owner_reported_historical_unverified"},
@@ -56,7 +78,8 @@ class PurposeBehaviorTests(unittest.TestCase):
             "odometer_context": {"value": "historical", "evidence_status": "owner_reported_historical_unverified"},
         }
 
-    def bundle(self, vehicle_key: str, index: int = 0, source: str = "autotrader"):
+    @staticmethod
+    def bundle(vehicle_key: str, index: int = 0, source: str = "autotrader"):
         canonical_id = f"{source}:{vehicle_key}:{index}"
         return {
             "record": {
@@ -95,7 +118,8 @@ class PurposeBehaviorTests(unittest.TestCase):
             },
         }
 
-    def incomplete_preferences(self):
+    @staticmethod
+    def incomplete_preferences():
         list_fields = {
             "cargo_requirements",
             "acceptable_seller_types",
@@ -108,6 +132,12 @@ class PurposeBehaviorTests(unittest.TestCase):
             }
             for name in purpose.FAMILY_PREFERENCE_FIELDS
         }
+
+    def test_owned_field_matching_uses_type_appropriate_rules(self):
+        subject = self.owned_subject()
+        self.assertEqual(purpose._field_status("year", subject, "2013"), "match")
+        self.assertEqual(purpose._field_status("fuel", subject, "Biodiesel"), "conflict")
+        self.assertEqual(purpose._field_status("fuel", subject, "diesel"), "match")
 
     def test_ram_comparability_is_explainable_not_ranked(self):
         record = purpose._owned_record(
@@ -181,6 +211,38 @@ class PurposeBehaviorTests(unittest.TestCase):
         self.assertNotIn("rank", record)
         self.assertNotIn("score", record)
 
+    def test_numeric_preferences_report_matches_mismatches_and_missing_evidence(self):
+        for field, key, limit, outside in (
+            ("budget_max_cad", "price_cad", 30000, 30001),
+            ("min_year", "year", 2020, 2019),
+            ("max_year", "year", 2023, 2024),
+            ("max_mileage_km", "mileage_km", 150000, 150001),
+            ("max_distance_km", "distance_km", 500, 501),
+            ("minimum_seating", "seating", 7, 6),
+        ):
+            for value, expected in (
+                (limit, "preference_match"),
+                (outside, "preference_mismatch"),
+                (None, "listing_evidence_missing"),
+            ):
+                with self.subTest(field=field, value=value):
+                    preferences = self.incomplete_preferences()
+                    preferences[field] = {"value": limit, "evidence_status": "friend_reported_unverified"}
+                    bundle = self.bundle("kia_carnival")
+                    base = purpose._base_record(bundle, "family_friend_purchase", "single_source")
+                    evidence = {
+                        "seating": {"value": 8},
+                        "accident_title": {"value": None},
+                        "service_history": {"value": None},
+                        "cargo_features": {"value": []},
+                    }
+                    if key == "seating":
+                        evidence[key]["value"] = value
+                    else:
+                        base[key] = value
+                    _, reasons, _ = purpose.evaluate_preferences(base, evidence, preferences)
+                    self.assertIn(f"{expected}:{field}", reasons)
+
     def test_recorded_preferences_produce_visible_mismatch_not_silent_exclusion(self):
         preferences = self.incomplete_preferences()
         values = {
@@ -211,7 +273,8 @@ class PurposeBehaviorTests(unittest.TestCase):
 
 
 class PurposeBuildTests(PurposeBehaviorTests):
-    def config(self, vehicle_key: str):
+    @staticmethod
+    def config(vehicle_key: str):
         make_model = {
             "ram_3500": ("RAM", "3500"),
             "honda_odyssey": ("Honda", "Odyssey"),
@@ -248,7 +311,8 @@ class PurposeBuildTests(PurposeBehaviorTests):
             },
         }
 
-    def copy_inputs(self, root: Path):
+    @staticmethod
+    def copy_inputs(root: Path):
         repository_root = Path(__file__).resolve().parents[1]
         (root / "purpose_inputs.json").write_text(
             (repository_root / "purpose_inputs.json").read_text(encoding="utf-8"),
@@ -311,6 +375,114 @@ class PurposeBuildTests(PurposeBehaviorTests):
             ]
             self.assertEqual(len(questions), 3)
             self.assertTrue(all(record["questions"] for record in questions))
+
+
+    def test_partial_source_build_validates_against_effective_sources(self):
+        config = self.config("ram_3500")
+        bundle = self.bundle("ram_3500", source="autotrader")
+
+        def load_available_source(root, config, source, run_id):
+            if source == "autotrader":
+                return [bundle]
+            raise purpose.SourceUnavailableError("kijiji unavailable")
+
+        with (
+            tempfile.TemporaryDirectory() as temp,
+            mock.patch.object(purpose, "load_vehicle_config", return_value=config),
+            mock.patch.object(purpose, "load_source_bundles", side_effect=load_available_source),
+            mock.patch.object(purpose_validation, "load_vehicle_config", return_value=config),
+            mock.patch.object(purpose_validation, "load_source_bundles", return_value=[bundle]),
+        ):
+            root = Path(temp)
+            self.copy_inputs(root)
+            summary = purpose.build(
+                root=root,
+                config_path=Path("config_ram3500.json"),
+                run_id="run-1",
+                sources=["autotrader", "kijiji"],
+                inputs_path=Path("purpose_inputs.json"),
+            )
+            validation = purpose_validation.validate_purpose_output(
+                root=root,
+                config_path=Path("config_ram3500.json"),
+                inputs_path=Path("purpose_inputs.json"),
+                run_id="run-1",
+                expected_sources=summary["sources"],
+            )
+
+        self.assertEqual(summary["sources"], ["autotrader"])
+        self.assertEqual(validation["validation_status"], "pass", validation["validation_errors"])
+        self.assertEqual(validation["sources"], ["autotrader"])
+
+
+class PurposeOutputAvailabilityTests(unittest.TestCase):
+    def test_all_unavailable_sources_are_a_skip_outcome_without_overwriting_prior_artifacts(self):
+        config = {"vehicle_key": "ram_3500"}
+        inputs = {
+            "vehicles": {
+                "ram_3500": {"analysis_profile": "owned_vehicle_value"}
+            }
+        }
+        with (
+            tempfile.TemporaryDirectory() as temp,
+            mock.patch.object(purpose, "load_vehicle_config", return_value=config),
+            mock.patch.object(purpose, "load_purpose_inputs", return_value=inputs),
+            mock.patch.object(
+                purpose,
+                "load_source_bundles",
+                side_effect=purpose.SourceUnavailableError("source unavailable"),
+            ),
+        ):
+            root = Path(temp)
+            stale_csv = purpose.artifact_paths(
+                root, config, "owned_vehicle_value"
+            )["records_csv"]
+            stale_csv.parent.mkdir(parents=True, exist_ok=True)
+            stale_csv.write_text("previous-run-output", encoding="utf-8")
+            with self.assertRaises(purpose.NoPurposeSourcesAvailableError):
+                purpose.build(
+                    root=root,
+                    config_path=Path("config_ram3500.json"),
+                    run_id="run-current",
+                    sources=["autotrader", "kijiji"],
+                    inputs_path=Path("purpose_inputs.json"),
+                )
+
+            self.assertEqual(stale_csv.read_text(encoding="utf-8"), "previous-run-output")
+
+    def test_cli_returns_dedicated_unavailable_status_but_does_not_swallow_integrity_errors(self):
+        arguments = [
+            "build",
+            "--config", "config_ram3500.json",
+            "--run-id", "run-current",
+            "--source", "autotrader",
+            "--source", "kijiji",
+        ]
+        with (
+            tempfile.TemporaryDirectory() as temp,
+            mock.patch.object(purpose.Path, "cwd", return_value=Path(temp)),
+            mock.patch.object(
+                purpose,
+                "build",
+                side_effect=purpose.NoPurposeSourcesAvailableError("no valid source collections"),
+            ),
+        ):
+            self.assertEqual(
+                purpose.main(arguments),
+                purpose.PURPOSE_OUTPUT_UNAVAILABLE_EXIT_CODE,
+            )
+
+        with (
+            tempfile.TemporaryDirectory() as temp,
+            mock.patch.object(purpose.Path, "cwd", return_value=Path(temp)),
+            mock.patch.object(
+                purpose,
+                "build",
+                side_effect=ValueError("accepted/identity count mismatch"),
+            ),
+            self.assertRaisesRegex(ValueError, "accepted/identity count mismatch"),
+        ):
+            purpose.main(arguments)
 
 
 if __name__ == "__main__":

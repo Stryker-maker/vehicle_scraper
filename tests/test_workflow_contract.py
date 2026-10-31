@@ -1,4 +1,8 @@
+import json
+import os
 import re
+import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -125,6 +129,75 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertNotIn("data/ford_f350/purpose_output", self.collection)
         self.assertNotIn("config_f150.json", self.collection)
         self.assertNotIn("config_tundra.json", self.collection)
+
+    def test_secondary_summaries_include_only_the_current_build_artifact(self):
+        sections = (
+            (
+                "Build and validate secondary-purpose output for narrow validation",
+                "Prepare single-pair validation artifact",
+            ),
+            (
+                "Build and validate secondary-purpose outputs",
+                "Enforce critical anomaly policy",
+            ),
+        )
+        summary_commands = (
+            'summary_path=$(python -c \'import json,sys; print(json.load(sys.stdin)["artifacts"]["summary_markdown"])\' <<< "$build_output")',
+            'test -f "$summary_path"',
+            'printf \'%s\\n\' "$summary_path" >> "$GITHUB_STEP_SUMMARY"',
+            'cat "$summary_path" >> "$GITHUB_STEP_SUMMARY"',
+        )
+        for start_marker, end_marker in sections:
+            with self.subTest(section=start_marker):
+                start = self.collection.index(start_marker)
+                end = self.collection.index(end_marker, start)
+                block = self.collection[start:end]
+                self.assertIn("build_output=$(python purpose_outputs.py build", block)
+                self.assertNotIn("find ", block)
+                extracted = [
+                    line.strip()
+                    for line in block.splitlines()
+                    if line.strip().startswith("summary_path=$(")
+                    or line.strip() in summary_commands[1:]
+                ]
+                self.assertEqual(extracted, list(summary_commands))
+
+                with tempfile.TemporaryDirectory() as temp:
+                    root = Path(temp)
+                    current = root / "data" / "vehicle" / "current" / "current_latest.md"
+                    stale = root / "data" / "vehicle" / "old_profile" / "old_latest.md"
+                    current.parent.mkdir(parents=True)
+                    stale.parent.mkdir(parents=True)
+                    current.write_text("CURRENT PROFILE SUMMARY\n", encoding="utf-8")
+                    stale.write_text("STALE PROFILE SUMMARY\n", encoding="utf-8")
+                    summary_file = root / "workflow-summary.md"
+                    env = os.environ.copy()
+                    env["BUILD_OUTPUT"] = json.dumps(
+                        {
+                            "artifacts": {
+                                "summary_markdown": str(current.relative_to(root))
+                            }
+                        }
+                    )
+                    env["GITHUB_STEP_SUMMARY"] = str(summary_file)
+                    script = (
+                        'set -euo pipefail\n'
+                        'build_output="$BUILD_OUTPUT"\n'
+                        + "\n".join(extracted)
+                    )
+                    result = subprocess.run(
+                        ["bash", "-c", script],
+                        cwd=root,
+                        env=env,
+                        capture_output=True,
+                        text=True,
+                        check=False,
+                    )
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    summary = summary_file.read_text(encoding="utf-8")
+                    self.assertIn(str(current.relative_to(root)), summary)
+                    self.assertIn("CURRENT PROFILE SUMMARY", summary)
+                    self.assertNotIn("STALE PROFILE SUMMARY", summary)
 
     def test_health_purpose_anomaly_retention_and_publish_gates_are_ordered(self):
         for value in (
