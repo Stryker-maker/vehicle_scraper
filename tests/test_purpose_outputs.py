@@ -7,6 +7,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+import purpose_output_validation as purpose_validation
 import purpose_outputs as purpose
 
 
@@ -371,42 +372,78 @@ class PurposeBuildTests(PurposeBehaviorTests):
             self.assertTrue(all(record["questions"] for record in questions))
 
 
+    def test_partial_source_build_validates_against_effective_sources(self):
+        config = self.config("ram_3500")
+        bundle = self.bundle("ram_3500", source="autotrader")
+
+        def load_available_source(root, config, source, run_id):
+            if source == "autotrader":
+                return [bundle]
+            raise purpose.SourceUnavailableError("kijiji unavailable")
+
+        with (
+            tempfile.TemporaryDirectory() as temp,
+            mock.patch.object(purpose, "load_vehicle_config", return_value=config),
+            mock.patch.object(purpose, "load_source_bundles", side_effect=load_available_source),
+            mock.patch.object(purpose_validation, "load_vehicle_config", return_value=config),
+            mock.patch.object(purpose_validation, "load_source_bundles", return_value=[bundle]),
+        ):
+            root = Path(temp)
+            self.copy_inputs(root)
+            summary = purpose.build(
+                root=root,
+                config_path=Path("config_ram3500.json"),
+                run_id="run-1",
+                sources=["autotrader", "kijiji"],
+                inputs_path=Path("purpose_inputs.json"),
+            )
+            validation = purpose_validation.validate_purpose_output(
+                root=root,
+                config_path=Path("config_ram3500.json"),
+                inputs_path=Path("purpose_inputs.json"),
+                run_id="run-1",
+                expected_sources=summary["sources"],
+            )
+
+        self.assertEqual(summary["sources"], ["autotrader"])
+        self.assertEqual(validation["validation_status"], "pass", validation["validation_errors"])
+        self.assertEqual(validation["sources"], ["autotrader"])
+
+
 class PurposeOutputAvailabilityTests(unittest.TestCase):
     def test_all_unavailable_sources_are_a_skip_outcome_without_overwriting_prior_artifacts(self):
-        with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp)
-            config = {"vehicle_key": "ram_3500"}
-            inputs = {
-                "vehicles": {
-                    "ram_3500": {"analysis_profile": "owned_vehicle_value"}
-                }
+        config = {"vehicle_key": "ram_3500"}
+        inputs = {
+            "vehicles": {
+                "ram_3500": {"analysis_profile": "owned_vehicle_value"}
             }
+        }
+        with (
+            tempfile.TemporaryDirectory() as temp,
+            mock.patch.object(purpose, "load_vehicle_config", return_value=config),
+            mock.patch.object(purpose, "load_purpose_inputs", return_value=inputs),
+            mock.patch.object(
+                purpose,
+                "load_source_bundles",
+                side_effect=purpose.SourceUnavailableError("source unavailable"),
+            ),
+            self.assertRaises(purpose.NoPurposeSourcesAvailableError),
+        ):
+            root = Path(temp)
             stale_csv = purpose.artifact_paths(
                 root, config, "owned_vehicle_value"
             )["records_csv"]
             stale_csv.parent.mkdir(parents=True, exist_ok=True)
             stale_csv.write_text("previous-run-output", encoding="utf-8")
-
-            with mock.patch.object(purpose, "load_vehicle_config", return_value=config), mock.patch.object(
-                purpose, "load_purpose_inputs", return_value=inputs
-            ), mock.patch.object(
-                purpose,
-                "load_source_bundles",
-                side_effect=purpose.SourceUnavailableError("source unavailable"),
-            ):
-                with self.assertRaises(purpose.NoPurposeSourcesAvailableError):
-                    purpose.build(
-                        root=root,
-                        config_path=Path("config_ram3500.json"),
-                        run_id="run-current",
-                        sources=["autotrader", "kijiji"],
-                        inputs_path=Path("purpose_inputs.json"),
-                    )
-
-            self.assertEqual(
-                stale_csv.read_text(encoding="utf-8"),
-                "previous-run-output",
+            purpose.build(
+                root=root,
+                config_path=Path("config_ram3500.json"),
+                run_id="run-current",
+                sources=["autotrader", "kijiji"],
+                inputs_path=Path("purpose_inputs.json"),
             )
+
+        self.assertEqual(stale_csv.read_text(encoding="utf-8"), "previous-run-output")
 
     def test_cli_returns_dedicated_unavailable_status_but_does_not_swallow_integrity_errors(self):
         arguments = [
@@ -416,24 +453,31 @@ class PurposeOutputAvailabilityTests(unittest.TestCase):
             "--source", "autotrader",
             "--source", "kijiji",
         ]
-        with tempfile.TemporaryDirectory() as temp:
-            with mock.patch.object(purpose.Path, "cwd", return_value=Path(temp)), mock.patch.object(
+        with (
+            tempfile.TemporaryDirectory() as temp,
+            mock.patch.object(purpose.Path, "cwd", return_value=Path(temp)),
+            mock.patch.object(
                 purpose,
                 "build",
                 side_effect=purpose.NoPurposeSourcesAvailableError("no valid source collections"),
-            ):
-                self.assertEqual(
-                    purpose.main(arguments),
-                    purpose.PURPOSE_OUTPUT_UNAVAILABLE_EXIT_CODE,
-                )
+            ),
+        ):
+            self.assertEqual(
+                purpose.main(arguments),
+                purpose.PURPOSE_OUTPUT_UNAVAILABLE_EXIT_CODE,
+            )
 
-            with mock.patch.object(purpose.Path, "cwd", return_value=Path(temp)), mock.patch.object(
+        with (
+            tempfile.TemporaryDirectory() as temp,
+            mock.patch.object(purpose.Path, "cwd", return_value=Path(temp)),
+            mock.patch.object(
                 purpose,
                 "build",
                 side_effect=ValueError("accepted/identity count mismatch"),
-            ):
-                with self.assertRaisesRegex(ValueError, "accepted/identity count mismatch"):
-                    purpose.main(arguments)
+            ),
+            self.assertRaisesRegex(ValueError, "accepted/identity count mismatch"),
+        ):
+            purpose.main(arguments)
 
 
 if __name__ == "__main__":

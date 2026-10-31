@@ -262,17 +262,32 @@ jobs:
           set -euo pipefail
           for config in config_ram3500.json config_forester.json config_odyssey.json config_carnival.json; do
             vehicle_key=$(python -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["vehicle_key"])' "$config")
-            if python purpose_outputs.py build \
+            requested_sources=(autotrader kijiji)
+            requested_source_args=()
+            for source in "${requested_sources[@]}"; do
+              requested_source_args+=(--source "$source")
+            done
+            if build_output=$(python purpose_outputs.py build \
               --config "$config" \
               --run-id "$GITHUB_RUN_ID" \
-              --source autotrader \
-              --source kijiji \
-              --inputs purpose_inputs.json; then
+              "${requested_source_args[@]}" \
+              --inputs purpose_inputs.json); then
+              printf '%s\n' "$build_output"
+              mapfile -t effective_sources < <(
+                python -c 'import json,sys; print("\n".join(json.load(sys.stdin)["sources"]))' <<< "$build_output"
+              )
+              if [[ "${#effective_sources[@]}" -eq 0 ]]; then
+                echo "Purpose build returned no effective sources for $vehicle_key" >&2
+                exit 1
+              fi
+              effective_source_args=()
+              for source in "${effective_sources[@]}"; do
+                effective_source_args+=(--source "$source")
+              done
               python purpose_output_validation.py \
                 --config "$config" \
                 --run-id "$GITHUB_RUN_ID" \
-                --source autotrader \
-                --source kijiji \
+                "${effective_source_args[@]}" \
                 --inputs purpose_inputs.json
               find "data/$vehicle_key/purpose_output" -name '*_latest.md' -type f -print -exec cat {} \; >> "$GITHUB_STEP_SUMMARY"
             else

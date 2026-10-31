@@ -1,3 +1,4 @@
+import argparse
 import json
 import os
 import subprocess
@@ -5,11 +6,12 @@ import tempfile
 import time
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from generated_data_publish import prepare_manifest
 from phase1_common import utc_now
 from purpose_outputs import build as build_purpose, read_jsonl
-from workflow_anomalies import compare_health_reports, isolate_anomalous_collections
+from workflow_anomalies import _run_build_action, compare_health_reports, isolate_anomalous_collections
 
 
 class CollectionIsolationTests(unittest.TestCase):
@@ -1824,10 +1826,6 @@ class CollectionIsolationTests(unittest.TestCase):
 
 
     def test_build_report_never_claims_requested_collections_were_isolated_after_preflight_failure(self):
-        import argparse
-        from unittest import mock
-        from workflow_anomalies import _run_build_action
-
         run_id = "run-isolation-preflight-failure"
         pair = {"vehicle_key": "ford_f150", "source": "autotrader"}
         report = {
@@ -1847,16 +1845,17 @@ class CollectionIsolationTests(unittest.TestCase):
             current="current.json",
             run_id=run_id,
         )
-        with mock.patch("workflow_anomalies.load_optional_json", side_effect=[None, {"run_id": run_id}]), mock.patch(
-            "workflow_anomalies.compare_health_reports", return_value=report
-        ), mock.patch(
-            "workflow_anomalies.isolate_anomalous_collections",
-            side_effect=ValueError("invalid isolation request"),
-        ), mock.patch(
-            "workflow_anomalies.write_anomaly_report", side_effect=capture_report
+        with (
+            mock.patch("workflow_anomalies.load_optional_json", side_effect=[None, {"run_id": run_id}]),
+            mock.patch("workflow_anomalies.compare_health_reports", return_value=report),
+            mock.patch(
+                "workflow_anomalies.isolate_anomalous_collections",
+                side_effect=ValueError("invalid isolation request"),
+            ),
+            mock.patch("workflow_anomalies.write_anomaly_report", side_effect=capture_report),
+            self.assertRaisesRegex(ValueError, "invalid isolation request"),
         ):
-            with self.assertRaisesRegex(ValueError, "invalid isolation request"):
-                _run_build_action(self.root, args)
+            _run_build_action(self.root, args)
 
         self.assertEqual(len(saved_reports), 1)
         self.assertEqual(saved_reports[0]["isolated_collections"], [])
@@ -1871,10 +1870,6 @@ class CollectionIsolationTests(unittest.TestCase):
 
 
     def test_build_report_persists_unrecovered_rollback_paths_after_isolation_failure(self):
-        import argparse
-        from unittest import mock
-        from workflow_anomalies import _run_build_action
-
         run_id = "run-isolation-rollback-failure"
         pair = {"vehicle_key": "ford_f150", "source": "autotrader"}
         report = {
@@ -1898,22 +1893,56 @@ class CollectionIsolationTests(unittest.TestCase):
             current="current.json",
             run_id=run_id,
         )
-        with mock.patch("workflow_anomalies.load_optional_json", side_effect=[None, {"run_id": run_id}]), mock.patch(
-            "workflow_anomalies.compare_health_reports", return_value=report
-        ), mock.patch(
-            "workflow_anomalies.isolate_anomalous_collections",
-            side_effect=RuntimeError(unrecovered),
-        ), mock.patch(
-            "workflow_anomalies.write_anomaly_report", side_effect=capture_report
+        with (
+            mock.patch("workflow_anomalies.load_optional_json", side_effect=[None, {"run_id": run_id}]),
+            mock.patch("workflow_anomalies.compare_health_reports", return_value=report),
+            mock.patch(
+                "workflow_anomalies.isolate_anomalous_collections",
+                side_effect=RuntimeError(unrecovered),
+            ),
+            mock.patch("workflow_anomalies.write_anomaly_report", side_effect=capture_report),
+            self.assertRaisesRegex(RuntimeError, "Rollback failed to restore paths"),
         ):
-            with self.assertRaisesRegex(RuntimeError, "Rollback failed to restore paths"):
-                _run_build_action(self.root, args)
+            _run_build_action(self.root, args)
 
         self.assertEqual(saved_reports[0]["isolated_collections"], [])
         self.assertIn(
             "/quarantine/latest.csv -> /latest/latest.csv",
             saved_reports[0]["isolation_failure"]["message"],
         )
+
+
+    def test_build_report_preserves_requested_identities_when_hyphenated_run_id_fails_validation(self):
+        run_id = "run-with-hyphen"
+        pair = {"vehicle_key": "ford_f150", "source": "autotrader"}
+        report = {
+            "run_id": run_id,
+            "isolated_collections": [pair],
+            "anomalies": [],
+        }
+        saved_reports = []
+
+        def capture_report(root, report):
+            saved_reports.append(json.loads(json.dumps(report)))
+            return []
+
+        args = argparse.Namespace(
+            baseline="baseline.json",
+            current="current.json",
+            run_id=run_id,
+        )
+        with (
+            mock.patch("workflow_anomalies.load_optional_json", side_effect=[None, {"run_id": run_id}]),
+            mock.patch("workflow_anomalies.compare_health_reports", return_value=report),
+            mock.patch("workflow_anomalies.write_anomaly_report", side_effect=capture_report),
+            self.assertRaisesRegex(ValueError, "Invalid or missing run_id"),
+        ):
+            _run_build_action(self.root, args)
+
+        self.assertEqual(len(saved_reports), 1)
+        self.assertEqual(saved_reports[0]["isolated_collections"], [])
+        self.assertEqual(saved_reports[0]["isolation_requested_collections"], [pair])
+        self.assertEqual(saved_reports[0]["isolation_failure"]["error_type"], "ValueError")
 
 
 if __name__ == "__main__":

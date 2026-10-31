@@ -935,6 +935,12 @@ def _run_build_action(root: Path, args: argparse.Namespace) -> int:
         current=current,
         run_id=args.run_id,
     )
+    requested = report.get("isolated_collections")
+    report["isolation_requested_collections"] = (
+        [dict(item) for item in requested if isinstance(item, dict)]
+        if isinstance(requested, list)
+        else []
+    )
     isolation_exc: Exception | None = None
     try:
         actually_isolated = isolate_anomalous_collections(root=root, report=report)
