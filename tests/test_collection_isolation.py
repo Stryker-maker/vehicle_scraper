@@ -1330,7 +1330,6 @@ class CollectionIsolationTests(unittest.TestCase):
         Prove that _run_check_action rejects malformed isolated_collections and duplicate entries,
         failing closed (returning exit code 1).
         """
-        from workflow_anomalies import _run_check_action
 
         report_file = self.root / "anomalies_test.json"
         report_file.write_text(
@@ -1739,7 +1738,6 @@ class CollectionIsolationTests(unittest.TestCase):
         when all expected sources have critical anomalies, even if isolated_collections is empty
         because no output files were present to quarantine.
         """
-        from workflow_anomalies import _run_check_action
 
         run_id = "run_enforce_no_files_123"
 
