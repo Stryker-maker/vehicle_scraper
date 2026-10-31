@@ -168,8 +168,8 @@ class WorkflowContractTests(unittest.TestCase):
                     stale = root / "data" / "vehicle" / "old_profile" / "old_latest.md"
                     current.parent.mkdir(parents=True)
                     stale.parent.mkdir(parents=True)
-                    current.write_text("CURRENT PROFILE SUMMARY\\n", encoding="utf-8")
-                    stale.write_text("STALE PROFILE SUMMARY\\n", encoding="utf-8")
+                    current.write_text("CURRENT PROFILE SUMMARY\n", encoding="utf-8")
+                    stale.write_text("STALE PROFILE SUMMARY\n", encoding="utf-8")
                     summary_file = root / "workflow-summary.md"
                     env = os.environ.copy()
                     env["BUILD_OUTPUT"] = json.dumps(
@@ -181,9 +181,9 @@ class WorkflowContractTests(unittest.TestCase):
                     )
                     env["GITHUB_STEP_SUMMARY"] = str(summary_file)
                     script = (
-                        'set -euo pipefail\\n'
-                        'build_output="$BUILD_OUTPUT"\\n'
-                        + "\\n".join(extracted)
+                        'set -euo pipefail\n'
+                        'build_output="$BUILD_OUTPUT"\n'
+                        + "\n".join(extracted)
                     )
                     result = subprocess.run(
                         ["bash", "-c", script],
