@@ -154,14 +154,21 @@ jobs:
         run: |
           set -euo pipefail
           config=$(cut -f1 "${{ steps.collection-plan.outputs.path }}")
-          python purpose_outputs.py build \
+          build_output=$(python purpose_outputs.py build \
+            --config "$config" \
+            --run-id "$GITHUB_RUN_ID" \
+            --source "$SELECTED_SOURCE" \
+            --inputs purpose_inputs.json)
+          printf '%s\n' "$build_output"
+          python purpose_output_validation.py \
             --config "$config" \
             --run-id "$GITHUB_RUN_ID" \
             --source "$SELECTED_SOURCE" \
             --inputs purpose_inputs.json
-          python purpose_output_validation.py \
-            --config "$config" \
-            --run-id "$GITHUB_RUN_ID" \
+          summary_path=$(python -c 'import json,sys; print(json.load(sys.stdin)["artifacts"]["summary_markdown"])' <<< "$build_output")
+          test -f "$summary_path"
+          printf '%s\n' "$summary_path" >> "$GITHUB_STEP_SUMMARY"
+          cat "$summary_path" >> "$GITHUB_STEP_SUMMARY"
             --source "$SELECTED_SOURCE" \
             --inputs purpose_inputs.json
           find "data/$VEHICLE_KEY/purpose_output" -name '*_latest.md' -type f -print -exec cat {} \; >> "$GITHUB_STEP_SUMMARY"
@@ -289,7 +296,10 @@ jobs:
                 --run-id "$GITHUB_RUN_ID" \
                 "${effective_source_args[@]}" \
                 --inputs purpose_inputs.json
-              find "data/$vehicle_key/purpose_output" -name '*_latest.md' -type f -print -exec cat {} \; >> "$GITHUB_STEP_SUMMARY"
+              summary_path=$(python -c 'import json,sys; print(json.load(sys.stdin)["artifacts"]["summary_markdown"])' <<< "$build_output")
+              test -f "$summary_path"
+              printf '%s\n' "$summary_path" >> "$GITHUB_STEP_SUMMARY"
+              cat "$summary_path" >> "$GITHUB_STEP_SUMMARY"
             else
               build_status=$?
               if [[ "$build_status" -ne 10 ]]; then
