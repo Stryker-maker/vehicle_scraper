@@ -427,7 +427,6 @@ class PurposeOutputAvailabilityTests(unittest.TestCase):
                 "load_source_bundles",
                 side_effect=purpose.SourceUnavailableError("source unavailable"),
             ),
-            self.assertRaises(purpose.NoPurposeSourcesAvailableError),
         ):
             root = Path(temp)
             stale_csv = purpose.artifact_paths(
@@ -435,15 +434,20 @@ class PurposeOutputAvailabilityTests(unittest.TestCase):
             )["records_csv"]
             stale_csv.parent.mkdir(parents=True, exist_ok=True)
             stale_csv.write_text("previous-run-output", encoding="utf-8")
-            purpose.build(
-                root=root,
-                config_path=Path("config_ram3500.json"),
-                run_id="run-current",
-                sources=["autotrader", "kijiji"],
-                inputs_path=Path("purpose_inputs.json"),
-            )
+            try:
+                purpose.build(
+                    root=root,
+                    config_path=Path("config_ram3500.json"),
+                    run_id="run-current",
+                    sources=["autotrader", "kijiji"],
+                    inputs_path=Path("purpose_inputs.json"),
+                )
+            except purpose.NoPurposeSourcesAvailableError:
+                pass
+            else:
+                self.fail("Expected all-unavailable sources to produce the dedicated skip outcome")
 
-        self.assertEqual(stale_csv.read_text(encoding="utf-8"), "previous-run-output")
+            self.assertEqual(stale_csv.read_text(encoding="utf-8"), "previous-run-output")
 
     def test_cli_returns_dedicated_unavailable_status_but_does_not_swallow_integrity_errors(self):
         arguments = [
