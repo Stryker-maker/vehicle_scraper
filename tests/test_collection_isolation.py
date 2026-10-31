@@ -11,7 +11,7 @@ from unittest import mock
 from generated_data_publish import prepare_manifest
 from phase1_common import utc_now
 from purpose_outputs import build as build_purpose, read_jsonl
-from workflow_anomalies import _run_build_action, compare_health_reports, isolate_anomalous_collections
+from workflow_anomalies import _run_build_action, _run_check_action, compare_health_reports, isolate_anomalous_collections
 
 
 class CollectionIsolationTests(unittest.TestCase):
@@ -1781,7 +1781,6 @@ class CollectionIsolationTests(unittest.TestCase):
 
     def test_check_action_policy_enforce_allows_healthy_collections_when_only_subset_is_critical(self):
         """Allow enforcement to continue when fewer than all expected source collections are critical."""
-        from workflow_anomalies import _run_check_action
 
         health_file = self.root / "data" / "run_status" / "latest.json"
         health_file.parent.mkdir(parents=True, exist_ok=True)
