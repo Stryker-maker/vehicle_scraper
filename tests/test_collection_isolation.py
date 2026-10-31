@@ -997,8 +997,7 @@ class CollectionIsolationTests(unittest.TestCase):
         }
         ram_identity_path.write_text(json.dumps(ram_identity_record) + "\n", encoding="utf-8")
 
-        inputs_data = {
-            "schema_version": 1,
+        inputs_data = {            "schema_version": 1,
             "vehicles": {
                 "ram_3500": {
                     "analysis_profile": "owned_vehicle_value",
@@ -1331,7 +1330,6 @@ class CollectionIsolationTests(unittest.TestCase):
         failing closed (returning exit code 1).
         """
         from workflow_anomalies import _run_check_action
-        import argparse
 
         report_file = self.root / "anomalies_test.json"
         report_file.write_text(
@@ -1741,7 +1739,6 @@ class CollectionIsolationTests(unittest.TestCase):
         because no output files were present to quarantine.
         """
         from workflow_anomalies import _run_check_action
-        import argparse
 
         run_id = "run_enforce_no_files_123"
 
