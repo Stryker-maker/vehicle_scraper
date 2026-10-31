@@ -434,7 +434,7 @@ class PurposeOutputAvailabilityTests(unittest.TestCase):
             )["records_csv"]
             stale_csv.parent.mkdir(parents=True, exist_ok=True)
             stale_csv.write_text("previous-run-output", encoding="utf-8")
-            try:
+            with self.assertRaises(purpose.NoPurposeSourcesAvailableError):
                 purpose.build(
                     root=root,
                     config_path=Path("config_ram3500.json"),
@@ -442,10 +442,6 @@ class PurposeOutputAvailabilityTests(unittest.TestCase):
                     sources=["autotrader", "kijiji"],
                     inputs_path=Path("purpose_inputs.json"),
                 )
-            except purpose.NoPurposeSourcesAvailableError:
-                pass
-            else:
-                self.fail("Expected all-unavailable sources to produce the dedicated skip outcome")
 
             self.assertEqual(stale_csv.read_text(encoding="utf-8"), "previous-run-output")
 
