@@ -1779,6 +1779,38 @@ class CollectionIsolationTests(unittest.TestCase):
         exit_code = _run_check_action(self.root, args)
         self.assertEqual(exit_code, 1)
 
+    def test_check_action_policy_enforce_allows_healthy_collections_when_only_subset_is_critical(self):
+        """Allow enforcement to continue when fewer than all expected source collections are critical."""
+        from workflow_anomalies import _run_check_action
+
+        health_file = self.root / "data" / "run_status" / "latest.json"
+        health_file.parent.mkdir(parents=True, exist_ok=True)
+        health_file.write_text(
+            json.dumps({"schema_version": 6, "expected_source_runs": 2}),
+            encoding="utf-8",
+        )
+
+        report_file = self.root / "anomalies_partial_critical.json"
+        report_file.write_text(
+            json.dumps({
+                "anomaly_schema_version": 1,
+                "critical_anomaly_count": 1,
+                "isolated_collections": [],
+                "anomalies": [
+                    {
+                        "severity": "critical",
+                        "code": "collector_command_failed",
+                        "vehicle_key": "ford_f150",
+                        "source": "autotrader",
+                    }
+                ],
+            }),
+            encoding="utf-8",
+        )
+
+        args = argparse.Namespace(report=str(report_file), policy="enforce")
+        self.assertEqual(_run_check_action(self.root, args), 0)
+
     def test_downstream_builders_exclude_critically_isolated_sources(self):
         """
         Prove that f350_buyer_intelligence and purpose_outputs exclude sources marked
