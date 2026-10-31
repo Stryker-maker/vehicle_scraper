@@ -1,0 +1,368 @@
+{
+  "deleted_bytes": 1052406,
+  "deleted_file_count": 35,
+  "deletions": [
+    {
+      "category": "autotrader_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/subaru_forester/autotrader/subaru_forester_autotrader_2026-07-13_11-30.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "6cfc0d39107e30cf2574d3f5c255068b8956c63110db7b646f3f62e4b5332ca8",
+      "size_bytes": 19070,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "autotrader_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/subaru_forester/autotrader/subaru_forester_autotrader_2026-07-06_12-24.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "9f42a75c90f9d46daa17424d9111d266e7ef60a43f75c5d0a8a8a97d37132574",
+      "size_bytes": 15093,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "autotrader_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/subaru_forester/autotrader/subaru_forester_autotrader_2026-06-29_13-06.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "3557af0b70e4b609748551c01c4a8b1a6f422f14f6ca590e3b95f34fab7e73f4",
+      "size_bytes": 16687,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "autotrader_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/subaru_forester/autotrader/subaru_forester_autotrader_2026-06-22_20-32.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "33478be86cb1f294d55e2146dbdcd68774fbf08958d44954ccfd1e491ddfbb8e",
+      "size_bytes": 17402,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "autotrader_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/subaru_forester/autotrader/subaru_forester_autotrader_2026-06-18_01-24.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "e5308fcfa26d367555f1fbb8361d7c9947184c3db2d52876069255ebc68db6d9",
+      "size_bytes": 19889,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "autotrader_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/subaru_forester/autotrader/subaru_forester_autotrader_2026-06-15_21-10.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "06c0abe5fe9b46e7c4982e4713dabc20c8af7bcda821d8e1aaffce0b5440f9b4",
+      "size_bytes": 15080,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "autotrader_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/subaru_forester/autotrader/subaru_forester_autotrader_2026-06-08_18-48.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "c00774b4b4e4a0f78a1ab6bee9a0f1b36099da48d6051874916e8d93d7ee1dfe",
+      "size_bytes": 16220,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "autotrader_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/subaru_forester/autotrader/subaru_forester_autotrader_2026-06-01_21-50.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "1cf99a013241ef1f0cf7a0d9f46640e67e8353882caf10302d85eea1b71dc949",
+      "size_bytes": 13689,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "autotrader_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/subaru_forester/autotrader/subaru_forester_autotrader_2026-05-25_17-10.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "282a6a00ee7c07d0de93f55a203058196ae83311669f951cfd848c38bd246106",
+      "size_bytes": 15104,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "autotrader_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/subaru_forester/autotrader/subaru_forester_autotrader_2026-05-24_13-56.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "96b04c4c65c2d3ef3725b9cea55e6ec77ebc736dde5caa05c29feddb152e8f98",
+      "size_bytes": 14153,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "kijiji_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/subaru_forester/kijiji/subaru_forester_kijiji_2026-07-06_14-43.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "a5d8ca31a3a28bfde2cd9e06ce9eaabebd2815fb92a9b02c3630186422222d03",
+      "size_bytes": 16774,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "kijiji_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/subaru_forester/kijiji/subaru_forester_kijiji_2026-06-29_15-26.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "b143597d753a911da477ce403d1499afe225a5ac683195c93e032bfb28e0fd4b",
+      "size_bytes": 16796,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "kijiji_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/subaru_forester/kijiji/subaru_forester_kijiji_2026-06-22_22-37.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "dbda861b69357799bdb7b06d5457fd9d95293f26d7733e905c13f93ac2a3eb4b",
+      "size_bytes": 16805,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "kijiji_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/subaru_forester/kijiji/subaru_forester_kijiji_2026-06-18_04-01.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "a666578f12573b95f13405138f4c84b5b4cf6b7fefe0b6eeac8ee903e350662d",
+      "size_bytes": 16735,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "kijiji_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/subaru_forester/kijiji/subaru_forester_kijiji_2026-06-15_23-38.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "e6b3edd63fe179b03c437f845c71a1c219ec01b1d6cc4813251e384444761f52",
+      "size_bytes": 16709,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "kijiji_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/subaru_forester/kijiji/subaru_forester_kijiji_2026-06-08_20-42.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "87581e1731fb77b3fa35c194eb070260dd8bc77aa5b824a3967f41e6297e27e8",
+      "size_bytes": 16774,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "kijiji_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/subaru_forester/kijiji/subaru_forester_kijiji_2026-06-01_23-58.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "3ed9b390b526b92692d5701841d61935b00978bf8652e370c69f6e76699aabdc",
+      "size_bytes": 16777,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "kijiji_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/subaru_forester/kijiji/subaru_forester_kijiji_2026-05-25_19-21.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "49a67185c5068e99958b19e759cdba1fad19701d6b4e557ef97e9fdd751a926f",
+      "size_bytes": 16618,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "kijiji_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/subaru_forester/kijiji/subaru_forester_kijiji_2026-05-24_16-05.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "6e3d7333dc5a1d0ba00480bd2298ed5535d235f78281ce46084aaac8200ce1cb",
+      "size_bytes": 16554,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "manual_review_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/subaru_forester/manual_review/subaru_forester_manual_review_2026-07-21_22-41-49.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "99933d93ecac32dad936053322699dffded467f2c173a1109680bda6c324103b",
+      "size_bytes": 83222,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "manual_review_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/subaru_forester/manual_review/subaru_forester_manual_review_2026-07-21_20-58-14.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "6ac31c71d6b521234336ad79c86b2e06dd85f939c5f0874666bcfc4eb853c48f",
+      "size_bytes": 80857,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "manual_review_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/subaru_forester/manual_review/subaru_forester_manual_review_2026-07-21_17-20-38.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "9885200827fabdbb6a0aceafbd3ce6e39319d5519ea74d7cb60035d0e97d766d",
+      "size_bytes": 43710,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "legacy_price_history",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/subaru_forester/price_history_autotrader.json",
+      "reason": "retired_unsupported_history",
+      "run_id": "41223293350",
+      "sha256": "86764e41bce1e4d6cdc472cce77b96c3f812c9fedeba2e05c7e36c82a6d1f306",
+      "size_bytes": 46413,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "legacy_price_history",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/subaru_forester/price_history_kijiji.json",
+      "reason": "retired_unsupported_history",
+      "run_id": "41223293350",
+      "sha256": "af2af015a56140dc174f3ddf43786787657a205a06879952f063f7f19c8cd913",
+      "size_bytes": 131473,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "legacy_merged_csv",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/subaru_forester/merged/subaru_forester_merged_2026-05-24_16-05.csv",
+      "reason": "disabled_misleading_legacy_output",
+      "run_id": "41223293350",
+      "sha256": "fc03cc71fe524d4652b24e19020549600e6aa73048c07ba68d53400d36b617a8",
+      "size_bytes": 29789,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "legacy_merged_csv",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/subaru_forester/merged/subaru_forester_merged_2026-05-25_19-21.csv",
+      "reason": "disabled_misleading_legacy_output",
+      "run_id": "41223293350",
+      "sha256": "34bcdeb55c12b982b18b0b71d71e6093830ee6e59ee9157fd7031052bf23f325",
+      "size_bytes": 31402,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "legacy_merged_csv",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/subaru_forester/merged/subaru_forester_merged_2026-06-01_23-58.csv",
+      "reason": "disabled_misleading_legacy_output",
+      "run_id": "41223293350",
+      "sha256": "1b4d017a1eb5ab936089ecc63e6585ce94ada8fc9bdeae03dfe7538ce04e81f3",
+      "size_bytes": 29715,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "legacy_merged_csv",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/subaru_forester/merged/subaru_forester_merged_2026-06-08_20-42.csv",
+      "reason": "disabled_misleading_legacy_output",
+      "run_id": "41223293350",
+      "sha256": "b9ce3a6ac3a979580f40df3ed6e1fdc5b66a73bb5420366afc057c4976e6079d",
+      "size_bytes": 32676,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "legacy_merged_csv",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/subaru_forester/merged/subaru_forester_merged_2026-06-15_23-38.csv",
+      "reason": "disabled_misleading_legacy_output",
+      "run_id": "41223293350",
+      "sha256": "ad769c97ba283812edcd0d40bac4c71a9c2fb7f7c7a349dcb4a386fe071b65e0",
+      "size_bytes": 31443,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "legacy_merged_csv",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/subaru_forester/merged/subaru_forester_merged_2026-06-18_04-17.csv",
+      "reason": "disabled_misleading_legacy_output",
+      "run_id": "41223293350",
+      "sha256": "df5de67e8bdc69b47b860e17f25207808d0b229229f45ff7595761a7f5c2d6a5",
+      "size_bytes": 36149,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "legacy_merged_csv",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/subaru_forester/merged/subaru_forester_merged_2026-06-22_22-53.csv",
+      "reason": "disabled_misleading_legacy_output",
+      "run_id": "41223293350",
+      "sha256": "787d4cda358c32279bb30f92ded037b3b575ce156407636720a045e2358015b6",
+      "size_bytes": 33699,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "legacy_merged_csv",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/subaru_forester/merged/subaru_forester_merged_2026-06-29_15-43.csv",
+      "reason": "disabled_misleading_legacy_output",
+      "run_id": "41223293350",
+      "sha256": "42338f0f820310acfba78c510ae7d0f9d61ccf6b9b5b132d5f2bcf19475e9e06",
+      "size_bytes": 32968,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "legacy_merged_csv",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/subaru_forester/merged/subaru_forester_merged_2026-07-06_15-01.csv",
+      "reason": "disabled_misleading_legacy_output",
+      "run_id": "41223293350",
+      "sha256": "075c527b05799ea9566a46569d87e2f08f381a3d2f6a25e8ca9a8424dae905f9",
+      "size_bytes": 30929,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "legacy_merged_csv",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/subaru_forester/merged/subaru_forester_merged_2026-07-13_13-55.csv",
+      "reason": "disabled_misleading_legacy_output",
+      "run_id": "41223293350",
+      "sha256": "5cf01e8c92bf398b25bbc5ccd5d04e56722128016a2c85c23513f9e11be26e07",
+      "size_bytes": 34781,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "legacy_merged_csv",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/subaru_forester/merged/subaru_forester_merged_2026-07-20_12-10.csv",
+      "reason": "disabled_misleading_legacy_output",
+      "run_id": "41223293350",
+      "sha256": "b6c5d051fb1c375dc2f2a0c240613835443f4f1c00396d20c6979017f511c967",
+      "size_bytes": 30251,
+      "storage_retention_schema_version": 1
+    }
+  ],
+  "generated_at_utc": "2026-10-31T17:34:45+00:00",
+  "ledger": "data/subaru_forester/retention/deletion_ledger.json",
+  "ledger_chain_sha256": "0f1f7163b79eacc0321b3669105b9be7cc660df39d81c28b653f3c5b51857a2d",
+  "ledger_deleted_bytes_total": 1052406,
+  "ledger_deleted_file_count_total": 35,
+  "legacy_merged_csv_removed": true,
+  "legacy_price_history_removed": true,
+  "manual_review_archive_keep_count": 4,
+  "run_id": "41223293350",
+  "source_archive_keep_count": 8,
+  "storage_retention_schema_version": 1,
+  "vehicle_key": "subaru_forester"
+}

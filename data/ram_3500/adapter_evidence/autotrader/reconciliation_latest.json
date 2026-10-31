@@ -1,0 +1,29 @@
+{
+  "accepted_records": 2,
+  "adapter_schema_version": 1,
+  "archive_output": "data/ram_3500/autotrader/ram_3500_autotrader_2026-10-31_17-17.csv",
+  "artifacts": {
+    "reconciliation": "data/ram_3500/adapter_evidence/autotrader/reconciliation_latest.json",
+    "records": "data/ram_3500/adapter_evidence/autotrader/records_latest.jsonl",
+    "requests": "data/ram_3500/adapter_evidence/autotrader/requests_latest.jsonl"
+  },
+  "duplicate_records": 17,
+  "failed_page_count": 0,
+  "fetched_record_scope": "autotrader_adapter_response_listing_objects",
+  "fetched_records": 100,
+  "generated_at_utc": "2026-10-31T17:17:41+00:00",
+  "latest_output": "data/ram_3500/latest/ram_3500_autotrader_latest.csv",
+  "page_request_count": 5,
+  "pagination_complete": true,
+  "parse_failures": 0,
+  "parsed_records": 83,
+  "reconciled": true,
+  "reconciliation_equation": "fetched_records = accepted_records + rejected_records + parse_failures",
+  "rejected_records": 98,
+  "request_attempt_count": 5,
+  "run_id": "41223293350",
+  "source": "autotrader",
+  "source_fetch_completeness": "pagination_observed_complete_for_configured_queries",
+  "successful_page_count": 5,
+  "vehicle_key": "ram_3500"
+}

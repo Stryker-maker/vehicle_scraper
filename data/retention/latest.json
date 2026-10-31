@@ -1,0 +1,69 @@
+{
+  "active_vehicle_keys": [
+    "ford_f350",
+    "ram_3500",
+    "subaru_forester",
+    "honda_odyssey",
+    "kia_carnival",
+    "ford_f150"
+  ],
+  "deleted_bytes": 5060722,
+  "deleted_file_count": 173,
+  "generated_at_utc": "2026-10-31T17:34:45+00:00",
+  "largest_file_bytes": 6915338,
+  "managed_bytes": 80242784,
+  "managed_file_count": 377,
+  "manual_review_archive_keep_count": 4,
+  "max_active_data_bytes": 524288000,
+  "max_managed_file_bytes": 52428800,
+  "oversized_files": [],
+  "run_id": "41223293350",
+  "source_archive_keep_count": 8,
+  "storage_retention_schema_version": 1,
+  "vehicle_reports": [
+    {
+      "deleted_bytes": 583307,
+      "deleted_file_count": 36,
+      "latest_report": "data/ford_f350/retention/latest.json",
+      "ledger": "data/ford_f350/retention/deletion_ledger.json",
+      "vehicle_key": "ford_f350"
+    },
+    {
+      "deleted_bytes": 235061,
+      "deleted_file_count": 35,
+      "latest_report": "data/ram_3500/retention/latest.json",
+      "ledger": "data/ram_3500/retention/deletion_ledger.json",
+      "vehicle_key": "ram_3500"
+    },
+    {
+      "deleted_bytes": 1052406,
+      "deleted_file_count": 35,
+      "latest_report": "data/subaru_forester/retention/latest.json",
+      "ledger": "data/subaru_forester/retention/deletion_ledger.json",
+      "vehicle_key": "subaru_forester"
+    },
+    {
+      "deleted_bytes": 675182,
+      "deleted_file_count": 21,
+      "latest_report": "data/honda_odyssey/retention/latest.json",
+      "ledger": "data/honda_odyssey/retention/deletion_ledger.json",
+      "vehicle_key": "honda_odyssey"
+    },
+    {
+      "deleted_bytes": 169137,
+      "deleted_file_count": 20,
+      "latest_report": "data/kia_carnival/retention/latest.json",
+      "ledger": "data/kia_carnival/retention/deletion_ledger.json",
+      "vehicle_key": "kia_carnival"
+    },
+    {
+      "deleted_bytes": 2345629,
+      "deleted_file_count": 26,
+      "latest_report": "data/ford_f150/retention/latest.json",
+      "ledger": "data/ford_f150/retention/deletion_ledger.json",
+      "vehicle_key": "ford_f150"
+    }
+  ],
+  "verification_errors": [],
+  "verification_status": "pass"
+}

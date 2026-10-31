@@ -1,0 +1,152 @@
+{
+  "analysis_profile": "family_friend_purchase",
+  "artifacts": {
+    "questions_jsonl": "data/honda_odyssey/purpose_output/family_candidate/seller_questions_latest.jsonl",
+    "records_csv": "data/honda_odyssey/purpose_output/family_candidate/candidate_review_latest.csv",
+    "records_jsonl": "data/honda_odyssey/purpose_output/family_candidate/candidate_review_latest.jsonl",
+    "summary_json": "data/honda_odyssey/purpose_output/family_candidate/requirements_summary_latest.json",
+    "summary_markdown": "data/honda_odyssey/purpose_output/family_candidate/requirements_summary_latest.md"
+  },
+  "asking_price_distribution_cad": {
+    "count": 69,
+    "maximum": 47995,
+    "median": 31900,
+    "minimum": 14900,
+    "q1": 22999,
+    "q3": 37990
+  },
+  "candidate_classification_counts": {
+    "candidate_pending_requirements": 69
+  },
+  "generated_at_utc": "2026-10-31T17:34:44+00:00",
+  "interpretation_contract": "candidate_review_not_rank_not_recommendation_not_condition_verification",
+  "market_scope": "configured_query_accepted_listing_claims_not_complete_market",
+  "mileage_distribution_km": {
+    "count": 69,
+    "maximum": 271273,
+    "median": 116062,
+    "minimum": 23885,
+    "q1": 77925,
+    "q3": 196583
+  },
+  "missing_preference_fields": [
+    "acceptable_seller_types",
+    "accident_title_requirement",
+    "availability_constraints",
+    "budget_max_cad",
+    "cargo_requirements",
+    "max_distance_km",
+    "max_mileage_km",
+    "max_year",
+    "min_year",
+    "minimum_seating",
+    "service_history_requirement"
+  ],
+  "preferences": {
+    "acceptable_seller_types": {
+      "evidence_status": "friend_input_required",
+      "value": []
+    },
+    "accident_title_requirement": {
+      "evidence_status": "friend_input_required",
+      "value": null
+    },
+    "availability_constraints": {
+      "evidence_status": "friend_input_required",
+      "value": []
+    },
+    "budget_max_cad": {
+      "evidence_status": "friend_input_required",
+      "value": null
+    },
+    "cargo_requirements": {
+      "evidence_status": "friend_input_required",
+      "value": []
+    },
+    "max_distance_km": {
+      "evidence_status": "friend_input_required",
+      "value": null
+    },
+    "max_mileage_km": {
+      "evidence_status": "friend_input_required",
+      "value": null
+    },
+    "max_year": {
+      "evidence_status": "friend_input_required",
+      "value": null
+    },
+    "min_year": {
+      "evidence_status": "friend_input_required",
+      "value": null
+    },
+    "minimum_seating": {
+      "evidence_status": "friend_input_required",
+      "value": null
+    },
+    "service_history_requirement": {
+      "evidence_status": "friend_input_required",
+      "value": null
+    }
+  },
+  "purpose_input_schema_version": 1,
+  "purpose_output_schema_version": 1,
+  "questions_for_friend": [
+    {
+      "field": "acceptable_seller_types",
+      "question": "Are dealer, private, or both seller types acceptable?"
+    },
+    {
+      "field": "accident_title_requirement",
+      "question": "What accident and title-history conditions are acceptable?"
+    },
+    {
+      "field": "availability_constraints",
+      "question": "What timing, deposit, inspection, or availability constraints apply?"
+    },
+    {
+      "field": "budget_max_cad",
+      "question": "What is the maximum all-in purchase budget?"
+    },
+    {
+      "field": "cargo_requirements",
+      "question": "Which cargo or seat-folding features are required?"
+    },
+    {
+      "field": "max_distance_km",
+      "question": "How far is the buyer willing to travel?"
+    },
+    {
+      "field": "max_mileage_km",
+      "question": "What is the maximum acceptable odometer reading?"
+    },
+    {
+      "field": "max_year",
+      "question": "What is the newest acceptable model year?"
+    },
+    {
+      "field": "min_year",
+      "question": "What is the oldest acceptable model year?"
+    },
+    {
+      "field": "minimum_seating",
+      "question": "How many usable seating positions are required?"
+    },
+    {
+      "field": "service_history_requirement",
+      "question": "How much service-history evidence is required?"
+    }
+  ],
+  "record_count": 69,
+  "requirements_status": "friend_input_required",
+  "run_id": "41223293350",
+  "scope": "combined_sources",
+  "source_record_counts": {
+    "autotrader": 52,
+    "kijiji": 17
+  },
+  "sources": [
+    "autotrader",
+    "kijiji"
+  ],
+  "vehicle_key": "honda_odyssey"
+}

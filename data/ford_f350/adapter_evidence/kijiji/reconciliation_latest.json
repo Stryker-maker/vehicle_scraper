@@ -1,0 +1,39 @@
+{
+  "accepted_records": 12,
+  "adapter_schema_version": 1,
+  "archive_output": "data/ford_f350/kijiji/ford_f350_kijiji_2026-10-31_17-15.csv",
+  "artifacts": {
+    "reconciliation": "data/ford_f350/adapter_evidence/kijiji/reconciliation_latest.json",
+    "records": "data/ford_f350/adapter_evidence/kijiji/records_latest.jsonl",
+    "requests": "data/ford_f350/adapter_evidence/kijiji/requests_latest.jsonl"
+  },
+  "failed_page_count": 0,
+  "fetched_record_scope": "kijiji_adapter_json_ld_listing_objects",
+  "fetched_records": 348,
+  "generated_at_utc": "2026-10-31T17:15:58+00:00",
+  "latest_output": "data/ford_f350/latest/ford_f350_kijiji_latest.csv",
+  "listing_specific_location_records": 0,
+  "location_registry_version": 1,
+  "page_request_count": 11,
+  "pagination_complete": true,
+  "parse_failures": 0,
+  "query_location_count": 6,
+  "query_locations": [
+    "Edmonton, AB",
+    "Calgary, AB",
+    "Saskatoon, SK",
+    "Regina, SK",
+    "Kelowna, BC",
+    "Kamloops, BC"
+  ],
+  "reconciled": true,
+  "reconciliation_equation": "fetched_records = accepted_records + rejected_records + parse_failures",
+  "rejected_records": 336,
+  "request_attempt_count": 11,
+  "run_id": "41223293350",
+  "source": "kijiji",
+  "source_fetch_completeness": "configured_validated_hub_queries_only_not_marketplace_complete",
+  "successful_page_count": 11,
+  "unknown_location_records": 348,
+  "vehicle_key": "ford_f350"
+}
