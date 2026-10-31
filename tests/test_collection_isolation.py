@@ -997,7 +997,8 @@ class CollectionIsolationTests(unittest.TestCase):
         }
         ram_identity_path.write_text(json.dumps(ram_identity_record) + "\n", encoding="utf-8")
 
-        inputs_data = {            "schema_version": 1,
+        inputs_data = {
+            "schema_version": 1,
             "vehicles": {
                 "ram_3500": {
                     "analysis_profile": "owned_vehicle_value",
