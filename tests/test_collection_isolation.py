@@ -1,3 +1,4 @@
+import argparse
 import json
 import os
 import subprocess
@@ -5,11 +6,12 @@ import tempfile
 import time
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from generated_data_publish import prepare_manifest
 from phase1_common import utc_now
 from purpose_outputs import build as build_purpose, read_jsonl
-from workflow_anomalies import compare_health_reports, isolate_anomalous_collections
+from workflow_anomalies import _run_build_action, _run_check_action, compare_health_reports, isolate_anomalous_collections
 
 
 class CollectionIsolationTests(unittest.TestCase):
@@ -1328,8 +1330,6 @@ class CollectionIsolationTests(unittest.TestCase):
         Prove that _run_check_action rejects malformed isolated_collections and duplicate entries,
         failing closed (returning exit code 1).
         """
-        from workflow_anomalies import _run_check_action
-        import argparse
 
         report_file = self.root / "anomalies_test.json"
         report_file.write_text(
@@ -1738,8 +1738,6 @@ class CollectionIsolationTests(unittest.TestCase):
         when all expected sources have critical anomalies, even if isolated_collections is empty
         because no output files were present to quarantine.
         """
-        from workflow_anomalies import _run_check_action
-        import argparse
 
         run_id = "run_enforce_no_files_123"
 
@@ -1778,6 +1776,37 @@ class CollectionIsolationTests(unittest.TestCase):
         args = argparse.Namespace(report=str(report_file), policy="enforce")
         exit_code = _run_check_action(self.root, args)
         self.assertEqual(exit_code, 1)
+
+    def test_check_action_policy_enforce_allows_healthy_collections_when_only_subset_is_critical(self):
+        """Allow enforcement to continue when fewer than all expected source collections are critical."""
+
+        health_file = self.root / "data" / "run_status" / "latest.json"
+        health_file.parent.mkdir(parents=True, exist_ok=True)
+        health_file.write_text(
+            json.dumps({"schema_version": 6, "expected_source_runs": 2}),
+            encoding="utf-8",
+        )
+
+        report_file = self.root / "anomalies_partial_critical.json"
+        report_file.write_text(
+            json.dumps({
+                "anomaly_schema_version": 1,
+                "critical_anomaly_count": 1,
+                "isolated_collections": [],
+                "anomalies": [
+                    {
+                        "severity": "critical",
+                        "code": "collector_command_failed",
+                        "vehicle_key": "ford_f150",
+                        "source": "autotrader",
+                    }
+                ],
+            }),
+            encoding="utf-8",
+        )
+
+        args = argparse.Namespace(report=str(report_file), policy="enforce")
+        self.assertEqual(_run_check_action(self.root, args), 0)
 
     def test_downstream_builders_exclude_critically_isolated_sources(self):
         """
@@ -1821,6 +1850,126 @@ class CollectionIsolationTests(unittest.TestCase):
 
         with self.assertRaisesRegex(SourceUnavailableError, "isolated due to critical anomaly"):
             _load_and_validate_source_status(self.root, config, src, run_id)
+
+
+    def test_build_report_never_claims_requested_collections_were_isolated_after_preflight_failure(self):
+        run_id = "run-isolation-preflight-failure"
+        pair = {"vehicle_key": "ford_f150", "source": "autotrader"}
+        report = {
+            "run_id": run_id,
+            "isolated_collections": [pair],
+            "isolation_requested_collections": [pair],
+            "anomalies": [],
+        }
+        saved_reports = []
+
+        def capture_report(root, report):
+            saved_reports.append(json.loads(json.dumps(report)))
+            return []
+
+        args = argparse.Namespace(
+            baseline="baseline.json",
+            current="current.json",
+            run_id=run_id,
+        )
+        with (
+            mock.patch("workflow_anomalies.load_optional_json", side_effect=[None, {"run_id": run_id}]),
+            mock.patch("workflow_anomalies.compare_health_reports", return_value=report),
+            mock.patch(
+                "workflow_anomalies.isolate_anomalous_collections",
+                side_effect=ValueError("invalid isolation request"),
+            ),
+            mock.patch("workflow_anomalies.write_anomaly_report", side_effect=capture_report),
+            self.assertRaisesRegex(ValueError, "invalid isolation request"),
+        ):
+            _run_build_action(self.root, args)
+
+        self.assertEqual(len(saved_reports), 1)
+        self.assertEqual(saved_reports[0]["isolated_collections"], [])
+        self.assertEqual(saved_reports[0]["isolation_requested_collections"], [pair])
+        self.assertEqual(
+            saved_reports[0]["isolation_failure"],
+            {
+                "error_type": "ValueError",
+                "message": "invalid isolation request",
+            },
+        )
+
+
+    def test_build_report_persists_unrecovered_rollback_paths_after_isolation_failure(self):
+        run_id = "run-isolation-rollback-failure"
+        pair = {"vehicle_key": "ford_f150", "source": "autotrader"}
+        report = {
+            "run_id": run_id,
+            "isolated_collections": [pair],
+            "isolation_requested_collections": [pair],
+            "anomalies": [],
+        }
+        unrecovered = (
+            "Atomic anomaly isolation failed during file movement: move failed. "
+            "Rollback failed to restore paths: /quarantine/latest.csv -> /latest/latest.csv"
+        )
+        saved_reports = []
+
+        def capture_report(root, report):
+            saved_reports.append(json.loads(json.dumps(report)))
+            return []
+
+        args = argparse.Namespace(
+            baseline="baseline.json",
+            current="current.json",
+            run_id=run_id,
+        )
+        with (
+            mock.patch("workflow_anomalies.load_optional_json", side_effect=[None, {"run_id": run_id}]),
+            mock.patch("workflow_anomalies.compare_health_reports", return_value=report),
+            mock.patch(
+                "workflow_anomalies.isolate_anomalous_collections",
+                side_effect=RuntimeError(unrecovered),
+            ),
+            mock.patch("workflow_anomalies.write_anomaly_report", side_effect=capture_report),
+            self.assertRaisesRegex(RuntimeError, "Rollback failed to restore paths"),
+        ):
+            _run_build_action(self.root, args)
+
+        self.assertEqual(saved_reports[0]["isolated_collections"], [])
+        self.assertIn(
+            "/quarantine/latest.csv -> /latest/latest.csv",
+            saved_reports[0]["isolation_failure"]["message"],
+        )
+
+
+    def test_build_report_preserves_requested_identities_when_hyphenated_run_id_fails_validation(self):
+        run_id = "run-with-hyphen"
+        pair = {"vehicle_key": "ford_f150", "source": "autotrader"}
+        report = {
+            "run_id": run_id,
+            "isolated_collections": [pair],
+            "anomalies": [],
+        }
+        saved_reports = []
+
+        def capture_report(root, report):
+            saved_reports.append(json.loads(json.dumps(report)))
+            return []
+
+        args = argparse.Namespace(
+            baseline="baseline.json",
+            current="current.json",
+            run_id=run_id,
+        )
+        with (
+            mock.patch("workflow_anomalies.load_optional_json", side_effect=[None, {"run_id": run_id}]),
+            mock.patch("workflow_anomalies.compare_health_reports", return_value=report),
+            mock.patch("workflow_anomalies.write_anomaly_report", side_effect=capture_report),
+            self.assertRaisesRegex(ValueError, "Invalid or missing run_id"),
+        ):
+            _run_build_action(self.root, args)
+
+        self.assertEqual(len(saved_reports), 1)
+        self.assertEqual(saved_reports[0]["isolated_collections"], [])
+        self.assertEqual(saved_reports[0]["isolation_requested_collections"], [pair])
+        self.assertEqual(saved_reports[0]["isolation_failure"]["error_type"], "ValueError")
 
 
 if __name__ == "__main__":

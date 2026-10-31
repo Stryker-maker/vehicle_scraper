@@ -935,12 +935,24 @@ def _run_build_action(root: Path, args: argparse.Namespace) -> int:
         current=current,
         run_id=args.run_id,
     )
+    requested = report.get("isolated_collections")
+    report["isolation_requested_collections"] = (
+        [dict(item) for item in requested if isinstance(item, dict)]
+        if isinstance(requested, list)
+        else []
+    )
     isolation_exc: Exception | None = None
     try:
         actually_isolated = isolate_anomalous_collections(root=root, report=report)
     except (ValueError, RuntimeError) as exc:
         isolation_exc = exc
-        actually_isolated = report.get("isolated_collections", [])
+        # Requested collections are not proof that any files were successfully isolated.
+        # The exception message retains rollback details, including paths that could not be restored.
+        actually_isolated = []
+        report["isolation_failure"] = {
+            "error_type": type(exc).__name__,
+            "message": str(exc),
+        }
 
     report["isolated_collections"] = actually_isolated
     paths = write_anomaly_report(root=root, report=report)
@@ -979,6 +991,45 @@ def _validate_isolated_collections(isolated: Any) -> list[dict[str, str]]:
     return validated
 
 
+def _critical_collection_pairs(
+    report: dict[str, Any], isolated: list[dict[str, str]]
+) -> set[tuple[str, str]]:
+    """Return valid collection identities marked critical or successfully isolated."""
+    critical_pairs = {(entry["vehicle_key"], entry["source"]) for entry in isolated}
+    for item in report.get("anomalies", []):
+        if not isinstance(item, dict) or item.get("severity") != "critical":
+            continue
+        vehicle_key = str(item.get("vehicle_key") or "").strip()
+        source = str(item.get("source") or "").strip()
+        if (
+            vehicle_key
+            and source
+            and IDENTIFIER_PATTERN.match(vehicle_key)
+            and IDENTIFIER_PATTERN.match(source)
+        ):
+            critical_pairs.add((vehicle_key, source))
+    return critical_pairs
+
+
+def _enforce_critical_anomaly_policy(
+    root: Path, report: dict[str, Any], isolated: list[dict[str, str]]
+) -> int:
+    """Fail closed when every expected source collection is critically anomalous."""
+    health = load_optional_json(root / "data" / "run_status" / "latest.json")
+    expected_sources = health.get("expected_source_runs") if isinstance(health, dict) else None
+    if not isinstance(expected_sources, int) or expected_sources <= 0:
+        print("Health report missing or invalid expected_source_runs; failing closed.")
+        return 1
+
+    critical_pairs = _critical_collection_pairs(report, isolated)
+    if len(critical_pairs) >= expected_sources:
+        print(
+            f"All expected collections ({expected_sources}) are critically anomalous or isolated; failing closed."
+        )
+        return 1
+    return 0
+
+
 def _run_check_action(root: Path, args: argparse.Namespace) -> int:
     """Execute check subcommand: validate anomaly report and enforce policy against isolated collections."""
     report = load_optional_json(Path(args.report))
@@ -995,25 +1046,7 @@ def _run_check_action(root: Path, args: argparse.Namespace) -> int:
     if isolated:
         print(f"Isolated collections due to critical anomalies: {isolated}")
     if args.policy == "enforce" and int(report.get("critical_anomaly_count", 0)) > 0:
-        health_path = root / "data" / "run_status" / "latest.json"
-        health = load_optional_json(health_path)
-        expected_sources = health.get("expected_source_runs") if isinstance(health, dict) else None
-        if not isinstance(expected_sources, int) or expected_sources <= 0:
-            print("Health report missing or invalid expected_source_runs; failing closed.")
-            return 1
-        critical_pairs = {(entry["vehicle_key"], entry["source"]) for entry in isolated}
-        for item in report.get("anomalies", []):
-            if isinstance(item, dict) and item.get("severity") == "critical":
-                vk = str(item.get("vehicle_key") or "").strip()
-                src = str(item.get("source") or "").strip()
-                if vk and src and IDENTIFIER_PATTERN.match(vk) and IDENTIFIER_PATTERN.match(src):
-                    critical_pairs.add((vk, src))
-
-        if len(critical_pairs) >= expected_sources:
-            print(
-                f"All expected collections ({expected_sources}) are critically anomalous or isolated; failing closed."
-            )
-            return 1
+        return _enforce_critical_anomaly_policy(root, report, isolated)
     return 0
 
 
