@@ -4,7 +4,11 @@ on:
   push:
     branches:
       - main
+    paths-ignore:
+      - 'data/**'
   pull_request:
+    paths-ignore:
+      - 'data/**'
   workflow_dispatch:
     inputs:
       ref:
