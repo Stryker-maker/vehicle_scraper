@@ -43,6 +43,7 @@ from phase1_source_runner_common import (
     restore_identity_if_unhealthy,
     snapshot_archive_signatures,
     snapshot_reconciliation_signature,
+    source_execution_outcome_fields,
     source_runtime_contract_fields,
     validate_collection_scope,
 )
@@ -165,22 +166,13 @@ def run_kijiji(
         "run_id": active_run,
         "vehicle_key": config["vehicle_key"],
         "source": "kijiji",
-        "collection_scope": collection_scope,
         "compatibility_identity": compatibility_identity,
         "compatibility_fingerprint": compatibility_fingerprint,
         "config_path": str(config_path.relative_to(root)),
-        "command": command,
-        "started_at_utc": started_at,
         "completed_at_utc": completed_at,
         "execution_status": status_name,
         "collection_status": status_name,
-        "exit_code": returncode,
-        "timed_out": timed_out,
-        "timeout_seconds": timeout_seconds,
         "failure_reasons": failures,
-        "expected_output": str(output_path.relative_to(root)),
-        "output_exists": output_path.exists(),
-        "output_updated_this_run": fresh,
         "distance_processing_disabled": True,
         "distance_filter_disabled": True,
         "location_evidence_contract": (
@@ -234,10 +226,9 @@ def run_kijiji(
         "identity_transition_event_count": int(identity.get("transition_event_count", 0)),
         **{**validation, "row_count": current_rows},
         **quality,
-        "stdout_tail": stdout[-4000:],
-        "stderr_tail": stderr[-4000:],
     }
     status.update(source_runtime_contract_fields(locals()))
+    status.update(source_execution_outcome_fields(locals()))
     finalize_source_status_from_context(status, locals(), source="kijiji")
     write_json(status_path, status)
     print_source_summary(config["vehicle_key"], "kijiji", status_name, status)
