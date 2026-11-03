@@ -47,6 +47,7 @@ from phase1_source_runner_common import (
     source_runtime_contract_fields,
     source_schema_version_fields,
     source_status_identity_fields,
+    source_validation_quality_fields,
     source_status_metrics_from_context,
     validate_collection_scope,
 )
@@ -152,17 +153,16 @@ def run_autotrader(
     )
 
     status = {
-        "schema_version": SOURCE_STATUS_SCHEMA_VERSION,
         "collection_scope": collection_scope,
         "distance_processing_disabled": False,
         "distance_filter_disabled": False,
         "distance_evidence_contract": "explicit_route_api_or_geodesic_or_unavailable",
-        "canonical_evidence_artifacts": evidence.get("artifacts", {}),
-        **{**validation, "row_count": current_rows}, **quality,
     }
+    status.update(source_validation_quality_fields(validation, quality, current_rows))
     status.update(source_status_identity_fields(locals(), source="autotrader"))
     status.update(
         source_schema_version_fields(
+            status_schema_version=SOURCE_STATUS_SCHEMA_VERSION,
             config_schema_version=CONFIG_SCHEMA_VERSION,
             evidence_schema_version=EVIDENCE_SCHEMA_VERSION,
             adapter_schema_version=ADAPTER_SCHEMA_VERSION,
