@@ -33,8 +33,10 @@ from phase1_common import (
 from phase1_source_runner_common import (
     assess_source_output,
     build_source_evidence_and_identity,
+    build_source_evidence_and_identity_from_context,
     collector_quality_report,
     collector_status_name,
+    execute_and_assess_source,
     execute_source_collector,
     finalize_source_status_from_context,
     print_source_summary,
@@ -100,50 +102,47 @@ def run_kijiji(
         ],
     )
 
-    returncode, timed_out, stdout, stderr = execute_source_collector(
-        command,
-        root=root,
-        timeout_seconds=timeout_seconds,
-        subprocess_module=subprocess,
-    )
-
     (
+        returncode,
+        timed_out,
+        stdout,
+        stderr,
         fresh,
         validation,
         observed_rows,
         current_rows,
         stale_rows,
         failures,
-    ) = assess_source_output(
-        output_path,
+    ) = execute_and_assess_source(
+        command,
+        root=root,
+        timeout_seconds=timeout_seconds,
+        output_path=output_path,
         before_signature=before_signature,
         started_ns=started_ns,
-        returncode=returncode,
-        timed_out=timed_out,
+        subprocess_module=subprocess,
+        execute_source_collector_func=execute_source_collector,
+        assess_source_output_func=assess_source_output,
         file_signature_func=file_signature,
         validate_csv_func=validate_csv,
     )
 
     completed_at = utc_now()
-    evidence, evidence_error, identity, identity_error = build_source_evidence_and_identity(
-        root=root,
-        config=config,
-        source="kijiji",
-        active_run=active_run,
-        completed_at=completed_at,
-        fresh=fresh,
-        validation=validation,
-        current_rows=current_rows,
-        failures=failures,
-        adapter_schema_version=ADAPTER_SCHEMA_VERSION,
-        evidence_schema_version=EVIDENCE_SCHEMA_VERSION,
-        build_canonical_evidence=build_kijiji_canonical_evidence,
-        update_identity=update_source_identity_lifecycle,
+    evidence, evidence_error, identity, identity_error = (
+        build_source_evidence_and_identity_from_context(
+            locals(),
+            source="kijiji",
+            adapter_schema_version=ADAPTER_SCHEMA_VERSION,
+            evidence_schema_version=EVIDENCE_SCHEMA_VERSION,
+            build_canonical_evidence=build_kijiji_canonical_evidence,
+            build_source_evidence_and_identity_func=build_source_evidence_and_identity,
+            update_identity=update_source_identity_lifecycle,
         additional_evidence_defaults={
             "query_location_count": 0,
             "listing_specific_location_records": 0,
             "unknown_location_records": 0,
         },
+        )
     )
 
     config_isolated = restore_config_if_mutated(
