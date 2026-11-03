@@ -5,8 +5,8 @@ import os
 import subprocess
 import sys
 import time
-from pathlib import Path
 from collections.abc import Sequence
+from pathlib import Path
 from typing import Any
 
 from autotrader_adapter import ADAPTER_SCHEMA_VERSION
@@ -20,8 +20,8 @@ from identity_lifecycle import (
     update_source_identity_lifecycle,
 )
 from phase1_common import (
-    analyze_csv_quality,
     DEFAULT_TIMEOUT_SECONDS,
+    analyze_csv_quality,
     expected_output_path,
     file_signature,
     source_status_path,
