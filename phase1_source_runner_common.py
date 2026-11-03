@@ -48,13 +48,17 @@ def restore_identity_if_unhealthy(
 
 
 def execute_source_collector(
-    command: Sequence[str], *, root: Path, timeout_seconds: float
+    command: Sequence[str],
+    *,
+    root: Path,
+    timeout_seconds: float,
+    subprocess_module: Any = subprocess,
 ) -> tuple[int | None, bool, str, str]:
     stdout = stderr = ""
     returncode: int | None = None
     timed_out = False
     try:
-        completed = subprocess.run(
+        completed = subprocess_module.run(
             command,
             cwd=root,
             text=True,
