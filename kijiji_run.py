@@ -116,8 +116,7 @@ def run_kijiji(
     )
 
     completed_at = utc_now()
-    evidence, evidence_error, identity, identity_error = (
-        build_source_evidence_and_identity(
+    evidence, evidence_error, identity, identity_error = build_source_evidence_and_identity(
             root=root,
             config=config,
             source="kijiji",
@@ -135,7 +134,6 @@ def run_kijiji(
                 "listing_specific_location_records": 0,
                 "unknown_location_records": 0,
             },
-        )
     )
 
     config_isolated = restore_config_if_mutated(
