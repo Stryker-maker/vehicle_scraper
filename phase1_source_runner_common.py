@@ -4,7 +4,8 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any, Callable, Sequence
+from collections.abc import Callable, Sequence
+from typing import Any
 
 from phase1_common import (
     analyze_csv_quality,
