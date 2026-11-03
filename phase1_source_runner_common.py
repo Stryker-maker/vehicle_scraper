@@ -115,10 +115,10 @@ def assess_source_output(
     started_ns: int,
     returncode: int | None,
     timed_out: bool,
-    file_signature_func: Callable[[Path], tuple[int, int] | None] = file_signature,
-    validate_csv_func: Callable[[Path], dict[str, Any]] = validate_csv,
+    file_signature_func: Callable[[Path], tuple[int, int] | None] | None = None,
+    validate_csv_func: Callable[[Path], dict[str, Any]] | None = None,
 ) -> tuple[bool, dict[str, Any], int, int, int, list[str]]:
-    after_signature = file_signature_func(output_path)
+    after_signature = (file_signature_func or file_signature)(output_path)
     fresh = bool(
         after_signature
         and (
@@ -127,7 +127,7 @@ def assess_source_output(
             or after_signature[0] >= started_ns
         )
     )
-    validation = validate_csv_func(output_path)
+    validation = (validate_csv_func or validate_csv)(output_path)
     observed_rows = int(validation["row_count"])
     current_rows = observed_rows if fresh else 0
     stale_rows = observed_rows if output_path.exists() and not fresh else 0
@@ -202,12 +202,10 @@ def collector_quality_report(
     fresh: bool,
     schema_valid: bool,
     stale_rows: int,
-    analyze_csv_quality_func: Callable[[Path, str], dict[str, Any]] = (
-        analyze_csv_quality
-    ),
+    analyze_csv_quality_func: Callable[[Path, str], dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     if fresh and schema_valid:
-        return analyze_csv_quality_func(output_path, source)
+        return (analyze_csv_quality_func or analyze_csv_quality)(output_path, source)
     status = "not_evaluated_stale_output" if stale_rows else "not_evaluated"
     return {
         "data_quality_status": status,
