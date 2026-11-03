@@ -33,10 +33,11 @@ from phase1_common import (
 from phase1_source_runner_common import (
     assess_source_output,
     build_source_evidence_and_identity,
-    finalize_source_status_from_context,
     collector_quality_report,
     collector_status_name,
     execute_source_collector,
+    finalize_source_status_from_context,
+    print_source_summary,
     resolve_collector_command,
     restore_config_if_mutated,
     restore_identity_if_unhealthy,
