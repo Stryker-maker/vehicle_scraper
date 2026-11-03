@@ -16,6 +16,7 @@ from phase1_common import (
     MANUAL_REVIEW_FIELDS, SOURCES, check_source_anomalously_isolated, load_json,
     source_status_path, status_is_current_success, utc_now, write_json,
 )
+from phase1_source_runner_common import source_status_metrics
 
 SourcePlan = Iterable[tuple[Path, Sequence[str]]]
 
@@ -437,34 +438,49 @@ def collect_health(
                     "quality_warning_summary": status.get(
                         "quality_warning_summary", {}
                     ),
-                    "row_count": current_rows, "current_row_count": current_rows,
-                    "stale_row_count": stale_rows,
-                    "fetched_record_count": int(status.get("fetched_record_count", 0)) if current_run else 0,
-                    "accepted_record_count": int(status.get("accepted_record_count", 0)) if current_run else 0,
-                    "rejected_record_count": int(status.get("rejected_record_count", 0)) if current_run else 0,
-                    "parse_failure_count": int(status.get("parse_failure_count", 0)) if current_run else 0,
+                    **source_status_metrics(
+                        current_rows=current_rows,
+                        stale_rows=stale_rows,
+                        fetched_record_count=(
+                            int(status.get("fetched_record_count", 0)) if current_run else 0
+                        ),
+                        accepted_record_count=(
+                            int(status.get("accepted_record_count", 0)) if current_run else 0
+                        ),
+                        rejected_record_count=(
+                            int(status.get("rejected_record_count", 0)) if current_run else 0
+                        ),
+                        parse_failure_count=(
+                            int(status.get("parse_failure_count", 0)) if current_run else 0
+                        ),
+                        identity_tracked_listing_count=(
+                            int(status.get("identity_tracked_listing_count", 0))
+                            if current_run else 0
+                        ),
+                        identity_new_listing_count=(
+                            int(status.get("identity_new_listing_count", 0))
+                            if current_run else 0
+                        ),
+                        identity_reappeared_listing_count=(
+                            int(status.get("identity_reappeared_listing_count", 0))
+                            if current_run else 0
+                        ),
+                        identity_missing_listing_count=(
+                            int(status.get("identity_missing_listing_count", 0))
+                            if current_run else 0
+                        ),
+                        identity_retired_listing_count=(
+                            int(status.get("identity_retired_listing_count", 0))
+                            if current_run else 0
+                        ),
+                        failure_reasons=status.get("failure_reasons", []),
+                    ),
                     "evidence_reconciliation_status": status.get(
                         "evidence_reconciliation_status", "not_evaluated"
                     ),
                     "identity_lifecycle_status": status.get(
                         "identity_lifecycle_status", "not_evaluated"
                     ),
-                    "identity_tracked_listing_count": int(
-                        status.get("identity_tracked_listing_count", 0)
-                    ) if current_run else 0,
-                    "identity_new_listing_count": int(
-                        status.get("identity_new_listing_count", 0)
-                    ) if current_run else 0,
-                    "identity_reappeared_listing_count": int(
-                        status.get("identity_reappeared_listing_count", 0)
-                    ) if current_run else 0,
-                    "identity_missing_listing_count": int(
-                        status.get("identity_missing_listing_count", 0)
-                    ) if current_run else 0,
-                    "identity_retired_listing_count": int(
-                        status.get("identity_retired_listing_count", 0)
-                    ) if current_run else 0,
-                    "failure_reasons": status.get("failure_reasons", []),
                     "status_path": str(status_path.relative_to(root)),
                     "compatibility_fingerprint": compatibility_fingerprint,
                     "compatibility_identity": compatibility_identity,
@@ -476,18 +492,23 @@ def collect_health(
                     "execution_status": "missing", "collection_status": "missing",
                     "data_quality_status": "not_evaluated",
                     "quality_warning_rows": 0, "quality_warning_count": 0,
-                    "quality_warning_summary": {}, "row_count": 0,
-                    "current_row_count": 0, "stale_row_count": 0,
-                    "fetched_record_count": 0, "accepted_record_count": 0,
-                    "rejected_record_count": 0, "parse_failure_count": 0,
+                    "quality_warning_summary": {},
+                    **source_status_metrics(
+                        current_rows=0,
+                        stale_rows=0,
+                        fetched_record_count=0,
+                        accepted_record_count=0,
+                        rejected_record_count=0,
+                        parse_failure_count=0,
+                        identity_tracked_listing_count=0,
+                        identity_new_listing_count=0,
+                        identity_reappeared_listing_count=0,
+                        identity_missing_listing_count=0,
+                        identity_retired_listing_count=0,
+                        failure_reasons=["missing_status"],
+                    ),
                     "evidence_reconciliation_status": "missing",
                     "identity_lifecycle_status": "missing",
-                    "identity_tracked_listing_count": 0,
-                    "identity_new_listing_count": 0,
-                    "identity_reappeared_listing_count": 0,
-                    "identity_missing_listing_count": 0,
-                    "identity_retired_listing_count": 0,
-                    "failure_reasons": ["missing_status"],
                     "status_path": str(status_path.relative_to(root)),
                 })
     unhealthy = [entry for entry in entries if not entry["healthy"]]
