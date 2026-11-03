@@ -57,7 +57,55 @@ class SourceRunnerCommonTests(unittest.TestCase):
             )
         self.assertEqual(result, (None, True, "partial", "timeout"))
 
-    def test_collector_status_name(self):
+    def test_source_status_decision_fields(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            output = root / "latest.csv"
+            with patch.object(
+                common,
+                "validate_invocation_archive_output",
+                return_value="data/vehicle/kijiji/archive.csv",
+            ) as validate_archive:
+                fields = common.source_status_decision_fields(
+                    root=root,
+                    config={"vehicle_key": "vehicle"},
+                    source="kijiji",
+                    active_run="run-1",
+                    started_ns=100,
+                    rec_before_sig=None,
+                    archive_before_sigs={},
+                    fresh=True,
+                    output_path=output,
+                    status_name="success",
+                    identity_error=None,
+                    evidence={"reconciled": True},
+                )
+                validate_archive.assert_called_once()
+            self.assertEqual(fields["latest_output"], "latest.csv")
+            self.assertEqual(fields["archive_output"], "data/vehicle/kijiji/archive.csv")
+            self.assertEqual(fields["evidence_reconciliation_status"], "reconciled")
+            self.assertEqual(fields["identity_lifecycle_status"], "updated")
+
+            stale = common.source_status_decision_fields(
+                root=root,
+                config={"vehicle_key": "vehicle"},
+                source="kijiji",
+                active_run="run-1",
+                started_ns=100,
+                rec_before_sig=None,
+                archive_before_sigs={},
+                fresh=False,
+                output_path=output,
+                status_name="degraded",
+                identity_error="failed",
+                evidence={"reconciled": False},
+            )
+            self.assertIsNone(stale["latest_output"])
+            self.assertIsNone(stale["archive_output"])
+            self.assertEqual(stale["evidence_reconciliation_status"], "not_reconciled")
+            self.assertEqual(stale["identity_lifecycle_status"], "not_updated")
+
+    def test_collector_status_name(self)
         self.assertEqual(common.collector_status_name(True, 0, []), "timed_out")
         self.assertEqual(common.collector_status_name(False, 2, []), "failed")
         self.assertEqual(common.collector_status_name(False, 0, ["warning"]), "degraded")
