@@ -156,6 +156,11 @@ def run_kijiji(
     status = build_source_status_from_context(
         locals(),
         source="kijiji",
+        status_schema_version=SOURCE_STATUS_SCHEMA_VERSION,
+        config_schema_version=CONFIG_SCHEMA_VERSION,
+        evidence_schema_version=EVIDENCE_SCHEMA_VERSION,
+        adapter_schema_version=ADAPTER_SCHEMA_VERSION,
+        identity_schema_version=IDENTITY_LIFECYCLE_SCHEMA_VERSION,
         source_fields={
             "location_registry_version": LOCATION_REGISTRY_VERSION,
             "distance_processing_disabled": True,
