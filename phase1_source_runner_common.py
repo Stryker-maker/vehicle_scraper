@@ -63,6 +63,36 @@ def empty_source_identity() -> dict[str, Any]:
     }
 
 
+
+def build_source_evidence_and_identity_from_context(
+    context: Mapping[str, Any],
+    *,
+    source: str,
+    adapter_schema_version: int,
+    evidence_schema_version: int,
+    build_canonical_evidence: Callable[..., dict[str, Any]],
+    build_source_evidence_and_identity_func: Callable[..., tuple[dict[str, Any], str | None, dict[str, Any], str | None]],
+    update_identity: Callable[..., dict[str, Any]],
+    additional_evidence_defaults: dict[str, Any] | None = None,
+) -> tuple[dict[str, Any], str | None, dict[str, Any], str | None]:
+    return build_source_evidence_and_identity_func(
+        root=context["root"],
+        config=context["config"],
+        source=source,
+        active_run=context["active_run"],
+        completed_at=context["completed_at"],
+        fresh=context["fresh"],
+        validation=context["validation"],
+        current_rows=context["current_rows"],
+        failures=context["failures"],
+        adapter_schema_version=adapter_schema_version,
+        evidence_schema_version=evidence_schema_version,
+        build_canonical_evidence=build_canonical_evidence,
+        additional_evidence_defaults=additional_evidence_defaults,
+        update_identity=update_identity,
+    )
+
+
 def build_source_evidence_and_identity(
     *,
     root: Path,
@@ -534,6 +564,63 @@ def collector_status_name(
     if returncode not in (0, None):
         return "failed"
     return "degraded" if failures else "success"
+
+
+
+def execute_and_assess_source(
+    command: Sequence[str],
+    *,
+    root: Path,
+    timeout_seconds: float,
+    output_path: Path,
+    before_signature: tuple[int, int] | None,
+    started_ns: int,
+    subprocess_module: Any,
+    execute_source_collector_func: Callable[..., tuple[int | None, bool, str, str]],
+    assess_source_output_func: Callable[..., tuple[bool, dict[str, Any], int, int, int, list[str]]],
+    file_signature_func: Callable[[Path], tuple[int, int] | None],
+    validate_csv_func: Callable[[Path], dict[str, Any]],
+) -> tuple[
+    int | None,
+    bool,
+    str,
+    str,
+    bool,
+    dict[str, Any],
+    int,
+    int,
+    int,
+    list[str],
+]:
+    returncode, timed_out, stdout, stderr = execute_source_collector_func(
+        command,
+        root=root,
+        timeout_seconds=timeout_seconds,
+        subprocess_module=subprocess_module,
+    )
+    fresh, validation, observed_rows, current_rows, stale_rows, failures = (
+        assess_source_output_func(
+            output_path,
+            before_signature=before_signature,
+            started_ns=started_ns,
+            returncode=returncode,
+            timed_out=timed_out,
+            file_signature_func=file_signature_func,
+            validate_csv_func=validate_csv_func,
+        )
+    )
+    return (
+        returncode,
+        timed_out,
+        stdout,
+        stderr,
+        fresh,
+        validation,
+        observed_rows,
+        current_rows,
+        stale_rows,
+        failures,
+    )
 
 
 def collector_quality_report(
