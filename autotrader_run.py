@@ -32,6 +32,7 @@ from phase1_common import (
 from phase1_source_runner_common import (
     assess_source_output,
     build_source_evidence_and_identity,
+    finalize_source_status_from_context,
     collector_quality_report,
     collector_status_name,
     execute_source_collector,
@@ -40,7 +41,6 @@ from phase1_source_runner_common import (
     restore_identity_if_unhealthy,
     snapshot_archive_signatures,
     snapshot_reconciliation_signature,
-    source_status_decision_fields,
     validate_collection_scope,
 )
 from vehicle_config import CONFIG_SCHEMA_VERSION, load_vehicle_config
@@ -207,31 +207,9 @@ def run_autotrader(
         **{**validation, "row_count": current_rows}, **quality,
         "stdout_tail": stdout[-4000:], "stderr_tail": stderr[-4000:],
     }
-    status.update(
-        source_status_decision_fields(
-            root=root,
-            config=config,
-            source="autotrader",
-            active_run=active_run,
-            started_ns=started_ns,
-            rec_before_sig=rec_before_sig,
-            archive_before_sigs=archive_before_sigs,
-            fresh=fresh,
-            output_path=output_path,
-            status_name=status_name,
-            identity_error=identity_error,
-            evidence=evidence,
-        )
-    )
+    finalize_source_status_from_context(status, locals(), source="autotrader")
     write_json(status_path, status)
-    print(
-        f"[{config['vehicle_key']}:autotrader] {status_name} | fetched={status['fetched_record_count']} "
-        f"| accepted={status['accepted_record_count']} | rejected={status['rejected_record_count']} "
-        f"| parse_failures={status['parse_failure_count']} "
-        f"| lifecycle={status['identity_lifecycle_status']} "
-        f"| new={status['identity_new_listing_count']} "
-        f"| reappeared={status['identity_reappeared_listing_count']}"
-    )
+    print_source_summary(config["vehicle_key"], "autotrader", status_name, status)
     return status
 
 
