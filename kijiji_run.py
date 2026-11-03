@@ -15,6 +15,7 @@ from identity_lifecycle import (
     IDENTITY_LIFECYCLE_SCHEMA_VERSION,
     restore_artifacts,
     snapshot_artifacts,
+    update_source_identity_lifecycle,
 )
 from kijiji_adapter import ADAPTER_SCHEMA_VERSION
 from kijiji_canonical import build_kijiji_canonical_evidence
@@ -129,6 +130,7 @@ def run_kijiji(
         adapter_schema_version=ADAPTER_SCHEMA_VERSION,
         evidence_schema_version=EVIDENCE_SCHEMA_VERSION,
         build_canonical_evidence=build_kijiji_canonical_evidence,
+        update_identity=update_source_identity_lifecycle,
         additional_evidence_defaults={
             "query_location_count": 0,
             "listing_specific_location_records": 0,
