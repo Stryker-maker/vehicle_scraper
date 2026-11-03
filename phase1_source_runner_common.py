@@ -305,6 +305,27 @@ def source_status_decision_fields(
 
 
 
+
+def source_execution_outcome_fields(
+    context: Mapping[str, Any],
+) -> dict[str, Any]:
+    return {
+        "command": context["command"],
+        "collection_scope": context["collection_scope"],
+        "started_at_utc": context["started_at"],
+        "exit_code": context["returncode"],
+        "timed_out": context["timed_out"],
+        "timeout_seconds": context["timeout_seconds"],
+        "expected_output": str(
+            context["output_path"].relative_to(context["root"])
+        ),
+        "output_exists": context["output_path"].exists(),
+        "output_updated_this_run": context["fresh"],
+        "stdout_tail": context["stdout"][-4000:],
+        "stderr_tail": context["stderr"][-4000:],
+    }
+
+
 def source_runtime_contract_fields(
     context: Mapping[str, Any],
 ) -> dict[str, Any]:
