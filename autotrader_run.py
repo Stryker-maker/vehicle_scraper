@@ -20,10 +20,12 @@ from identity_lifecycle import (
 )
 from phase1_common import (
     DEFAULT_TIMEOUT_SECONDS,
+    analyze_csv_quality,
     expected_output_path,
     file_signature,
     source_status_path,
     utc_now,
+    validate_csv,
     write_json,
 )
 from phase1_source_runner_common import (
@@ -192,6 +194,8 @@ def run_autotrader(
         started_ns=started_ns,
         returncode=returncode,
         timed_out=timed_out,
+        file_signature_func=file_signature,
+        validate_csv_func=validate_csv,
     )
 
     completed_at = utc_now()
@@ -216,7 +220,12 @@ def run_autotrader(
     restore_identity_if_unhealthy(status_name, identity_before, restore_artifacts)
 
     quality = collector_quality_report(
-        output_path, "autotrader", fresh, validation["schema_valid"], stale_rows
+        output_path,
+        "autotrader",
+        fresh,
+        validation["schema_valid"],
+        stale_rows,
+        analyze_csv_quality_func=analyze_csv_quality,
     )
 
     status = {
