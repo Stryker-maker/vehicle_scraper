@@ -12,7 +12,14 @@ from typing import Any, Sequence
 
 from canonical_evidence import read_jsonl, write_jsonl
 from identity_lifecycle import IDENTITY_LIFECYCLE_SCHEMA_VERSION, load_current_identity_records
-from phase1_common import load_json, source_status_path, status_is_current_success, utc_now, write_json
+from phase1_common import (
+    check_source_anomalously_isolated,
+    load_json,
+    source_status_path,
+    status_is_current_success,
+    utc_now,
+    write_json,
+)
 from vehicle_config import load_vehicle_config
 
 BUYER_SCHEMA_VERSION = 1
@@ -187,6 +194,8 @@ def extract_configuration_evidence(normalized: dict[str, Any], raw_payload: Any)
     engine_hours, engine_match = _hours(text, "engine")
     idle_hours, idle_match = _hours(text, "idle")
     lowered = text.casefold()
+    service: str | None
+    service_match: str | None
     if re.search(r"\b(?:no|without)\s+(?:service|maintenance)\s+records?\b", lowered):
         service, service_match = "records_not_available_claim", "no service records"
     else:
@@ -229,7 +238,6 @@ def extract_configuration_evidence(normalized: dict[str, Any], raw_payload: Any)
         "prior_use_claims": _claim(sorted(set(use_claims))),
     }
 
-
 def year_fit(year: int | None) -> str:
     if year == 2023:
         return "ideal_2023"
@@ -254,22 +262,54 @@ def percentile(values: Sequence[float], quantile: float) -> float | None:
     return clean[lower] * (1 - weight) + clean[upper] * weight
 
 
+def _filter_priced(rows: Sequence[dict[str, Any]]):
+    return [row for row in rows if isinstance(row.get("price_cad"), int) and row["price_cad"] > 0]
+
+def _cohort_exact(priced: list[dict[str, Any]], year: int):
+    return [row for row in priced if row.get("year") == year]
+
+def _cohort_adjacent(priced: list[dict[str, Any]], year: int):
+    return [row for row in priced if isinstance(row.get("year"), int) and abs(row["year"] - year) <= 1]
+
+def _cohort_early(priced: list[dict[str, Any]]):
+    return [row for row in priced if isinstance(row.get("year"), int) and 2020 <= row["year"] <= 2023]
+
 def cohort(rows: Sequence[dict[str, Any]], target: dict[str, Any]) -> tuple[str, list[dict[str, Any]]]:
-    priced = [row for row in rows if isinstance(row.get("price_cad"), int) and row["price_cad"] > 0]
+    priced = _filter_priced(rows)
     year = target.get("year")
     if isinstance(year, int):
-        exact = [row for row in priced if row.get("year") == year]
-        if len(exact) >= MIN_BAND_COHORT:
-            return f"exact_model_year_{year}", exact
-        adjacent = [row for row in priced if isinstance(row.get("year"), int) and abs(row["year"] - year) <= 1]
-        if len(adjacent) >= MIN_BAND_COHORT:
-            return f"model_year_{year}_plus_minus_1", adjacent
+        cohort_checks = [
+            (f"exact_model_year_{year}", lambda: _cohort_exact(priced, year)),
+            (f"model_year_{year}_plus_minus_1", lambda: _cohort_adjacent(priced, year)),
+        ]
         if 2020 <= year <= 2023:
-            target_rows = [row for row in priced if isinstance(row.get("year"), int) and 2020 <= row["year"] <= 2023]
-            if len(target_rows) >= MIN_BAND_COHORT:
-                return "early_2020s_2020_2023", target_rows
+            cohort_checks.append(("early_2020s_2020_2023", lambda: _cohort_early(priced)))
+        for name, func in cohort_checks:
+            subset = func()
+            if len(subset) >= MIN_BAND_COHORT:
+                return name, subset
     return "all_current_accepted_f350_claims", priced
 
+
+def _regression_status(pairs: list[tuple[float, float]], mileage_km: int | None) -> str:
+    if mileage_km is None or len(pairs) < MIN_REGRESSION_COHORT or len({x for x, _ in pairs}) < 3:
+        return "insufficient_comparables"
+    mean_x = statistics.fmean(x for x, _ in pairs)
+    denominator = sum((x - mean_x) ** 2 for x, _ in pairs)
+    if denominator <= 0:
+        return "insufficient_mileage_variation"
+    return "ok"
+
+def _compute_regression(pairs: list[tuple[float, float]]) -> dict[str, float]:
+    mean_x = statistics.fmean(x for x, _ in pairs)
+    mean_y = statistics.fmean(y for _, y in pairs)
+    denominator = sum((x - mean_x) ** 2 for x, _ in pairs)
+    slope = sum((x - mean_x) * (y - mean_y) for x, y in pairs) / denominator
+    intercept = mean_y - slope * mean_x
+    total = sum((y - mean_y) ** 2 for _, y in pairs)
+    residual = sum((y - (intercept + slope * x)) ** 2 for x, y in pairs)
+    r2 = 1 - residual / total if total > 0 else 0.0
+    return {"slope": slope, "intercept": intercept, "r2": r2}
 
 def regression(rows: Sequence[dict[str, Any]], mileage_km: int | None) -> dict[str, Any]:
     pairs = [(float(row["mileage_km"]), float(row["price_cad"])) for row in rows
@@ -278,21 +318,18 @@ def regression(rows: Sequence[dict[str, Any]], mileage_km: int | None) -> dict[s
     base = {"sample_count": len(pairs), "projected_asking_price_cad": None,
             "slope_cad_per_10000_km": None, "intercept_cad": None, "r_squared": None,
             "meaning": "asking_price_context_not_appraisal_or_future_value"}
-    if mileage_km is None or len(pairs) < MIN_REGRESSION_COHORT or len({x for x, _ in pairs}) < 3:
-        return {**base, "status": "insufficient_comparables"}
-    mean_x = statistics.fmean(x for x, _ in pairs)
-    mean_y = statistics.fmean(y for _, y in pairs)
-    denominator = sum((x - mean_x) ** 2 for x, _ in pairs)
-    if denominator <= 0:
-        return {**base, "status": "insufficient_mileage_variation"}
-    slope = sum((x - mean_x) * (y - mean_y) for x, y in pairs) / denominator
-    intercept = mean_y - slope * mean_x
-    total = sum((y - mean_y) ** 2 for _, y in pairs)
-    residual = sum((y - (intercept + slope * x)) ** 2 for x, y in pairs)
-    r2 = 1 - residual / total if total > 0 else 0.0
-    return {**base, "status": "available", "projected_asking_price_cad": round(intercept + slope * mileage_km),
-            "slope_cad_per_10000_km": round(slope * 10_000, 2), "intercept_cad": round(intercept, 2),
-            "r_squared": round(r2, 4)}
+    status = _regression_status(pairs, mileage_km)
+    if status != "ok":
+        return {**base, "status": status}
+    stats = _compute_regression(pairs)
+    assert mileage_km is not None
+    projected = round(stats["intercept"] + stats["slope"] * mileage_km)
+    return {**base,
+            "status": "available",
+            "projected_asking_price_cad": projected,
+            "slope_cad_per_10000_km": round(stats["slope"] * 10_000, 2),
+            "intercept_cad": round(stats["intercept"], 2),
+            "r_squared": round(stats["r2"], 4)}
 
 
 def market_context(rows: Sequence[dict[str, Any]], target: dict[str, Any]) -> dict[str, Any]:
@@ -300,14 +337,26 @@ def market_context(rows: Sequence[dict[str, Any]], target: dict[str, Any]) -> di
     prices = [float(row["price_cad"]) for row in selected]
     q1, median, q3 = percentile(prices, 0.25), percentile(prices, 0.5), percentile(prices, 0.75)
     price = target.get("price_cad")
-    if not isinstance(price, int) or len(selected) < MIN_BAND_COHORT or None in (q1, median, q3):
+    if (
+        price is None
+        or not isinstance(price, (int, float))
+        or not math.isfinite(float(price))
+        or len(selected) < MIN_BAND_COHORT
+    ):
         position, difference = "insufficient_comparables", None
-    elif price < q1:
-        position, difference = "below_observed_interquartile_range", round(price - median)
-    elif price > q3:
-        position, difference = "above_observed_interquartile_range", round(price - median)
+    elif q1 is None or median is None or q3 is None:
+        position, difference = "insufficient_comparables", None
     else:
-        position, difference = "within_observed_interquartile_range", round(price - median)
+        price = float(price)
+        q1 = float(q1)
+        median = float(median)
+        q3 = float(q3)
+        if price < q1:
+            position, difference = "below_observed_interquartile_range", round(price - median)
+        elif price > q3:
+            position, difference = "above_observed_interquartile_range", round(price - median)
+        else:
+            position, difference = "within_observed_interquartile_range", round(price - median)
     return {
         "cohort_basis": basis, "comparable_count": len(selected),
         "price_q1_cad": None if q1 is None else round(q1),
@@ -397,32 +446,44 @@ def seller_questions(normalized: dict[str, Any], configuration: dict[str, Any], 
     return questions
 
 
+def _validate_schema(value: dict[str, Any]) -> None:
+    if not isinstance(value, dict) or value.get("schema_version") != OWNER_OVERRIDE_SCHEMA_VERSION:
+        raise ValueError("Owner override schema version mismatch")
+
+def _validate_vehicle_and_overrides(value: dict[str, Any]) -> None:
+    if value.get("vehicle_key") != "ford_f350" or not isinstance(value.get("overrides"), dict):
+        raise ValueError("Owner override vehicle or overrides mismatch")
+
+def _validate_override_entry(canonical_id: str, override: Any, allowed: set[str]) -> None:
+    if not isinstance(canonical_id, str) or not canonical_id or not isinstance(override, dict):
+        raise ValueError("Owner override entries must be canonical-ID objects")
+    unknown = sorted(set(override) - allowed)
+    if unknown:
+        raise ValueError(f"Unknown owner override field(s) for {canonical_id}: {', '.join(unknown)}")
+    disposition = override.get("owner_disposition", "unreviewed")
+    if disposition not in OWNER_DISPOSITIONS:
+        raise ValueError(f"Unsupported owner disposition for {canonical_id}: {disposition}")
+    classification = override.get("classification_override")
+    if classification is not None and classification not in OWNER_CLASSIFICATIONS:
+        raise ValueError(f"Unsupported classification override for {canonical_id}: {classification}")
+    if classification and not _text(override.get("override_reason")):
+        raise ValueError(f"classification_override requires override_reason for {canonical_id}")
+    tags = override.get("owner_tags", [])
+    if not isinstance(tags, list) or any(not isinstance(tag, str) for tag in tags):
+        raise ValueError(f"owner_tags must be a string list for {canonical_id}")
+
 def load_owner_overrides(path: Path) -> dict[str, Any]:
     if not path.exists():
         return {"schema_version": OWNER_OVERRIDE_SCHEMA_VERSION, "vehicle_key": "ford_f350", "overrides": {}}
     value = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(value, dict) or value.get("schema_version") != OWNER_OVERRIDE_SCHEMA_VERSION:
-        raise ValueError("Owner override schema version mismatch")
-    if value.get("vehicle_key") != "ford_f350" or not isinstance(value.get("overrides"), dict):
-        raise ValueError("Owner override vehicle or overrides mismatch")
+
+    _validate_schema(value)
+    _validate_vehicle_and_overrides(value)
+
     allowed = {"owner_disposition", "owner_note", "owner_tags", "classification_override", "override_reason"}
     for canonical_id, override in value["overrides"].items():
-        if not isinstance(canonical_id, str) or not canonical_id or not isinstance(override, dict):
-            raise ValueError("Owner override entries must be canonical-ID objects")
-        unknown = sorted(set(override) - allowed)
-        if unknown:
-            raise ValueError(f"Unknown owner override field(s) for {canonical_id}: {', '.join(unknown)}")
-        disposition = override.get("owner_disposition", "unreviewed")
-        if disposition not in OWNER_DISPOSITIONS:
-            raise ValueError(f"Unsupported owner disposition for {canonical_id}: {disposition}")
-        classification = override.get("classification_override")
-        if classification is not None and classification not in OWNER_CLASSIFICATIONS:
-            raise ValueError(f"Unsupported classification override for {canonical_id}: {classification}")
-        if classification and not _text(override.get("override_reason")):
-            raise ValueError(f"classification_override requires override_reason for {canonical_id}")
-        tags = override.get("owner_tags", [])
-        if not isinstance(tags, list) or any(not isinstance(tag, str) for tag in tags):
-            raise ValueError(f"owner_tags must be a string list for {canonical_id}")
+        _validate_override_entry(canonical_id, override, allowed)
+
     return value
 
 
@@ -456,17 +517,37 @@ def _raw_payloads(root: Path, status: dict[str, Any], source: str, run_id: str) 
     return result
 
 
-def load_source_bundles(root: Path, config: dict[str, Any], source: str, run_id: str) -> list[dict[str, Any]]:
+class SourceUnavailableError(ValueError):
+    """Raised when a source collection is missing or not current success for the requested run."""
+
+
+def _load_and_validate_source_status(root: Path, config: dict[str, Any], source: str, run_id: str) -> dict[str, Any]:
+    """Validate status existence, schema, and current success state for a source run."""
     if source not in SUPPORTED_SOURCES:
         raise ValueError(f"Unsupported source: {source}")
+    vk = str(config.get("vehicle_key") or "").strip()
+    if check_source_anomalously_isolated(root, vk, source, run_id):
+        raise SourceUnavailableError(
+            f"{source}: collection for {vk} is isolated due to critical anomaly"
+        )
     status_path = source_status_path(root, config, source)
     if not status_path.exists():
-        raise ValueError(f"{source}: source status missing")
+        raise SourceUnavailableError(f"{source}: source status missing")
     status = load_json(status_path)
-    if status.get("schema_version") != SOURCE_STATUS_SCHEMA_VERSION or not status_is_current_success(status, run_id):
-        raise ValueError(f"{source}: source status is not current schema-v8 success")
+    if not isinstance(status, dict):
+        raise ValueError(f"{source}: source status is not a JSON object")
+    if status.get("schema_version") != SOURCE_STATUS_SCHEMA_VERSION:
+        raise ValueError(f"{source}: status schema_version mismatch ({status.get('schema_version')!r}), expected schema-v8 success")
+    if not status_is_current_success(status, run_id):
+        raise SourceUnavailableError(f"{source}: source status is not current-run success")
     if status.get("identity_lifecycle_schema_version") != IDENTITY_LIFECYCLE_SCHEMA_VERSION:
         raise ValueError(f"{source}: identity lifecycle schema mismatch")
+    return status
+
+
+def load_source_bundles(root: Path, config: dict[str, Any], source: str, run_id: str) -> list[dict[str, Any]]:
+    """Load accepted evidence, identity lifecycle, and adapter payload bundles for a source run."""
+    status = _load_and_validate_source_status(root, config, source, run_id)
     accepted_path = status.get("canonical_evidence_artifacts", {}).get("accepted")
     if not accepted_path:
         raise ValueError(f"{source}: accepted canonical artifact missing")
@@ -574,19 +655,23 @@ def csv_row(value: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _compute_quantiles(values: Sequence[int], quantile_map: dict[str, float]) -> dict[str, Any]:
+    if not values:
+        return dict.fromkeys(quantile_map, None)
+    return {label: round(percentile(values, q) or 0) for label, q in quantile_map.items()}
+
+
 def year_groups(listings: Sequence[dict[str, Any]]) -> dict[str, Any]:
     groups: dict[str, Any] = {}
+    quantiles_price = {"price_q1_cad": 0.25, "price_median_cad": 0.5, "price_q3_cad": 0.75}
+    quantiles_mileage = {"mileage_q1_km": 0.25, "mileage_median_km": 0.5, "mileage_q3_km": 0.75}
     for year in sorted({value["year"] for value in listings if isinstance(value.get("year"), int)}):
         rows = [value for value in listings if value.get("year") == year]
         prices = [value["price_cad"] for value in rows if isinstance(value.get("price_cad"), int)]
         mileages = [value["mileage_km"] for value in rows if isinstance(value.get("mileage_km"), int)]
-        groups[str(year)] = {"listing_claim_count": len(rows),
-            "price_q1_cad": None if not prices else round(percentile(prices, .25) or 0),
-            "price_median_cad": None if not prices else round(percentile(prices, .5) or 0),
-            "price_q3_cad": None if not prices else round(percentile(prices, .75) or 0),
-            "mileage_q1_km": None if not mileages else round(percentile(mileages, .25) or 0),
-            "mileage_median_km": None if not mileages else round(percentile(mileages, .5) or 0),
-            "mileage_q3_km": None if not mileages else round(percentile(mileages, .75) or 0)}
+        stats_price = _compute_quantiles(prices, quantiles_price)
+        stats_mileage = _compute_quantiles(mileages, quantiles_mileage)
+        groups[str(year)] = {"listing_claim_count": len(rows), **stats_price, **stats_mileage}
     return groups
 
 
@@ -617,6 +702,24 @@ def market_summary(listings: Sequence[dict[str, Any]], run_id: str, scope: str, 
                 "five-year mileage projection uses the owner's 5000-8000 km annual-use scenario"]}
 
 
+def _collect_available_f350_source_bundles(
+    root: Path, config: dict[str, Any], selected: Sequence[str], run_id: str
+) -> tuple[list[dict[str, Any]], list[str]]:
+    """Collect valid source bundles and sources, handling missing/failed runs gracefully."""
+    bundles: list[dict[str, Any]] = []
+    valid_sources: list[str] = []
+    for source in selected:
+        try:
+            loaded = load_source_bundles(root, config, source, run_id)
+            bundles.extend(loaded)
+            valid_sources.append(source)
+        except SourceUnavailableError:
+            pass
+    if not valid_sources:
+        raise ValueError("No valid source collections available for ford_f350")
+    return bundles, valid_sources
+
+
 def write_summary_markdown(path: Path, summary: dict[str, Any]) -> None:
     lines = ["# F-350 Buyer Intelligence", "", f"- Run ID: `{summary['run_id']}`", f"- Scope: `{summary['scope']}`",
              f"- Sources: {', '.join(summary['sources'])}", f"- Current accepted listing claims: {summary['listing_claim_count']}",
@@ -635,8 +738,28 @@ def write_summary_markdown(path: Path, summary: dict[str, Any]) -> None:
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def _generate_f350_investigation_outputs(
+    bundles: list[dict[str, Any]],
+    market_rows: Sequence[dict[str, Any]],
+    overrides: dict[str, Any],
+    relative: dict[str, str],
+    effective_scope: str,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Generate and sort rich investigation listings and seller question records."""
+    listings: list[dict[str, Any]] = []
+    questions: list[dict[str, Any]] = []
+    for bundle in bundles:
+        listing, question_record = _listing(bundle, market_rows, overrides, relative, effective_scope)
+        listings.append(listing)
+        questions.append(question_record)
+    listings.sort(key=lambda value: (-int(value.get("year") or 0), int(value.get("price_cad") or 10**12), str(value.get("source")), str(value.get("canonical_listing_id"))))
+    questions.sort(key=lambda value: (str(value.get("source")), str(value.get("canonical_listing_id"))))
+    return listings, questions
+
+
 def build(root: Path, config_path: Path, run_id: str, sources: Sequence[str] | None = None,
           overrides_path: Path = Path("f350_owner_overrides.json")) -> dict[str, Any]:
+    """Build governed F-350 buyer intelligence market summary and investigation artifacts."""
     root = root.resolve()
     config_path = config_path if config_path.is_absolute() else root / config_path
     config = load_vehicle_config(config_path)
@@ -645,36 +768,33 @@ def build(root: Path, config_path: Path, run_id: str, sources: Sequence[str] | N
     selected = tuple(sources or SUPPORTED_SOURCES)
     if not selected or any(source not in SUPPORTED_SOURCES for source in selected) or len(selected) != len(set(selected)):
         raise ValueError("Buyer intelligence source plan is invalid")
-    scope = "full_sources" if set(selected) == set(SUPPORTED_SOURCES) else "single_source"
     override_file = overrides_path if overrides_path.is_absolute() else root / overrides_path
     overrides = load_owner_overrides(override_file)
     override_bytes = override_file.read_bytes() if override_file.exists() else json.dumps(overrides, sort_keys=True).encode("utf-8")
-    bundles: list[dict[str, Any]] = []
-    for source in selected:
-        bundles.extend(load_source_bundles(root, config, source, run_id))
-    market_rows = [_base(bundle, scope) for bundle in bundles]
+    bundles, valid_sources = _collect_available_f350_source_bundles(root, config, selected, run_id)
+    effective_scope = "full_sources" if set(valid_sources) == set(SUPPORTED_SOURCES) else "single_source"
+    market_rows = [_base(bundle, effective_scope) for bundle in bundles]
     paths = artifact_paths(root, config)
     relative = {key: str(value.relative_to(root)) for key, value in paths.items()}
-    listings: list[dict[str, Any]] = []
-    questions: list[dict[str, Any]] = []
-    for bundle in bundles:
-        listing, question_record = _listing(bundle, market_rows, overrides, relative, scope)
-        listings.append(listing)
-        questions.append(question_record)
-    listings.sort(key=lambda value: (-int(value.get("year") or 0), int(value.get("price_cad") or 10**12), str(value.get("source")), str(value.get("canonical_listing_id"))))
-    questions.sort(key=lambda value: (str(value.get("source")), str(value.get("canonical_listing_id"))))
+    listings, questions = _generate_f350_investigation_outputs(bundles, market_rows, overrides, relative, effective_scope)
     write_jsonl(paths["investigation_jsonl"], listings)
     write_jsonl(paths["seller_questions"], questions)
     paths["investigation_csv"].parent.mkdir(parents=True, exist_ok=True)
     with paths["investigation_csv"].open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=CSV_FIELDS, extrasaction="ignore")
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=CSV_FIELDS,
+            extrasaction="ignore",
+            lineterminator="\n",
+            quoting=csv.QUOTE_ALL,
+        )
         writer.writeheader()
         writer.writerows(csv_row(value) for value in listings)
-    summary = market_summary(listings, run_id, scope, selected, hashlib.sha256(override_bytes).hexdigest())
+    summary = market_summary(listings, run_id, effective_scope, valid_sources, hashlib.sha256(override_bytes).hexdigest())
     summary["artifacts"] = relative
     write_json(paths["market_summary_json"], summary)
     write_summary_markdown(paths["market_summary_markdown"], summary)
-    print(f"[ford_f350:buyer_intelligence] scope={scope} | listings={len(listings)} | sources={','.join(selected)}")
+    print(f"[ford_f350:buyer_intelligence] scope={effective_scope} | listings={len(listings)} | sources={','.join(valid_sources)}")
     return summary
 
 

@@ -1,0 +1,222 @@
+{
+  "deleted_bytes_total": 675182,
+  "deleted_file_count_total": 21,
+  "deletion_chain_sha256": "ffe03ebb14138e1b53cd9848da03622cb6edad9f923ce7d6a34625f80b525163",
+  "last_updated_at_utc": "2026-10-31T17:34:45+00:00",
+  "last_updated_run_id": "41223293350",
+  "recent_deletion_limit": 100,
+  "recent_deletions": [
+    {
+      "category": "autotrader_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/honda_odyssey/autotrader/honda_odyssey_autotrader_2026-07-13_11-36.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "d876a7f26d35ba41b275369dea205b2f0dee1116bc8e1c0126107ffaad8e12dc",
+      "size_bytes": 15988,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "autotrader_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/honda_odyssey/autotrader/honda_odyssey_autotrader_2026-07-06_12-30.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "a868a045842dba57aa785b8a4912473b7afbc5f60d08713f079be00696df383e",
+      "size_bytes": 18496,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "autotrader_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/honda_odyssey/autotrader/honda_odyssey_autotrader_2026-06-29_13-11.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "5c7f7830c0167f1bc55d892f50cafe1652e7285b1ee1d925233072726f6c1d24",
+      "size_bytes": 19080,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "autotrader_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/honda_odyssey/autotrader/honda_odyssey_autotrader_2026-06-22_20-37.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "e7b3a2fbf9d14cf68a26a5fa5ef7ccd42aad583bcfc380a09265978f77e9ac84",
+      "size_bytes": 13990,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "autotrader_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/honda_odyssey/autotrader/honda_odyssey_autotrader_2026-06-18_01-29.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "e59dbe5b7d253dbfee7dd34aa27657ad7ec8ec49c5cd5670c58dece2c9854120",
+      "size_bytes": 14436,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "kijiji_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/honda_odyssey/kijiji/honda_odyssey_kijiji_2026-07-13_13-49.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "e328a31ef624fc3b3aa329df59ae2ac749c81504a4e75227c185c30bc2ff9503",
+      "size_bytes": 16326,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "kijiji_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/honda_odyssey/kijiji/honda_odyssey_kijiji_2026-07-06_14-56.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "b962e23e513b094daaf7bc29cc9951934a257dd1691599091037ecc6be9adbf8",
+      "size_bytes": 16336,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "kijiji_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/honda_odyssey/kijiji/honda_odyssey_kijiji_2026-06-29_15-38.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "27681ff61bbe6e7ea6a29bcc1d882b9db722f9cc9f0383f852e52879645f5678",
+      "size_bytes": 16230,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "kijiji_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/honda_odyssey/kijiji/honda_odyssey_kijiji_2026-06-22_22-48.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "51dddf72f8d21649dec0ac7d4348d010a152e7cc2f8e300f148e2cf34baf4ff7",
+      "size_bytes": 16340,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "kijiji_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/honda_odyssey/kijiji/honda_odyssey_kijiji_2026-06-18_04-12.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "3972c172ec00df3460d848bfe307cf07d15ff6e6ae4da312514a886bf055623e",
+      "size_bytes": 16081,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "manual_review_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/honda_odyssey/manual_review/honda_odyssey_manual_review_2026-07-21_22-41-49.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "39a1488d9adc85a62d5b53a5bcba44aec4c47f58a4d8fb721c106613fd8d4a1f",
+      "size_bytes": 87182,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "manual_review_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/honda_odyssey/manual_review/honda_odyssey_manual_review_2026-07-21_20-58-14.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "b7589365b4c55e41622fe57f1a4d14bb6f83a9c11747fb0d9d02d66d93b16dbe",
+      "size_bytes": 81913,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "manual_review_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/honda_odyssey/manual_review/honda_odyssey_manual_review_2026-07-21_17-20-38.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "e3952b986d60cb7457f096aacaeb752160b604cc186eeca14f39be8d54d455ef",
+      "size_bytes": 47097,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "legacy_price_history",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/honda_odyssey/price_history_autotrader.json",
+      "reason": "retired_unsupported_history",
+      "run_id": "41223293350",
+      "sha256": "16e55102c23347efb2c3f22c80f8d55f37220f088e0bfab4e0220bd4c5679be7",
+      "size_bytes": 30637,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "legacy_price_history",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/honda_odyssey/price_history_kijiji.json",
+      "reason": "retired_unsupported_history",
+      "run_id": "41223293350",
+      "sha256": "d11af66ea3031fd799092d7be1fcade3463ee5a584dbdb229765660a8c7176ed",
+      "size_bytes": 83924,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "legacy_merged_csv",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/honda_odyssey/merged/honda_odyssey_merged_2026-06-18_04-17.csv",
+      "reason": "disabled_misleading_legacy_output",
+      "run_id": "41223293350",
+      "sha256": "6ef93dce5ae015a03f4f1ab671681148d23dd95a66ca84e4a770e9f6da590599",
+      "size_bytes": 30769,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "legacy_merged_csv",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/honda_odyssey/merged/honda_odyssey_merged_2026-06-22_22-53.csv",
+      "reason": "disabled_misleading_legacy_output",
+      "run_id": "41223293350",
+      "sha256": "427c7f93e074cd4ece65aac94ef52490e016484ae1522389103d10886954bc7e",
+      "size_bytes": 30364,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "legacy_merged_csv",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/honda_odyssey/merged/honda_odyssey_merged_2026-06-29_15-43.csv",
+      "reason": "disabled_misleading_legacy_output",
+      "run_id": "41223293350",
+      "sha256": "aa42c7b6bc880f2215145ed39b728c8b01b08037a8e070f09d04e3bc662faf75",
+      "size_bytes": 35261,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "legacy_merged_csv",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/honda_odyssey/merged/honda_odyssey_merged_2026-07-06_15-01.csv",
+      "reason": "disabled_misleading_legacy_output",
+      "run_id": "41223293350",
+      "sha256": "432821121cbd5011b45056895a08fd6d865b21fb8645faa1f03e47cb24983e0c",
+      "size_bytes": 34944,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "legacy_merged_csv",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/honda_odyssey/merged/honda_odyssey_merged_2026-07-13_13-55.csv",
+      "reason": "disabled_misleading_legacy_output",
+      "run_id": "41223293350",
+      "sha256": "06700faaebdb4b68e69c5a100eb40591b3d3e5075bbe2fd3c99977c0850b5e7b",
+      "size_bytes": 32203,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "legacy_merged_csv",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/honda_odyssey/merged/honda_odyssey_merged_2026-07-20_12-10.csv",
+      "reason": "disabled_misleading_legacy_output",
+      "run_id": "41223293350",
+      "sha256": "633578b52ba61fc3f650edee3218eac1c0661ad0a88e3040bcdaf0645df6c640",
+      "size_bytes": 17585,
+      "storage_retention_schema_version": 1
+    }
+  ],
+  "storage_retention_schema_version": 1,
+  "vehicle_key": "honda_odyssey"
+}

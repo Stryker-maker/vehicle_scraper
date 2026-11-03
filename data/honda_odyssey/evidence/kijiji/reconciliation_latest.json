@@ -1,5 +1,5 @@
 {
-  "accepted_records": 111,
+  "accepted_records": 17,
   "artifacts": {
     "accepted": "data/honda_odyssey/evidence/kijiji/accepted_latest.jsonl",
     "normalized": "data/honda_odyssey/evidence/kijiji/normalized_latest.jsonl",
@@ -9,16 +9,31 @@
     "rejected": "data/honda_odyssey/evidence/kijiji/rejected_latest.jsonl"
   },
   "evidence_schema_version": 1,
-  "fetched_record_scope": "legacy_collector_emitted_csv_rows",
-  "fetched_records": 111,
-  "generated_at_utc": "2026-07-22T18:57:59+00:00",
-  "normalized_records": 111,
+  "failed_page_count": 0,
+  "fetched_record_scope": "kijiji_adapter_json_ld_listing_objects",
+  "fetched_records": 117,
+  "generated_at_utc": "2026-10-31T17:24:23+00:00",
+  "listing_specific_location_records": 0,
+  "location_registry_version": 1,
+  "normalized_records": 117,
+  "page_request_count": 7,
+  "pagination_complete": true,
   "parse_failures": 0,
+  "query_location_count": 6,
   "reconciled": true,
   "reconciliation_equation": "fetched_records = accepted_records + rejected_records + parse_failures",
-  "rejected_records": 0,
-  "run_id": "29946946382",
+  "rejected_records": 100,
+  "request_attempt_count": 7,
+  "run_id": "41223293350",
   "source": "kijiji",
-  "source_fetch_completeness": "not_proven_by_legacy_collector",
+  "source_adapter_artifacts": {
+    "reconciliation": "data/honda_odyssey/adapter_evidence/kijiji/reconciliation_latest.json",
+    "records": "data/honda_odyssey/adapter_evidence/kijiji/records_latest.jsonl",
+    "requests": "data/honda_odyssey/adapter_evidence/kijiji/requests_latest.jsonl"
+  },
+  "source_adapter_schema_version": 1,
+  "source_fetch_completeness": "configured_validated_hub_queries_only_not_marketplace_complete",
+  "successful_page_count": 7,
+  "unknown_location_records": 117,
   "vehicle_key": "honda_odyssey"
 }

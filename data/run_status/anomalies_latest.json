@@ -1,0 +1,28 @@
+{
+  "anomalies": [
+    {
+      "baseline": null,
+      "code": "baseline_incompatible",
+      "current": null,
+      "message": "Historical health reports existed but none was semantically compatible with the current source run; count-based baseline anomalies were not evaluated.",
+      "severity": "info",
+      "source": "",
+      "threshold": null,
+      "vehicle_key": ""
+    }
+  ],
+  "anomaly_schema_version": 1,
+  "anomaly_status": "baseline_incompatible",
+  "baseline_run_id": null,
+  "baseline_status": "incompatible",
+  "compatible_source_count": 0,
+  "critical_anomaly_count": 0,
+  "current_health_run_id": "41223293350",
+  "generated_at_utc": "2026-10-31T17:34:43+00:00",
+  "informational_anomaly_count": 1,
+  "isolated_collections": [],
+  "isolation_requested_collections": [],
+  "no_output_collections": [],
+  "run_id": "41223293350",
+  "warning_anomaly_count": 0
+}
