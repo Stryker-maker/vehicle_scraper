@@ -117,23 +117,23 @@ def run_kijiji(
 
     completed_at = utc_now()
     evidence, evidence_error, identity, identity_error = build_source_evidence_and_identity(
-            root=root,
-            config=config,
-            source="kijiji",
-            active_run=active_run,
-            completed_at=completed_at,
-            fresh=fresh,
-            validation=validation,
-            current_rows=current_rows,
-            failures=failures,
-            adapter_schema_version=ADAPTER_SCHEMA_VERSION,
-            evidence_schema_version=EVIDENCE_SCHEMA_VERSION,
-            build_canonical_evidence=build_kijiji_canonical_evidence,
-            additional_evidence_defaults={
-                "query_location_count": 0,
-                "listing_specific_location_records": 0,
-                "unknown_location_records": 0,
-            },
+        root=root,
+        config=config,
+        source="kijiji",
+        active_run=active_run,
+        completed_at=completed_at,
+        fresh=fresh,
+        validation=validation,
+        current_rows=current_rows,
+        failures=failures,
+        adapter_schema_version=ADAPTER_SCHEMA_VERSION,
+        evidence_schema_version=EVIDENCE_SCHEMA_VERSION,
+        build_canonical_evidence=build_kijiji_canonical_evidence,
+        additional_evidence_defaults={
+            "query_location_count": 0,
+            "listing_specific_location_records": 0,
+            "unknown_location_records": 0,
+        },
     )
 
     config_isolated = restore_config_if_mutated(
