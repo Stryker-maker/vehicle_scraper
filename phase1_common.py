@@ -364,6 +364,73 @@ def check_source_anomalously_isolated(
     return False
 
 
+def _signature_is_fresh(
+    after: tuple[int, int] | None,
+    before: tuple[int, int] | None,
+    started_ns: int,
+) -> bool:
+    return bool(
+        after
+        and after[0] >= started_ns
+        and (before is None or after != before)
+    )
+
+
+def _current_reconciliation_report(
+    rec_path: Path,
+    *,
+    active_run: str,
+    started_ns: int,
+    rec_before_sig: tuple[int, int] | None,
+) -> dict[str, Any] | None:
+    if not rec_path.exists():
+        return None
+    rec_after_sig = file_signature(rec_path)
+    if not _signature_is_fresh(rec_after_sig, rec_before_sig, started_ns):
+        return None
+    try:
+        data = load_json(rec_path)
+    except (ValueError, OSError):
+        return None
+    if not isinstance(data, dict) or data.get("run_id") != active_run:
+        return None
+    return data
+
+
+def _validated_invocation_archive(
+    root: Path,
+    archive_rel: Any,
+    *,
+    expected_dir: Path,
+    key: str,
+    source: str,
+    started_ns: int,
+    archive_before_sigs: dict[Path, tuple[int, int] | None] | None,
+) -> str | None:
+    if not isinstance(archive_rel, str) or not archive_rel.strip():
+        return None
+    try:
+        archive_path = (root / archive_rel.strip()).resolve()
+    except ValueError:
+        return None
+    if archive_path.parent != expected_dir:
+        return None
+    if not (archive_path.exists() and archive_path.is_file()):
+        return None
+    expected_prefix = f"{key}_{source}_"
+    if not (
+        archive_path.name.startswith(expected_prefix)
+        and archive_path.name.endswith(".csv")
+    ):
+        return None
+    archive_after_sig = file_signature(archive_path)
+    before_sigs = archive_before_sigs or {}
+    archive_before_sig = before_sigs.get(archive_path)
+    if not _signature_is_fresh(archive_after_sig, archive_before_sig, started_ns):
+        return None
+    return archive_rel.strip()
+
+
 def validate_invocation_archive_output(
     root: Path,
     config: dict[str, Any],
@@ -376,65 +443,24 @@ def validate_invocation_archive_output(
     """Validate that the adapter reconciliation report and archive_output belong to and were created/updated by the current invocation."""
     key = str(config["vehicle_key"])
     expected_dir = (root / "data" / key / source).resolve()
-    rec_path = root / "data" / key / "adapter_evidence" / source / "reconciliation_latest.json"
-    if not rec_path.exists():
+    rec_path = (
+        root / "data" / key / "adapter_evidence" / source
+        / "reconciliation_latest.json"
+    )
+    data = _current_reconciliation_report(
+        rec_path,
+        active_run=active_run,
+        started_ns=started_ns,
+        rec_before_sig=rec_before_sig,
+    )
+    if data is None:
         return None
-
-    rec_after_sig = file_signature(rec_path)
-    if not rec_after_sig:
-        return None
-
-    if rec_before_sig is None:
-        rec_fresh = rec_after_sig[0] >= started_ns
-    else:
-        rec_fresh = rec_after_sig != rec_before_sig and rec_after_sig[0] >= started_ns
-
-    if not rec_fresh:
-        return None
-
-    try:
-        data = load_json(rec_path)
-    except (ValueError, OSError):
-        return None
-    if not isinstance(data, dict) or data.get("run_id") != active_run:
-        return None
-
-    archive_rel = data.get("archive_output")
-    if isinstance(archive_rel, str) and archive_rel.strip():
-        try:
-            archive_path = (root / archive_rel.strip()).resolve()
-        except ValueError:
-            return None
-
-        if archive_path.parent != expected_dir:
-            return None
-
-        if not (archive_path.exists() and archive_path.is_file()):
-            return None
-
-        filename = archive_path.name
-        expected_prefix = f"{key}_{source}_"
-        if not (filename.startswith(expected_prefix) and filename.endswith(".csv")):
-            return None
-
-        archive_after_sig = file_signature(archive_path)
-        if not archive_after_sig:
-            return None
-
-        before_sigs = archive_before_sigs or {}
-        archive_before_sig = before_sigs.get(archive_path)
-
-        if archive_before_sig is None:
-            archive_fresh = archive_after_sig[0] >= started_ns
-        else:
-            archive_fresh = (
-                archive_after_sig != archive_before_sig
-                and archive_after_sig[0] >= started_ns
-            )
-
-        if not archive_fresh:
-            return None
-
-        return archive_rel.strip()
-
-    return None
+    return _validated_invocation_archive(
+        root,
+        data.get("archive_output"),
+        expected_dir=expected_dir,
+        key=key,
+        source=source,
+        started_ns=started_ns,
+        archive_before_sigs=archive_before_sigs,
+    )
