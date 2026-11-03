@@ -244,20 +244,6 @@ def run_kijiji(
     )
 
     status = {
-        **source_status_decision_fields(
-            root=root,
-            config=config,
-            source="kijiji",
-            active_run=active_run,
-            started_ns=started_ns,
-            rec_before_sig=rec_before_sig,
-            archive_before_sigs=archive_before_sigs,
-            fresh=fresh,
-            output_path=output_path,
-            status_name=status_name,
-            identity_error=identity_error,
-            evidence=evidence,
-        ),
         "schema_version": SOURCE_STATUS_SCHEMA_VERSION,
         "configuration_schema_version": CONFIG_SCHEMA_VERSION,
         "canonical_evidence_schema_version": EVIDENCE_SCHEMA_VERSION,
@@ -348,6 +334,22 @@ def run_kijiji(
         "stdout_tail": stdout[-4000:],
         "stderr_tail": stderr[-4000:],
     }
+    status.update(
+        source_status_decision_fields(
+            root=root,
+            config=config,
+            source="kijiji",
+            active_run=active_run,
+            started_ns=started_ns,
+            rec_before_sig=rec_before_sig,
+            archive_before_sigs=archive_before_sigs,
+            fresh=fresh,
+            output_path=output_path,
+            status_name=status_name,
+            identity_error=identity_error,
+            evidence=evidence,
+        )
+    )
     write_json(status_path, status)
     print(
         f"[{config['vehicle_key']}:kijiji] {status_name} "
