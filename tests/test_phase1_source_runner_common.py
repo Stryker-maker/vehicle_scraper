@@ -82,7 +82,9 @@ class SourceRunnerCommonTests(unittest.TestCase):
                 )
                 validate_archive.assert_called_once()
             self.assertEqual(fields["latest_output"], "latest.csv")
-            self.assertEqual(fields["archive_output"], "data/vehicle/kijiji/archive.csv")
+            self.assertEqual(
+                fields["archive_output"], "data/vehicle/kijiji/archive.csv"
+            )
             self.assertEqual(fields["evidence_reconciliation_status"], "reconciled")
             self.assertEqual(fields["identity_lifecycle_status"], "updated")
 
@@ -105,21 +107,29 @@ class SourceRunnerCommonTests(unittest.TestCase):
             self.assertEqual(stale["evidence_reconciliation_status"], "not_reconciled")
             self.assertEqual(stale["identity_lifecycle_status"], "not_updated")
 
-    def test_collector_status_name(self)
+    def test_collector_status_name(self):
         self.assertEqual(common.collector_status_name(True, 0, []), "timed_out")
         self.assertEqual(common.collector_status_name(False, 2, []), "failed")
-        self.assertEqual(common.collector_status_name(False, 0, ["warning"]), "degraded")
+        self.assertEqual(
+            common.collector_status_name(False, 0, ["warning"]), "degraded"
+        )
         self.assertEqual(common.collector_status_name(False, 0, []), "success")
 
     def test_quality_report(self):
-        with patch.object(common, "analyze_csv_quality", return_value={"quality": "ok"}) as analyze:
+        with patch.object(
+            common, "analyze_csv_quality", return_value={"quality": "ok"}
+        ) as analyze:
             self.assertEqual(
-                common.collector_quality_report(Path("latest.csv"), "kijiji", True, True, 0),
+                common.collector_quality_report(
+                    Path("latest.csv"), "kijiji", True, True, 0
+                ),
                 {"quality": "ok"},
             )
             analyze.assert_called_once_with(Path("latest.csv"), "kijiji")
         self.assertEqual(
-            common.collector_quality_report(Path("latest.csv"), "kijiji", False, True, 2),
+            common.collector_quality_report(
+                Path("latest.csv"), "kijiji", False, True, 2
+            ),
             {
                 "data_quality_status": "not_evaluated_stale_output",
                 "quality_warning_rows": 0,
@@ -128,7 +138,9 @@ class SourceRunnerCommonTests(unittest.TestCase):
             },
         )
         self.assertEqual(
-            common.collector_quality_report(Path("latest.csv"), "kijiji", False, False, 0)[
+            common.collector_quality_report(
+                Path("latest.csv"), "kijiji", False, False, 0
+            )[
                 "data_quality_status"
             ],
             "not_evaluated",
@@ -170,8 +182,9 @@ class SourceRunnerCommonTests(unittest.TestCase):
             path = Path(directory) / "latest.csv"
             path.write_text("", encoding="utf-8")
             invalid = {"row_count": 0, "schema_valid": False}
-            with patch.object(common, "file_signature", return_value=(200, 30)), patch.object(
-                common, "validate_csv", return_value=invalid
+            with (
+                patch.object(common, "file_signature", return_value=(200, 30)),
+                patch.object(common, "validate_csv", return_value=invalid),
             ):
                 result = common.assess_source_output(
                     path,
