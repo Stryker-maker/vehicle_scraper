@@ -17,6 +17,7 @@ from identity_lifecycle import (
     IDENTITY_LIFECYCLE_SCHEMA_VERSION,
     restore_artifacts,
     snapshot_artifacts,
+    update_source_identity_lifecycle,
 )
 from phase1_common import (
     DEFAULT_TIMEOUT_SECONDS,
@@ -124,6 +125,7 @@ def run_autotrader(
         adapter_schema_version=ADAPTER_SCHEMA_VERSION,
         evidence_schema_version=EVIDENCE_SCHEMA_VERSION,
         build_canonical_evidence=build_autotrader_canonical_evidence,
+        update_identity=update_source_identity_lifecycle,
     )
 
     config_isolated = restore_config_if_mutated(
