@@ -156,7 +156,7 @@ class KijijiAdapterTests(unittest.TestCase):
 
         self.assertIsNone(row)
         self.assertEqual(rejections, [])
-        self.assertEqual(failures, ["missing_price_or_year"])
+        self.assertEqual(failures, ["invalid_price", "invalid_year"])
 
     def test_validated_location_registry_and_search_url(self):
         descriptor = query_location("Edmonton, AB")
