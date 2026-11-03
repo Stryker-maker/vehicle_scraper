@@ -312,12 +312,10 @@ class SourceRunnerCommonTests(unittest.TestCase):
 
     def test_source_schema_version_fields(self):
         fields = common.source_schema_version_fields(
-            {
-                "CONFIG_SCHEMA_VERSION": 2,
-                "EVIDENCE_SCHEMA_VERSION": 3,
-                "ADAPTER_SCHEMA_VERSION": 4,
-                "IDENTITY_LIFECYCLE_SCHEMA_VERSION": 5,
-            }
+            config_schema_version=2,
+            evidence_schema_version=3,
+            adapter_schema_version=4,
+            identity_schema_version=5,
         )
         self.assertEqual(fields["configuration_schema_version"], 2)
         self.assertEqual(fields["canonical_evidence_schema_version"], 3)
