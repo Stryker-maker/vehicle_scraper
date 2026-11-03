@@ -38,7 +38,8 @@ class SourceRunnerCommonTests(unittest.TestCase):
         common.restore_identity_if_unhealthy("success", {"snapshot": 1}, restore)
         restore.assert_not_called()
         common.restore_identity_if_unhealthy("degraded", {"snapshot": 1}, restore)
-        restore.assert_called_once_with({"snapshot": 1})
+        self.assertEqual(restore.call_count, 1)
+        self.assertEqual(restore.call_args.args[0], {"snapshot": 1})
 
     def test_execute_source_collector_success_and_timeout(self):
         completed = subprocess.CompletedProcess(["collector"], 0, "ok\\n", "")
