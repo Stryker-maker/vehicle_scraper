@@ -19,8 +19,8 @@ from identity_lifecycle import (
     update_source_identity_lifecycle,
 )
 from phase1_common import (
-    DEFAULT_TIMEOUT_SECONDS,
     analyze_csv_quality,
+    DEFAULT_TIMEOUT_SECONDS,
     expected_output_path,
     file_signature,
     source_status_path,
@@ -33,11 +33,11 @@ from phase1_source_runner_common import (
     collector_quality_report,
     collector_status_name,
     execute_source_collector,
-    restore_config_if_mutated,
     resolve_collector_command,
-    snapshot_reconciliation_signature,
+    restore_config_if_mutated,
     restore_identity_if_unhealthy,
     snapshot_archive_signatures,
+    snapshot_reconciliation_signature,
     source_status_decision_fields,
     validate_collection_scope,
 )
