@@ -463,7 +463,8 @@ def parse_listing(
     if parse_failures:
         return None, [], parse_failures
 
-    assert price is not None and year is not None
+    if price is None or year is None:
+        return None, [], ["missing_price_or_year"]
     mileage = clean_int(item.get("mileageFromOdometer"))
     fuel, engine = _fuel_and_engine(item, combined)
     location, address, location_status, address_status = extract_listing_geography(item)
