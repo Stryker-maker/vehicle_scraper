@@ -7,15 +7,15 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any
 
-from identity_lifecycle import (
-    IDENTITY_LIFECYCLE_SCHEMA_VERSION,
-    update_source_identity_lifecycle,
-)
 from phase1_common import (
     analyze_csv_quality,
     file_signature,
     validate_csv,
     validate_invocation_archive_output,
+)
+from identity_lifecycle import (
+    IDENTITY_LIFECYCLE_SCHEMA_VERSION,
+    update_source_identity_lifecycle,
 )
 
 
@@ -96,7 +96,7 @@ def build_source_evidence_and_identity(
                 run_id=active_run,
                 completed_at_utc=completed_at,
             )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - preserve source-level failure isolation
             evidence_error = f"{type(exc).__name__}: {exc}"
             failures.append("canonical_evidence_failed")
         else:
@@ -123,7 +123,7 @@ def build_source_evidence_and_identity(
                         )
                         or None,
                     )
-                except Exception as exc:
+                except Exception as exc:  # noqa: BLE001 - preserve identity rollback behavior
                     identity_error = f"{type(exc).__name__}: {exc}"
                     failures.append("identity_lifecycle_failed")
                 else:
