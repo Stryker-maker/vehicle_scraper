@@ -309,6 +309,21 @@ class SourceRunnerCommonTests(unittest.TestCase):
         self.assertEqual(metrics["identity_retired_listing_count"], 1)
         self.assertEqual(metrics["failure_reasons"], ["warning"])
 
+
+    def test_source_schema_version_fields(self):
+        fields = common.source_schema_version_fields(
+            {
+                "CONFIG_SCHEMA_VERSION": 2,
+                "EVIDENCE_SCHEMA_VERSION": 3,
+                "ADAPTER_SCHEMA_VERSION": 4,
+                "IDENTITY_LIFECYCLE_SCHEMA_VERSION": 5,
+            }
+        )
+        self.assertEqual(fields["configuration_schema_version"], 2)
+        self.assertEqual(fields["canonical_evidence_schema_version"], 3)
+        self.assertEqual(fields["source_adapter_schema_version"], 4)
+        self.assertEqual(fields["identity_lifecycle_schema_version"], 5)
+
     def test_collection_scope_validation(self):
         common.validate_collection_scope("full", ("full", "single_pair"))
         with self.assertRaisesRegex(ValueError, "Unsupported collection scope"):
