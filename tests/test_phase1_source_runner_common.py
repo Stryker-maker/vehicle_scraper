@@ -187,11 +187,6 @@ class SourceRunnerCommonTests(unittest.TestCase):
             output_path = root / "latest.csv"
             output_path.write_text("data", encoding="utf-8")
             context = {
-                "SOURCE_STATUS_SCHEMA_VERSION": 8,
-                "CONFIG_SCHEMA_VERSION": 2,
-                "EVIDENCE_SCHEMA_VERSION": 3,
-                "ADAPTER_SCHEMA_VERSION": 4,
-                "IDENTITY_LIFECYCLE_SCHEMA_VERSION": 5,
                 "active_run": "run-1",
                 "config": {"vehicle_key": "vehicle"},
                 "collection_scope": "full",
@@ -233,6 +228,11 @@ class SourceRunnerCommonTests(unittest.TestCase):
                 status = common.build_source_status_from_context(
                     context,
                     source="kijiji",
+                    status_schema_version=8,
+                    config_schema_version=2,
+                    evidence_schema_version=3,
+                    adapter_schema_version=4,
+                    identity_schema_version=5,
                     source_fields={"location_registry_version": "v1"},
                 )
         self.assertEqual(status["source"], "kijiji")
