@@ -32,7 +32,7 @@ from phase1_common import (
 from phase1_source_runner_common import (
     assess_source_output,
     build_source_evidence_and_identity,
-    build_source_status,
+    build_source_status_from_context,
     collector_quality_report,
     collector_status_name,
     execute_source_collector,
@@ -41,7 +41,6 @@ from phase1_source_runner_common import (
     restore_identity_if_unhealthy,
     snapshot_archive_signatures,
     snapshot_reconciliation_signature,
-    source_status_decision_fields,
     validate_collection_scope,
 )
 from vehicle_config import CONFIG_SCHEMA_VERSION, load_vehicle_config
@@ -145,42 +144,9 @@ def run_autotrader(
         analyze_csv_quality_func=analyze_csv_quality,
     )
 
-    status = build_source_status(
+    status = build_source_status_from_context(
+        locals(),
         source="autotrader",
-        status_schema_version=SOURCE_STATUS_SCHEMA_VERSION,
-        config_schema_version=CONFIG_SCHEMA_VERSION,
-        evidence_schema_version=EVIDENCE_SCHEMA_VERSION,
-        adapter_schema_version=ADAPTER_SCHEMA_VERSION,
-        identity_schema_version=IDENTITY_LIFECYCLE_SCHEMA_VERSION,
-        active_run=active_run,
-        config=config,
-        collection_scope=collection_scope,
-        compatibility_identity=compatibility_identity,
-        compatibility_fingerprint=compatibility_fingerprint,
-        config_path=config_path,
-        root=root,
-        command=command,
-        started_at=started_at,
-        completed_at=completed_at,
-        status_name=status_name,
-        returncode=returncode,
-        timed_out=timed_out,
-        timeout_seconds=timeout_seconds,
-        failures=failures,
-        output_path=output_path,
-        fresh=fresh,
-        current_rows=current_rows,
-        stale_rows=stale_rows,
-        observed_rows=observed_rows,
-        config_isolated=config_isolated,
-        evidence=evidence,
-        evidence_error=evidence_error,
-        identity_error=identity_error,
-        identity=identity,
-        validation=validation,
-        quality=quality,
-        stdout=stdout,
-        stderr=stderr,
         source_fields={
             "distance_processing_disabled": False,
             "distance_filter_disabled": False,
@@ -188,22 +154,6 @@ def run_autotrader(
                 "explicit_route_api_or_geodesic_or_unavailable"
             ),
         },
-    )
-    status.update(
-        source_status_decision_fields(
-            root=root,
-            config=config,
-            source="autotrader",
-            active_run=active_run,
-            started_ns=started_ns,
-            rec_before_sig=rec_before_sig,
-            archive_before_sigs=archive_before_sigs,
-            fresh=fresh,
-            output_path=output_path,
-            status_name=status_name,
-            identity_error=identity_error,
-            evidence=evidence,
-        )
     )
     write_json(status_path, status)
     print(
