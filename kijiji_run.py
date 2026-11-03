@@ -35,6 +35,8 @@ from phase1_source_runner_common import (
     collector_status_name,
     execute_source_collector,
     restore_config_if_mutated,
+    resolve_collector_command,
+    snapshot_reconciliation_signature,
     restore_identity_if_unhealthy,
     snapshot_archive_signatures,
     source_status_decision_fields,
@@ -171,23 +173,20 @@ def run_kijiji(
     status_path = source_status_path(root, config, "kijiji")
     identity_before = snapshot_artifacts(root, config, "kijiji")
     rec_path = root / "data" / config["vehicle_key"] / "adapter_evidence" / "kijiji" / "reconciliation_latest.json"
-    try:
-        rec_before_sig = (rec_path.stat().st_mtime_ns, rec_path.stat().st_size) if rec_path.exists() else None
-    except OSError:
-        rec_before_sig = None
+    rec_before_sig = snapshot_reconciliation_signature(rec_path)
     archive_dir = root / "data" / config["vehicle_key"] / "kijiji"
     archive_before_sigs = snapshot_archive_signatures(archive_dir)
     before_signature = file_signature(output_path)
     started_at = utc_now()
     started_ns = time.time_ns()
-    command = list(
-        command
-        or [
+    command = resolve_collector_command(
+        command,
+        [
             sys.executable,
             "kijiji_adapter.py",
             "--config",
             str(config_path.relative_to(root)),
-        ]
+        ],
     )
 
     returncode, timed_out, stdout, stderr = execute_source_collector(
@@ -228,9 +227,9 @@ def run_kijiji(
         )
     )
 
-    config_isolated = restore_config_if_mutated(config_path, original_config)
-    if not config_isolated:
-        failures.append("approved_config_mutated")
+    config_isolated = restore_config_if_mutated(
+        config_path, original_config, failures
+    )
     status_name = collector_status_name(timed_out, returncode, failures)
     restore_identity_if_unhealthy(status_name, identity_before, restore_artifacts)
 
