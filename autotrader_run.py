@@ -36,6 +36,7 @@ from phase1_source_runner_common import (
     collector_status_name,
     execute_source_collector,
     finalize_source_status_from_context,
+    source_runtime_contract_fields,
     print_source_summary,
     resolve_collector_command,
     restore_config_if_mutated,
@@ -151,8 +152,6 @@ def run_autotrader(
         "canonical_evidence_schema_version": EVIDENCE_SCHEMA_VERSION,
         "source_adapter_schema_version": ADAPTER_SCHEMA_VERSION,
         "identity_lifecycle_schema_version": IDENTITY_LIFECYCLE_SCHEMA_VERSION,
-        "runtime_config_projection": "direct_schema_v2",
-        "approved_config_contains_legacy_controls": False,
         "run_id": active_run,
         "vehicle_key": config["vehicle_key"], "source": "autotrader",
         "collection_scope": collection_scope,
@@ -165,14 +164,8 @@ def run_autotrader(
         "timeout_seconds": timeout_seconds, "failure_reasons": failures,
         "expected_output": str(output_path.relative_to(root)),
         "output_exists": output_path.exists(), "output_updated_this_run": fresh,
-        "configured_max_results": None,
-        "effective_max_results": "unbounded", "row_cap_disabled": True,
-        "config_isolated": config_isolated,
         "distance_processing_disabled": False,
         "distance_filter_disabled": False,
-        "legacy_source_ranking_disabled": True,
-        "legacy_price_history_active": False,
-        "legacy_price_history_status": "retired_not_used_by_supported_output",
         "distance_evidence_contract": "explicit_route_api_or_geodesic_or_unavailable",
         "row_count": current_rows, "current_row_count": current_rows,
         "stale_row_count": stale_rows, "stale_output_available": stale_rows > 0,
@@ -208,6 +201,7 @@ def run_autotrader(
         **{**validation, "row_count": current_rows}, **quality,
         "stdout_tail": stdout[-4000:], "stderr_tail": stderr[-4000:],
     }
+    status.update(source_runtime_contract_fields(locals()))
     finalize_source_status_from_context(status, locals(), source="autotrader")
     write_json(status_path, status)
     print_source_summary(config["vehicle_key"], "autotrader", status_name, status)
