@@ -3,19 +3,19 @@ import json
 import sys
 import tempfile
 import unittest
-from unittest.mock import patch
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from kijiji_adapter import (
+    _check_legitimate_empty_page,
+    _execute_page_request,
+    _process_page_items,
     build_search_url,
     collect_kijiji,
     extract_page_payload,
     parse_listing,
-    _execute_page_request,
-    _process_page_items,
-    _check_legitimate_empty_page,
 )
 from kijiji_locations import query_location, validate_query_locations
 
@@ -140,7 +140,9 @@ class KijijiAdapterTests(unittest.TestCase):
         self.temp.cleanup()
 
 
-    def test_parse_listing_fails_closed_when_price_year_helper_returns_empty_values(self):
+    def test_parse_listing_fails_closed_when_price_year_helper_returns_empty_values(
+        self,
+    ):
         with patch(
             "kijiji_adapter._kijiji_price_and_year",
             return_value=(None, None, []),
