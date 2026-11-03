@@ -217,7 +217,7 @@ def _autotrader_rejection_reasons(
     fuel: str,
     engine: str,
     distance: DistanceResult,
-    max_distance_km: int | float,
+    max_distance_km: float,
 ) -> list[str]:
     rejections: list[str] = []
     if not listing_id:
