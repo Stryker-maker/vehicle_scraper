@@ -212,6 +212,48 @@ class SourceRunnerCommonTests(unittest.TestCase):
         self.assertEqual(fields["stdout_tail"], "out")
         self.assertEqual(fields["stderr_tail"], "err")
 
+
+    def test_source_evidence_status_fields(self):
+        fields = common.source_evidence_status_fields(
+            {
+                "stale_rows": 2,
+                "observed_rows": 5,
+                "evidence": {
+                    "fetched_record_scope": "complete",
+                    "source_fetch_completeness": "complete",
+                    "pagination_complete": True,
+                    "page_request_count": 3,
+                    "request_attempt_count": 4,
+                    "successful_page_count": 3,
+                    "failed_page_count": 1,
+                    "normalized_records": 5,
+                    "source_adapter_artifacts": {"records": "records.jsonl"},
+                },
+                "identity": {
+                    "artifacts": {"current": "current.jsonl"},
+                    "observed_current_count": 5,
+                    "transition_event_count": 2,
+                },
+                "evidence_error": None,
+                "identity_error": None,
+            }
+        )
+        self.assertTrue(fields["stale_output_available"])
+        self.assertEqual(fields["observed_file_row_count"], 5)
+        self.assertEqual(fields["fetched_record_scope"], "complete")
+        self.assertEqual(fields["source_fetch_completeness"], "complete")
+        self.assertTrue(fields["pagination_complete"])
+        self.assertEqual(fields["page_request_count"], 3)
+        self.assertEqual(fields["request_attempt_count"], 4)
+        self.assertEqual(fields["successful_page_count"], 3)
+        self.assertEqual(fields["failed_page_count"], 1)
+        self.assertEqual(fields["normalized_record_count"], 5)
+        self.assertIn("fetched_records =", fields["evidence_reconciliation_equation"])
+        self.assertEqual(fields["source_adapter_artifacts"], {"records": "records.jsonl"})
+        self.assertEqual(fields["identity_lifecycle_artifacts"], {"current": "current.jsonl"})
+        self.assertEqual(fields["identity_observed_current_count"], 5)
+        self.assertEqual(fields["identity_transition_event_count"], 2)
+
     def test_collection_scope_validation(self):
         common.validate_collection_scope("full", ("full", "single_pair"))
         with self.assertRaisesRegex(ValueError, "Unsupported collection scope"):
