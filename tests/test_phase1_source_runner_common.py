@@ -110,6 +110,74 @@ class SourceRunnerCommonTests(unittest.TestCase):
         update_identity.assert_not_called()
         self.assertEqual(result[2]["observed_current_count"], 0)
 
+
+    def test_build_source_status_preserves_common_and_source_specific_fields(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            config_path = root / "config.json"
+            config_path.write_text("{}", encoding="utf-8")
+            output_path = root / "latest.csv"
+            output_path.write_text("data", encoding="utf-8")
+            status = common.build_source_status(
+                source="kijiji",
+                status_schema_version=8,
+                config_schema_version=2,
+                evidence_schema_version=3,
+                adapter_schema_version=4,
+                identity_schema_version=5,
+                active_run="run-1",
+                config={"vehicle_key": "vehicle"},
+                collection_scope="full",
+                compatibility_identity={"key": "value"},
+                compatibility_fingerprint="fingerprint",
+                config_path=config_path,
+                root=root,
+                command=["python", "adapter.py"],
+                started_at="start",
+                completed_at="end",
+                status_name="success",
+                returncode=0,
+                timed_out=False,
+                timeout_seconds=90,
+                failures=[],
+                output_path=output_path,
+                fresh=True,
+                current_rows=2,
+                stale_rows=1,
+                observed_rows=3,
+                config_isolated=True,
+                evidence={
+                    "fetched_record_scope": "complete",
+                    "source_fetch_completeness": "complete",
+                    "pagination_complete": True,
+                    "fetched_records": 3,
+                    "normalized_records": 3,
+                    "accepted_records": 2,
+                    "rejected_records": 1,
+                    "parse_failures": 0,
+                    "page_request_count": 2,
+                },
+                evidence_error=None,
+                identity_error=None,
+                identity={"observed_current_count": 2},
+                validation={"row_count": 99, "schema_valid": True},
+                quality={"data_quality_status": "ok"},
+                stdout="stdout",
+                stderr="stderr",
+                source_fields={"distance_processing_disabled": True},
+            )
+        self.assertEqual(status["source"], "kijiji")
+        self.assertEqual(status["row_count"], 2)
+        self.assertEqual(status["current_row_count"], 2)
+        self.assertEqual(status["stale_row_count"], 1)
+        self.assertEqual(status["observed_file_row_count"], 3)
+        self.assertEqual(status["accepted_record_count"], 2)
+        self.assertEqual(status["schema_valid"], True)
+        self.assertEqual(status["data_quality_status"], "ok")
+        self.assertTrue(status["distance_processing_disabled"])
+        self.assertEqual(status["stdout_tail"], "stdout")
+        self.assertEqual(status["stderr_tail"], "stderr")
+
     def test_collection_scope_validation(self):
         common.validate_collection_scope("full", ("full", "single_pair"))
         with self.assertRaisesRegex(ValueError, "Unsupported collection scope"):
