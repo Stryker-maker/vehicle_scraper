@@ -178,6 +178,72 @@ class SourceRunnerCommonTests(unittest.TestCase):
         self.assertEqual(status["stdout_tail"], "stdout")
         self.assertEqual(status["stderr_tail"], "stderr")
 
+
+    def test_build_source_status_from_context_adds_publication_decisions(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            config_path = root / "config.json"
+            config_path.write_text("{}", encoding="utf-8")
+            output_path = root / "latest.csv"
+            output_path.write_text("data", encoding="utf-8")
+            context = {
+                "SOURCE_STATUS_SCHEMA_VERSION": 8,
+                "CONFIG_SCHEMA_VERSION": 2,
+                "EVIDENCE_SCHEMA_VERSION": 3,
+                "ADAPTER_SCHEMA_VERSION": 4,
+                "IDENTITY_LIFECYCLE_SCHEMA_VERSION": 5,
+                "active_run": "run-1",
+                "config": {"vehicle_key": "vehicle"},
+                "collection_scope": "full",
+                "compatibility_identity": {},
+                "compatibility_fingerprint": "fingerprint",
+                "config_path": config_path,
+                "root": root,
+                "command": ["python", "adapter.py"],
+                "started_at": "start",
+                "completed_at": "end",
+                "status_name": "success",
+                "returncode": 0,
+                "timed_out": False,
+                "timeout_seconds": 90,
+                "failures": [],
+                "output_path": output_path,
+                "fresh": True,
+                "current_rows": 1,
+                "stale_rows": 0,
+                "observed_rows": 1,
+                "config_isolated": True,
+                "evidence": {"reconciled": True},
+                "evidence_error": None,
+                "identity_error": None,
+                "identity": {},
+                "validation": {"schema_valid": True},
+                "quality": {"data_quality_status": "ok"},
+                "stdout": "",
+                "stderr": "",
+                "started_ns": 100,
+                "rec_before_sig": None,
+                "archive_before_sigs": {},
+            }
+            with patch.object(
+                common,
+                "validate_invocation_archive_output",
+                return_value="data/vehicle/kijiji/archive.csv",
+            ):
+                status = common.build_source_status_from_context(
+                    context,
+                    source="kijiji",
+                    source_fields={"location_registry_version": "v1"},
+                )
+        self.assertEqual(status["source"], "kijiji")
+        self.assertEqual(status["latest_output"], "latest.csv")
+        self.assertEqual(
+            status["archive_output"], "data/vehicle/kijiji/archive.csv"
+        )
+        self.assertEqual(status["evidence_reconciliation_status"], "reconciled")
+        self.assertEqual(status["identity_lifecycle_status"], "updated")
+        self.assertEqual(status["location_registry_version"], "v1")
+
     def test_collection_scope_validation(self):
         common.validate_collection_scope("full", ("full", "single_pair"))
         with self.assertRaisesRegex(ValueError, "Unsupported collection scope"):
