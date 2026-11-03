@@ -163,6 +163,22 @@ class SourceRunnerCommonTests(unittest.TestCase):
         self.assertIn("fetched=10", output.getvalue())
         self.assertIn("reappeared=1", output.getvalue())
 
+
+    def test_source_runtime_contract_fields(self):
+        fields = common.source_runtime_contract_fields({"config_isolated": True})
+        self.assertEqual(fields["runtime_config_projection"], "direct_schema_v2")
+        self.assertFalse(fields["approved_config_contains_legacy_controls"])
+        self.assertIsNone(fields["configured_max_results"])
+        self.assertEqual(fields["effective_max_results"], "unbounded")
+        self.assertTrue(fields["row_cap_disabled"])
+        self.assertTrue(fields["config_isolated"])
+        self.assertTrue(fields["legacy_source_ranking_disabled"])
+        self.assertFalse(fields["legacy_price_history_active"])
+        self.assertEqual(
+            fields["legacy_price_history_status"],
+            "retired_not_used_by_supported_output",
+        )
+
     def test_collection_scope_validation(self):
         common.validate_collection_scope("full", ("full", "single_pair"))
         with self.assertRaisesRegex(ValueError, "Unsupported collection scope"):
