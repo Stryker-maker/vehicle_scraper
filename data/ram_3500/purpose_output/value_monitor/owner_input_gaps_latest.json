@@ -1,0 +1,17 @@
+{
+  "analysis_profile": "owned_vehicle_value",
+  "meaning": "missing_owner_inputs_limit_personalized_subject_context",
+  "purpose_input_schema_version": 1,
+  "purpose_output_schema_version": 1,
+  "required_owner_actions": [
+    {
+      "action": "Record current owner input for current_odometer_km.",
+      "field": "current_odometer_km"
+    }
+  ],
+  "run_id": "41223293350",
+  "subject_profile_missing_fields": [
+    "current_odometer_km"
+  ],
+  "vehicle_key": "ram_3500"
+}

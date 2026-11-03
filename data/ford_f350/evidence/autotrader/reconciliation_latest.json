@@ -1,5 +1,5 @@
 {
-  "accepted_records": 21,
+  "accepted_records": 16,
   "artifacts": {
     "accepted": "data/ford_f350/evidence/autotrader/accepted_latest.jsonl",
     "normalized": "data/ford_f350/evidence/autotrader/normalized_latest.jsonl",
@@ -9,16 +9,27 @@
     "rejected": "data/ford_f350/evidence/autotrader/rejected_latest.jsonl"
   },
   "evidence_schema_version": 1,
-  "fetched_record_scope": "legacy_collector_emitted_csv_rows",
-  "fetched_records": 21,
-  "generated_at_utc": "2026-07-22T18:35:15+00:00",
-  "normalized_records": 21,
+  "failed_page_count": 0,
+  "fetched_record_scope": "autotrader_adapter_response_listing_objects",
+  "fetched_records": 170,
+  "generated_at_utc": "2026-10-31T17:15:43+00:00",
+  "normalized_records": 152,
+  "page_request_count": 10,
+  "pagination_complete": true,
   "parse_failures": 0,
   "reconciled": true,
   "reconciliation_equation": "fetched_records = accepted_records + rejected_records + parse_failures",
-  "rejected_records": 0,
-  "run_id": "29946946382",
+  "rejected_records": 154,
+  "request_attempt_count": 10,
+  "run_id": "41223293350",
   "source": "autotrader",
-  "source_fetch_completeness": "not_proven_by_legacy_collector",
+  "source_adapter_artifacts": {
+    "reconciliation": "data/ford_f350/adapter_evidence/autotrader/reconciliation_latest.json",
+    "records": "data/ford_f350/adapter_evidence/autotrader/records_latest.jsonl",
+    "requests": "data/ford_f350/adapter_evidence/autotrader/requests_latest.jsonl"
+  },
+  "source_adapter_schema_version": 1,
+  "source_fetch_completeness": "pagination_observed_complete_for_configured_queries",
+  "successful_page_count": 10,
   "vehicle_key": "ford_f350"
 }

@@ -648,6 +648,16 @@ def _plan_collection_moves(
         _plan_archive_moves(root, status_data, vk, src, quarantine_dir)
     )
 
+    # Validate every destination during Phase 1, before any collection is moved.
+    # A retry may reuse the same run ID; never let Path.replace overwrite evidence
+    # already present in that run's quarantine directory.
+    for src_path, dst_path in planned_moves:
+        if dst_path.exists() or dst_path.is_symlink():
+            raise ValueError(
+                f"Quarantine destination already exists; refusing to overwrite "
+                f"existing evidence: {dst_path} (source: {src_path})"
+            )
+
     return {"vehicle_key": vk, "source": src}, planned_moves
 
 
@@ -689,6 +699,31 @@ def _recalculate_report_counts(report: dict[str, Any]) -> None:
         report["anomaly_status"] = "warning"
 
 
+def _collection_outputs_already_quarantined(
+    root: Path, vehicle_key: str, source: str, run_id: str
+) -> bool:
+    """Return true only when every output recorded for this run exists in its quarantine."""
+    status_data = _validate_collection_provenance(root, vehicle_key, source, run_id)
+    quarantine_dir = root / "data" / vehicle_key / "quarantine" / source / run_id
+    expected_names: list[str] = []
+    if status_data.get("latest_output") is not None:
+        expected_names.append(f"{vehicle_key}_{source}_latest_quarantined.csv")
+    archive_output = status_data.get("archive_output")
+    if isinstance(archive_output, str) and archive_output.strip():
+        archive_path = (root / archive_output.strip()).resolve()
+        expected_dir = (root / "data" / vehicle_key / source).resolve()
+        try:
+            archive_path.relative_to(expected_dir)
+        except ValueError as exc:
+            raise ValueError(
+                f"Archive path {archive_output!r} escapes collection directory for {vehicle_key}:{source}"
+            ) from exc
+        expected_names.append(archive_path.name)
+    return bool(expected_names) and all(
+        (quarantine_dir / name).is_file() for name in expected_names
+    )
+
+
 def _plan_single_entry_isolation(
     root: Path, entry: Any, report_run_id: str, report: dict[str, Any]
 ) -> tuple[tuple[dict[str, str], list[tuple[Path, Path]]] | None, Exception | None]:
@@ -698,14 +733,20 @@ def _plan_single_entry_isolation(
     try:
         pair, moves = _plan_collection_moves(root, entry, report_run_id)
         if not moves:
+            already_quarantined = _collection_outputs_already_quarantined(
+                root, vk, src, report_run_id
+            )
+            if already_quarantined:
+                return (pair, moves), None
+            report.setdefault("no_output_collections", []).append(pair)
             report.setdefault("anomalies", []).append(
                 _anomaly(
                     severity="info",
                     code="no_isolation_outputs_present",
                     vehicle_key=vk,
                     source=src,
-                    message=f"No output files found to quarantine for collection {vk}:{src}",
-                    current="no_outputs",
+                    message=f"No current-run output files found to quarantine for collection {vk}:{src}",
+                    current="no_current_run_outputs",
                     threshold="files_present",
                 )
             )
@@ -726,6 +767,79 @@ def _plan_single_entry_isolation(
         return None, exc
 
 
+def _find_duplicate_quarantine_destinations(
+    planned_moves: list[tuple[Path, Path]],
+) -> list[tuple[Path, Path, Path]]:
+    """Return every repeated destination and the two source paths targeting it."""
+    destinations: dict[Path, Path] = {}
+    duplicates: list[tuple[Path, Path, Path]] = []
+    for source_path, destination_path in planned_moves:
+        previous_source = destinations.get(destination_path)
+        if previous_source is None:
+            destinations[destination_path] = source_path
+        else:
+            duplicates.append((previous_source, source_path, destination_path))
+    return duplicates
+
+
+def _record_duplicate_destination_failures(
+    planned_entries: list[tuple[dict[str, str], list[tuple[Path, Path]]]],
+    duplicate_destinations: list[tuple[Path, Path, Path]],
+    report: dict[str, Any],
+    message: str,
+) -> None:
+    """Record one critical isolation failure for each affected collection."""
+    duplicate_paths = {
+        destination
+        for _first_source, _second_source, destination in duplicate_destinations
+    }
+    failed_pairs: set[tuple[str, str]] = set()
+    for pair, moves in planned_entries:
+        targets_duplicate = any(
+            destination_path in duplicate_paths
+            for _source_path, destination_path in moves
+        )
+        if not targets_duplicate:
+            continue
+        identity = (pair["vehicle_key"], pair["source"])
+        if identity in failed_pairs:
+            continue
+        report.setdefault("anomalies", []).append(
+            _anomaly(
+                severity="critical",
+                code="collection_isolation_failed",
+                vehicle_key=pair["vehicle_key"],
+                source=pair["source"],
+                message=f"Collection isolation failed: {message}",
+                current="failed",
+                threshold="isolated",
+            )
+        )
+        failed_pairs.add(identity)
+
+
+def _raise_for_duplicate_quarantine_destinations(
+    planned_entries: list[tuple[dict[str, str], list[tuple[Path, Path]]]],
+    duplicate_destinations: list[tuple[Path, Path, Path]],
+    report: dict[str, Any],
+) -> None:
+    """Fail preflight and report every collection affected by duplicate destinations."""
+    duplicate_messages = [
+        f"{destination} (sources: {first_source}, {second_source})"
+        for first_source, second_source, destination in duplicate_destinations
+    ]
+    message = (
+        "Duplicate quarantine destination planned; refusing to execute "
+        "combined isolation plan: " + "; ".join(duplicate_messages)
+    )
+    _record_duplicate_destination_failures(
+        planned_entries, duplicate_destinations, report, message
+    )
+    report["isolated_collections"] = []
+    _recalculate_report_counts(report)
+    raise ValueError(message)
+
+
 def _plan_phase1_isolation(
     root: Path, isolated: list[Any], report_run_id: str, report: dict[str, Any]
 ) -> tuple[list[tuple[dict[str, str], list[tuple[Path, Path]]]], list[tuple[Path, Path]]]:
@@ -734,6 +848,7 @@ def _plan_phase1_isolation(
     combined_planned_moves: list[tuple[Path, Path]] = []
     validation_error: Exception | None = None
 
+    report["no_output_collections"] = []
     for entry in isolated:
         planned, exc = _plan_single_entry_isolation(root, entry, report_run_id, report)
         if exc is not None and validation_error is None:
@@ -748,6 +863,14 @@ def _plan_phase1_isolation(
         _recalculate_report_counts(report)
         raise validation_error
 
+    duplicate_destinations = _find_duplicate_quarantine_destinations(
+        combined_planned_moves
+    )
+    if duplicate_destinations:
+        _raise_for_duplicate_quarantine_destinations(
+            planned_entries, duplicate_destinations, report
+        )
+
     return planned_entries, combined_planned_moves
 
 
@@ -758,19 +881,27 @@ def isolate_anomalous_collections(root: Path, report: dict[str, Any]) -> list[di
     if not report_run_id or not IDENTIFIER_PATTERN.match(report_run_id):
         raise ValueError(f"Invalid or missing run_id in anomaly report: {report.get('run_id')!r}")
 
-    isolated = report.get("isolated_collections")
-    if not isinstance(isolated, list):
-        raise ValueError(f"isolated_collections must be a list: {isolated!r}")
+    requested = report.get("isolation_requested_collections")
+    if requested is None:
+        requested = report.get("isolated_collections")
+    if not isinstance(requested, list):
+        raise ValueError(f"isolation_requested_collections must be a list: {requested!r}")
+    report["isolation_requested_collections"] = [dict(item) for item in requested if isinstance(item, dict)]
+    if len(report["isolation_requested_collections"]) != len(requested):
+        raise ValueError("isolation_requested_collections must contain only objects")
+
+    # Keep the requested set distinct from the collections physically isolated.
+    report["no_output_collections"] = []
 
     # Phase 1: Validate and plan ALL requested collections with zero filesystem mutations
     planned_entries, combined_planned_moves = _plan_phase1_isolation(
-        root, isolated, report_run_id, report
+        root, requested, report_run_id, report
     )
 
     # Phase 2: Execute all planned moves under a single combined rollback boundary
     try:
         _execute_isolation_moves(combined_planned_moves)
-        completed_collections = [pair for pair, moves in planned_entries if moves]
+        completed_collections = [pair for pair, _moves in planned_entries]
     except (ValueError, RuntimeError) as exc:
         for pair, _ in planned_entries:
             report.setdefault("anomalies", []).append(
@@ -804,12 +935,24 @@ def _run_build_action(root: Path, args: argparse.Namespace) -> int:
         current=current,
         run_id=args.run_id,
     )
+    requested = report.get("isolated_collections")
+    report["isolation_requested_collections"] = (
+        [dict(item) for item in requested if isinstance(item, dict)]
+        if isinstance(requested, list)
+        else []
+    )
     isolation_exc: Exception | None = None
     try:
         actually_isolated = isolate_anomalous_collections(root=root, report=report)
     except (ValueError, RuntimeError) as exc:
         isolation_exc = exc
-        actually_isolated = report.get("isolated_collections", [])
+        # Requested collections are not proof that any files were successfully isolated.
+        # The exception message retains rollback details, including paths that could not be restored.
+        actually_isolated = []
+        report["isolation_failure"] = {
+            "error_type": type(exc).__name__,
+            "message": str(exc),
+        }
 
     report["isolated_collections"] = actually_isolated
     paths = write_anomaly_report(root=root, report=report)
@@ -848,6 +991,45 @@ def _validate_isolated_collections(isolated: Any) -> list[dict[str, str]]:
     return validated
 
 
+def _critical_collection_pairs(
+    report: dict[str, Any], isolated: list[dict[str, str]]
+) -> set[tuple[str, str]]:
+    """Return valid collection identities marked critical or successfully isolated."""
+    critical_pairs = {(entry["vehicle_key"], entry["source"]) for entry in isolated}
+    for item in report.get("anomalies", []):
+        if not isinstance(item, dict) or item.get("severity") != "critical":
+            continue
+        vehicle_key = str(item.get("vehicle_key") or "").strip()
+        source = str(item.get("source") or "").strip()
+        if (
+            vehicle_key
+            and source
+            and IDENTIFIER_PATTERN.match(vehicle_key)
+            and IDENTIFIER_PATTERN.match(source)
+        ):
+            critical_pairs.add((vehicle_key, source))
+    return critical_pairs
+
+
+def _enforce_critical_anomaly_policy(
+    root: Path, report: dict[str, Any], isolated: list[dict[str, str]]
+) -> int:
+    """Fail closed when every expected source collection is critically anomalous."""
+    health = load_optional_json(root / "data" / "run_status" / "latest.json")
+    expected_sources = health.get("expected_source_runs") if isinstance(health, dict) else None
+    if not isinstance(expected_sources, int) or expected_sources <= 0:
+        print("Health report missing or invalid expected_source_runs; failing closed.")
+        return 1
+
+    critical_pairs = _critical_collection_pairs(report, isolated)
+    if len(critical_pairs) >= expected_sources:
+        print(
+            f"All expected collections ({expected_sources}) are critically anomalous or isolated; failing closed."
+        )
+        return 1
+    return 0
+
+
 def _run_check_action(root: Path, args: argparse.Namespace) -> int:
     """Execute check subcommand: validate anomaly report and enforce policy against isolated collections."""
     report = load_optional_json(Path(args.report))
@@ -864,25 +1046,7 @@ def _run_check_action(root: Path, args: argparse.Namespace) -> int:
     if isolated:
         print(f"Isolated collections due to critical anomalies: {isolated}")
     if args.policy == "enforce" and int(report.get("critical_anomaly_count", 0)) > 0:
-        health_path = root / "data" / "run_status" / "latest.json"
-        health = load_optional_json(health_path)
-        expected_sources = health.get("expected_source_runs") if isinstance(health, dict) else None
-        if not isinstance(expected_sources, int) or expected_sources <= 0:
-            print("Health report missing or invalid expected_source_runs; failing closed.")
-            return 1
-        critical_pairs = {(entry["vehicle_key"], entry["source"]) for entry in isolated}
-        for item in report.get("anomalies", []):
-            if isinstance(item, dict) and item.get("severity") == "critical":
-                vk = str(item.get("vehicle_key") or "").strip()
-                src = str(item.get("source") or "").strip()
-                if vk and src and IDENTIFIER_PATTERN.match(vk) and IDENTIFIER_PATTERN.match(src):
-                    critical_pairs.add((vk, src))
-
-        if len(critical_pairs) >= expected_sources:
-            print(
-                f"All expected collections ({expected_sources}) are critically anomalous or isolated; failing closed."
-            )
-            return 1
+        return _enforce_critical_anomaly_policy(root, report, isolated)
     return 0
 
 

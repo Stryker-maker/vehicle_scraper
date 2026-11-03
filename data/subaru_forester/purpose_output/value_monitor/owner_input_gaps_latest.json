@@ -1,0 +1,47 @@
+{
+  "analysis_profile": "owned_vehicle_value",
+  "meaning": "missing_owner_inputs_limit_personalized_subject_context",
+  "purpose_input_schema_version": 1,
+  "purpose_output_schema_version": 1,
+  "required_owner_actions": [
+    {
+      "action": "Record current owner input for current_odometer_km.",
+      "field": "current_odometer_km"
+    },
+    {
+      "action": "Record current owner input for drivetrain.",
+      "field": "drivetrain"
+    },
+    {
+      "action": "Record current owner input for engine.",
+      "field": "engine"
+    },
+    {
+      "action": "Record current owner input for fuel.",
+      "field": "fuel"
+    },
+    {
+      "action": "Record current owner input for odometer_context.",
+      "field": "odometer_context"
+    },
+    {
+      "action": "Record current owner input for trim.",
+      "field": "trim"
+    },
+    {
+      "action": "Record current owner input for year.",
+      "field": "year"
+    }
+  ],
+  "run_id": "41223293350",
+  "subject_profile_missing_fields": [
+    "current_odometer_km",
+    "drivetrain",
+    "engine",
+    "fuel",
+    "odometer_context",
+    "trim",
+    "year"
+  ],
+  "vehicle_key": "subaru_forester"
+}

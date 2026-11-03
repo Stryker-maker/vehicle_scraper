@@ -1,0 +1,272 @@
+{
+  "deleted_bytes_total": 2345629,
+  "deleted_file_count_total": 26,
+  "deletion_chain_sha256": "c1954dbc17b188a37c84aa19871e607c1917c99ebbf77feecbebee237edf0c94",
+  "last_updated_at_utc": "2026-10-31T17:34:45+00:00",
+  "last_updated_run_id": "41223293350",
+  "recent_deletion_limit": 100,
+  "recent_deletions": [
+    {
+      "category": "autotrader_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ford_f150/autotrader/ford_f150_autotrader_2026-06-22_20-16.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "e05b8f77a960f5c88986868b456f023a36a1490d239f4a5df407e64a4b948b99",
+      "size_bytes": 23523,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "autotrader_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ford_f150/autotrader/ford_f150_autotrader_2026-06-18_01-06.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "ef5e1883398e8f50370631f5dc8416106b0f03288744b2061c04f7ae3bf08e6e",
+      "size_bytes": 23809,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "autotrader_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ford_f150/autotrader/ford_f150_autotrader_2026-06-15_20-54.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "ef521f19ead4a635ae8e13e7c126190dbc8d14ab40045dd68d9f534c22123a72",
+      "size_bytes": 23655,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "autotrader_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ford_f150/autotrader/ford_f150_autotrader_2026-06-08_18-31.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "5ce4c87567d7ff1a080e653ae9e103490367a892b36df46169044c2d5006b169",
+      "size_bytes": 23572,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "autotrader_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ford_f150/autotrader/ford_f150_autotrader_2026-06-01_21-34.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "d47476e3ec0e938a4af3bbd527d65e31493224799b1470ed8547f27c5f2095a8",
+      "size_bytes": 23785,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "autotrader_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ford_f150/autotrader/ford_f150_autotrader_2026-05-25_16-53.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "5423a0fc32e6c116a8f2eaa72a895472d6bdbc7a283d3c6b85493490342ad6b0",
+      "size_bytes": 22495,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "autotrader_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ford_f150/autotrader/ford_f150_autotrader_2026-05-24_13-40.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "1228e8db26a2759808790aaf727945c37360bee2b68d52ace9278b899ec7283f",
+      "size_bytes": 22775,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "kijiji_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ford_f150/kijiji/ford_f150_kijiji_2026-06-18_03-24.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "bb4d864da7f61238e7ceb97d50a30c61f97691520b608a1db2cc3202d068dc25",
+      "size_bytes": 15708,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "kijiji_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ford_f150/kijiji/ford_f150_kijiji_2026-06-15_23-03.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "130543c05582beb29616413c7394cff320a6ba5abd07c9152109c1d5c56f78bd",
+      "size_bytes": 15853,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "kijiji_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ford_f150/kijiji/ford_f150_kijiji_2026-06-08_20-08.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "b48153702a7b67d0915f5fa93b20a0f0a9d103f5af64ae90ee5af974cbccf42d",
+      "size_bytes": 15519,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "kijiji_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ford_f150/kijiji/ford_f150_kijiji_2026-06-01_23-24.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "4477e5e00ee45f26c2ff04d9e106c67bac6deca71e5aaa7216eb3f65707ebf26",
+      "size_bytes": 15662,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "kijiji_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ford_f150/kijiji/ford_f150_kijiji_2026-05-25_18-47.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "da2f33fe0c291abbd6a1ee057cee7ec17b879d408ac45c891c1d07af0a2b7105",
+      "size_bytes": 15715,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "kijiji_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ford_f150/kijiji/ford_f150_kijiji_2026-05-24_15-32.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "6e3c4b37bb235bef6d22c4985d88954b99fe2c825528a9c17564524eb897e84f",
+      "size_bytes": 15718,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "legacy_price_history",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ford_f150/price_history_autotrader.json",
+      "reason": "retired_unsupported_history",
+      "run_id": "41223293350",
+      "sha256": "bc8e9d23c49b7a284a7691bb98900165b487bd421abb55cf393f517720247e61",
+      "size_bytes": 275827,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "legacy_price_history",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ford_f150/price_history_kijiji.json",
+      "reason": "retired_unsupported_history",
+      "run_id": "41223293350",
+      "sha256": "c4dc3f820ee3484c9e770c524e748f8991874c922b3c472609eb3477a608cdf3",
+      "size_bytes": 1379099,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "legacy_merged_csv",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ford_f150/merged/ford_f150_merged_2026-05-24_16-05.csv",
+      "reason": "disabled_misleading_legacy_output",
+      "run_id": "41223293350",
+      "sha256": "f2957f017f59ccf110e920a74a1eadaacd1c16e958efab72fb8204ea09ef78b7",
+      "size_bytes": 38293,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "legacy_merged_csv",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ford_f150/merged/ford_f150_merged_2026-05-25_19-21.csv",
+      "reason": "disabled_misleading_legacy_output",
+      "run_id": "41223293350",
+      "sha256": "d70296aec0262c1c3f955b49b10881534133df7ae71f7b3d0547bf13b150e8be",
+      "size_bytes": 38389,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "legacy_merged_csv",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ford_f150/merged/ford_f150_merged_2026-06-01_23-58.csv",
+      "reason": "disabled_misleading_legacy_output",
+      "run_id": "41223293350",
+      "sha256": "cb0b835274208aa7cd4f27bff4b8642f8b948d5c4b2f2703378ccd34e50a93eb",
+      "size_bytes": 39626,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "legacy_merged_csv",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ford_f150/merged/ford_f150_merged_2026-06-08_20-42.csv",
+      "reason": "disabled_misleading_legacy_output",
+      "run_id": "41223293350",
+      "sha256": "9de04b09bc0b8a498603a94bbb24a388b9fe69cfd191b049c8fb8a09837be045",
+      "size_bytes": 39270,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "legacy_merged_csv",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ford_f150/merged/ford_f150_merged_2026-06-15_23-38.csv",
+      "reason": "disabled_misleading_legacy_output",
+      "run_id": "41223293350",
+      "sha256": "918f26a06bb224d5d4fbcbb63f9ff4a26c565b680b71d67c7f46daec37f3acca",
+      "size_bytes": 39695,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "legacy_merged_csv",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ford_f150/merged/ford_f150_merged_2026-06-18_04-17.csv",
+      "reason": "disabled_misleading_legacy_output",
+      "run_id": "41223293350",
+      "sha256": "9aacfbcec9c17f9dff25bcb6e5666f1c667a9c446587b846821491382abe517b",
+      "size_bytes": 39890,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "legacy_merged_csv",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ford_f150/merged/ford_f150_merged_2026-06-22_22-53.csv",
+      "reason": "disabled_misleading_legacy_output",
+      "run_id": "41223293350",
+      "sha256": "a9fec3e43c9a513852d0c817251cb0593c904a136a950d3150db0c3c0fa0694f",
+      "size_bytes": 39072,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "legacy_merged_csv",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ford_f150/merged/ford_f150_merged_2026-06-29_15-43.csv",
+      "reason": "disabled_misleading_legacy_output",
+      "run_id": "41223293350",
+      "sha256": "9b815960740d879ef5a3ac5b00dfac21d5d586b820de8af930d1c3f05c3b4455",
+      "size_bytes": 40077,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "legacy_merged_csv",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ford_f150/merged/ford_f150_merged_2026-07-06_15-01.csv",
+      "reason": "disabled_misleading_legacy_output",
+      "run_id": "41223293350",
+      "sha256": "057e3d49397f76418a19d29a1c8ec992728adf0dfa9203c70a30140cbe04968d",
+      "size_bytes": 39636,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "legacy_merged_csv",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ford_f150/merged/ford_f150_merged_2026-07-13_13-55.csv",
+      "reason": "disabled_misleading_legacy_output",
+      "run_id": "41223293350",
+      "sha256": "7cc10a615761d5a4cb93e43e99e9a488ad11bde34859a4f63b06def41b78940f",
+      "size_bytes": 39791,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "legacy_merged_csv",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ford_f150/merged/ford_f150_merged_2026-07-20_12-10.csv",
+      "reason": "disabled_misleading_legacy_output",
+      "run_id": "41223293350",
+      "sha256": "6f35948cefccbd26c0eea4386a9cb67baf463354f8e34eb81f271da5aef065ff",
+      "size_bytes": 39175,
+      "storage_retention_schema_version": 1
+    }
+  ],
+  "storage_retention_schema_version": 1,
+  "vehicle_key": "ford_f150"
+}

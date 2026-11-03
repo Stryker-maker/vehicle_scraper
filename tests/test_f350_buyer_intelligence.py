@@ -117,6 +117,17 @@ class MarketAndOverrideTests(unittest.TestCase):
             "configured_query_accepted_listing_claims_not_complete_market",
         )
 
+    def test_pre_2020_target_does_not_use_early_2020s_fallback(self):
+        rows = [
+            {"year": 2020, "price_cad": 50000, "mileage_km": 80000},
+            {"year": 2021, "price_cad": 52000, "mileage_km": 70000},
+            {"year": 2022, "price_cad": 54000, "mileage_km": 60000},
+            {"year": 2023, "price_cad": 56000, "mileage_km": 50000},
+        ]
+        basis, selected = buyer.cohort(rows, {"year": 2019})
+        self.assertEqual(basis, "all_current_accepted_f350_claims")
+        self.assertEqual(selected, rows)
+
     def test_small_cohort_does_not_create_regression_authority(self):
         rows = [
             {"year": 2023, "price_cad": 50000, "mileage_km": 80000},
@@ -128,6 +139,17 @@ class MarketAndOverrideTests(unittest.TestCase):
             result["mileage_adjusted_asking_price_projection"]["status"],
             "insufficient_comparables",
         )
+
+    def test_non_finite_target_price_is_rejected(self):
+        rows = [
+            {"year": 2023, "price_cad": 50000, "mileage_km": 80000},
+            {"year": 2023, "price_cad": 52000, "mileage_km": 70000},
+            {"year": 2023, "price_cad": 51000, "mileage_km": 75000},
+        ]
+        for price in (float("nan"), float("inf"), float("-inf")):
+            result = buyer.market_context(rows, {"year": 2023, "price_cad": price})
+            self.assertEqual(result["price_position"], "insufficient_comparables")
+            self.assertIsNone(result["price_difference_from_median_cad"])
 
     def test_override_requires_reason_and_preserves_computed_result(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -307,6 +329,21 @@ class BuildTests(unittest.TestCase):
                 )
             },
         }
+
+    def test_listing_without_service_history_retains_maintenance_question(self):
+        bundle = self.bundle(0, 50000, 100000)
+        bundle["raw_payload"]["description"] = "Crew Cab SRW 4x4"
+        listing, questions = buyer._listing(
+            bundle, [], {}, {"seller_questions": "questions.jsonl"}, "single_source"
+        )
+        self.assertIsNone(listing["configuration_evidence"]["service_history"]["value"])
+        self.assertIn("service_history", listing["missing_investigation_fields"])
+        maintenance = [
+            question for question in questions["questions"]
+            if question["reason"] == "service_history_missing"
+        ]
+        self.assertEqual(len(maintenance), 1)
+        self.assertIn("maintenance and repair records", maintenance[0]["question"])
 
     def test_build_writes_transparent_outputs_without_rank_or_score(self):
         with tempfile.TemporaryDirectory() as temp:

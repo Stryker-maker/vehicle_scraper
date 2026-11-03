@@ -1,0 +1,368 @@
+{
+  "deleted_bytes": 235061,
+  "deleted_file_count": 35,
+  "deletions": [
+    {
+      "category": "autotrader_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ram_3500/autotrader/ram_3500_autotrader_2026-07-13_11-26.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "2ec011e5d4dcf770d2d27b4ce79714cd14760c8e6ab89527c74469f499079f33",
+      "size_bytes": 1557,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "autotrader_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ram_3500/autotrader/ram_3500_autotrader_2026-07-06_12-20.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "d9b5dcdf387b3a210df7b1ef8e8dcd3a15ccef9482d226b32dbd2895220bece1",
+      "size_bytes": 1734,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "autotrader_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ram_3500/autotrader/ram_3500_autotrader_2026-06-29_12-58.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "6e2059ec0d5162df6b01f61ca92b3fe42606e25868a06e9534aa19ace698bf44",
+      "size_bytes": 2172,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "autotrader_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ram_3500/autotrader/ram_3500_autotrader_2026-06-22_20-23.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "40aaca27593b25c285f70dd956252726932451cedef23e80e54de4f0bff5cdeb",
+      "size_bytes": 1177,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "autotrader_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ram_3500/autotrader/ram_3500_autotrader_2026-06-18_01-13.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "ed030bd50dc1f1408b760fb383c679ac0633bdfb5904bc4c735d83bea03fefdf",
+      "size_bytes": 1177,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "autotrader_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ram_3500/autotrader/ram_3500_autotrader_2026-06-15_21-01.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "6fea75e731a48fc0cd01f369d0f8a330184f9260586b5af877d30365c3cc71b9",
+      "size_bytes": 1615,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "autotrader_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ram_3500/autotrader/ram_3500_autotrader_2026-06-08_18-38.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "7987ebd66dcff9882945bc2786ed7e27b44e937a4bc7072323bf34ca323c6429",
+      "size_bytes": 715,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "autotrader_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ram_3500/autotrader/ram_3500_autotrader_2026-06-01_21-41.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "ea98e323bf8e8da5db5c2657ddb8b4937707af4ed1ba63c5bdf28f128c74567a",
+      "size_bytes": 708,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "autotrader_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ram_3500/autotrader/ram_3500_autotrader_2026-05-25_17-00.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "861f280beea0fb959725f601d0883789f5713ad5f332a19e7de85616693e08a6",
+      "size_bytes": 2094,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "autotrader_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ram_3500/autotrader/ram_3500_autotrader_2026-05-24_13-47.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "241ed99531ad71d9f717bf6c9683b653d95f46d8b5926e7d6d4ab8ec80b2ecd6",
+      "size_bytes": 1608,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "kijiji_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ram_3500/kijiji/ram_3500_kijiji_2026-07-06_14-29.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "0e80598fd4e11d1d5bdccc51ddcc0e02ac779c332bcb3e69fc8b3bef7ea7dcde",
+      "size_bytes": 6576,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "kijiji_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ram_3500/kijiji/ram_3500_kijiji_2026-06-29_15-13.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "453664424371bf660743a112380ec3e61a271cd13c2f9ba5c78a9a631066f4a0",
+      "size_bytes": 5689,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "kijiji_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ram_3500/kijiji/ram_3500_kijiji_2026-06-22_22-19.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "a30f8140f5079c70ada88301e8240088f389fb97f723d30165306ce424fa2523",
+      "size_bytes": 8242,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "kijiji_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ram_3500/kijiji/ram_3500_kijiji_2026-06-18_03-43.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "94d9bb421f13100df72123269020c05264e1e44a29330cd9555ac32aa0f0d068",
+      "size_bytes": 8470,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "kijiji_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ram_3500/kijiji/ram_3500_kijiji_2026-06-15_23-21.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "5502bc2977b13d897a7b7a1bcd35f3c21f7f9b13f6c1a8c3055cd1e4973dbb94",
+      "size_bytes": 8421,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "kijiji_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ram_3500/kijiji/ram_3500_kijiji_2026-06-08_20-26.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "62cc8f16eb398f0ba8bf8d06c79ed4c4d93ffbb5e5887d83d56b17001c4548f9",
+      "size_bytes": 7233,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "kijiji_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ram_3500/kijiji/ram_3500_kijiji_2026-06-01_23-42.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "5876e10d4bbe2e847d63d7007cc6d73d5b2e9475cce7db70fea2a22a2b931a7d",
+      "size_bytes": 7857,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "kijiji_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ram_3500/kijiji/ram_3500_kijiji_2026-05-25_19-04.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "cc82dc3bf31323b6209327700851de0639ea71c17a7baf345ace8dd0be4416f6",
+      "size_bytes": 8685,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "kijiji_source_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ram_3500/kijiji/ram_3500_kijiji_2026-05-24_15-49.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "cb0750729a5ca6756a2df94dbdcb60d5b3abc2ce480f7bf64e4ba63c10b580b5",
+      "size_bytes": 9258,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "manual_review_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ram_3500/manual_review/ram_3500_manual_review_2026-07-21_22-41-49.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "8c0028629665a31bc12f2bb32ef4fc71463d025c5a8ff59e6e532f00260f964c",
+      "size_bytes": 9774,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "manual_review_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ram_3500/manual_review/ram_3500_manual_review_2026-07-21_20-58-14.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "271f363d71839b55c51bf8b984b3f96b3c75def58cd0be932e10116e12465c09",
+      "size_bytes": 8311,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "manual_review_archive",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ram_3500/manual_review/ram_3500_manual_review_2026-07-21_17-20-38.csv",
+      "reason": "archive_count_limit_exceeded",
+      "run_id": "41223293350",
+      "sha256": "71511723e5c567a82da903af90489ff4bc211085752ebce547a9173a73e8f4d3",
+      "size_bytes": 9120,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "legacy_price_history",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ram_3500/price_history_autotrader.json",
+      "reason": "retired_unsupported_history",
+      "run_id": "41223293350",
+      "sha256": "67bcf40e43d49710707591876117a1ec91c8f55e76b6a4fed8b4da04d7385ef0",
+      "size_bytes": 4001,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "legacy_price_history",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ram_3500/price_history_kijiji.json",
+      "reason": "retired_unsupported_history",
+      "run_id": "41223293350",
+      "sha256": "e7fee846553694fb4496b45de96688adf10cab8410ed37769c99487f4e5391a2",
+      "size_bytes": 25807,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "legacy_merged_csv",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ram_3500/merged/ram_3500_merged_2026-05-24_16-05.csv",
+      "reason": "disabled_misleading_legacy_output",
+      "run_id": "41223293350",
+      "sha256": "c824a3892bcf487d0818d6398a44f51d5aa09bb395cac9ad99bd0e5d0f21306e",
+      "size_bytes": 10418,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "legacy_merged_csv",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ram_3500/merged/ram_3500_merged_2026-05-25_19-21.csv",
+      "reason": "disabled_misleading_legacy_output",
+      "run_id": "41223293350",
+      "sha256": "63d046b3cdff284a78ed39dd8fcf4b77038ac0c9170637a882d2695be46c9ecf",
+      "size_bytes": 10324,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "legacy_merged_csv",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ram_3500/merged/ram_3500_merged_2026-06-01_23-58.csv",
+      "reason": "disabled_misleading_legacy_output",
+      "run_id": "41223293350",
+      "sha256": "91ce7552ef38050aff7f7b6c1369aee3339f08877bb8b93bb3c9b3d3d4aa57df",
+      "size_bytes": 8479,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "legacy_merged_csv",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ram_3500/merged/ram_3500_merged_2026-06-08_20-42.csv",
+      "reason": "disabled_misleading_legacy_output",
+      "run_id": "41223293350",
+      "sha256": "bfc50473aaaab921350b3481e5fd68e020d96681c7ad87f0570ebcd1a8fe0412",
+      "size_bytes": 7850,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "legacy_merged_csv",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ram_3500/merged/ram_3500_merged_2026-06-15_23-38.csv",
+      "reason": "disabled_misleading_legacy_output",
+      "run_id": "41223293350",
+      "sha256": "71de1b0302ec7c468e618cfd2c1c62d991116c0fda66405e498a5a1dc639ec4e",
+      "size_bytes": 9766,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "legacy_merged_csv",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ram_3500/merged/ram_3500_merged_2026-06-18_04-17.csv",
+      "reason": "disabled_misleading_legacy_output",
+      "run_id": "41223293350",
+      "sha256": "3ae8eca4e54de31ff92d5c55723bc631651af3894125ea257af881083ca32c7b",
+      "size_bytes": 9370,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "legacy_merged_csv",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ram_3500/merged/ram_3500_merged_2026-06-22_22-53.csv",
+      "reason": "disabled_misleading_legacy_output",
+      "run_id": "41223293350",
+      "sha256": "94e469cd959ae7305985a14b5f9e1760b002f7746b362dadb78edbd8dd266f79",
+      "size_bytes": 9136,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "legacy_merged_csv",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ram_3500/merged/ram_3500_merged_2026-06-29_15-43.csv",
+      "reason": "disabled_misleading_legacy_output",
+      "run_id": "41223293350",
+      "sha256": "4a792d7d598999de87d626c145219e0e2cf669bb4c9c1220d61b773749d989ed",
+      "size_bytes": 7176,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "legacy_merged_csv",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ram_3500/merged/ram_3500_merged_2026-07-06_15-01.csv",
+      "reason": "disabled_misleading_legacy_output",
+      "run_id": "41223293350",
+      "sha256": "ca1080aeb65ecee02c0e12cd494d98fffbb17d6db03d1d9ce0402e92580a01d2",
+      "size_bytes": 7825,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "legacy_merged_csv",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ram_3500/merged/ram_3500_merged_2026-07-13_13-55.csv",
+      "reason": "disabled_misleading_legacy_output",
+      "run_id": "41223293350",
+      "sha256": "9cade872a185159700bb801444b3573c0788a1c392a224e1418cc39de639d9b5",
+      "size_bytes": 6411,
+      "storage_retention_schema_version": 1
+    },
+    {
+      "category": "legacy_merged_csv",
+      "deleted_at_utc": "2026-10-31T17:34:45+00:00",
+      "path": "data/ram_3500/merged/ram_3500_merged_2026-07-20_12-10.csv",
+      "reason": "disabled_misleading_legacy_output",
+      "run_id": "41223293350",
+      "sha256": "93d93a9a4f3f36a14713980a40ec26b5a2c7f54cc1a0dc2719212ec4ffb10f0b",
+      "size_bytes": 6305,
+      "storage_retention_schema_version": 1
+    }
+  ],
+  "generated_at_utc": "2026-10-31T17:34:45+00:00",
+  "ledger": "data/ram_3500/retention/deletion_ledger.json",
+  "ledger_chain_sha256": "1a6c8922b3a603cfc469d89df04ea259b7280bb27e750a03c8dfafa05bc1ecdc",
+  "ledger_deleted_bytes_total": 235061,
+  "ledger_deleted_file_count_total": 35,
+  "legacy_merged_csv_removed": true,
+  "legacy_price_history_removed": true,
+  "manual_review_archive_keep_count": 4,
+  "run_id": "41223293350",
+  "source_archive_keep_count": 8,
+  "storage_retention_schema_version": 1,
+  "vehicle_key": "ram_3500"
+}

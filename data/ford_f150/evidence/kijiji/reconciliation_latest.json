@@ -1,0 +1,39 @@
+{
+  "accepted_records": 90,
+  "artifacts": {
+    "accepted": "data/ford_f150/evidence/kijiji/accepted_latest.jsonl",
+    "normalized": "data/ford_f150/evidence/kijiji/normalized_latest.jsonl",
+    "parse_failures": "data/ford_f150/evidence/kijiji/parse_failures_latest.jsonl",
+    "raw": "data/ford_f150/evidence/kijiji/raw_latest.jsonl",
+    "reconciliation": "data/ford_f150/evidence/kijiji/reconciliation_latest.json",
+    "rejected": "data/ford_f150/evidence/kijiji/rejected_latest.jsonl"
+  },
+  "evidence_schema_version": 1,
+  "failed_page_count": 0,
+  "fetched_record_scope": "kijiji_adapter_json_ld_listing_objects",
+  "fetched_records": 340,
+  "generated_at_utc": "2026-10-31T17:34:42+00:00",
+  "listing_specific_location_records": 0,
+  "location_registry_version": 1,
+  "normalized_records": 340,
+  "page_request_count": 10,
+  "pagination_complete": true,
+  "parse_failures": 0,
+  "query_location_count": 6,
+  "reconciled": true,
+  "reconciliation_equation": "fetched_records = accepted_records + rejected_records + parse_failures",
+  "rejected_records": 250,
+  "request_attempt_count": 10,
+  "run_id": "41223293350",
+  "source": "kijiji",
+  "source_adapter_artifacts": {
+    "reconciliation": "data/ford_f150/adapter_evidence/kijiji/reconciliation_latest.json",
+    "records": "data/ford_f150/adapter_evidence/kijiji/records_latest.jsonl",
+    "requests": "data/ford_f150/adapter_evidence/kijiji/requests_latest.jsonl"
+  },
+  "source_adapter_schema_version": 1,
+  "source_fetch_completeness": "configured_validated_hub_queries_only_not_marketplace_complete",
+  "successful_page_count": 10,
+  "unknown_location_records": 340,
+  "vehicle_key": "ford_f150"
+}
