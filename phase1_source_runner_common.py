@@ -306,6 +306,40 @@ def source_status_decision_fields(
 
 
 
+
+def source_evidence_status_fields(
+    context: Mapping[str, Any],
+) -> dict[str, Any]:
+    evidence = context["evidence"]
+    identity = context["identity"]
+    return {
+        "stale_output_available": context["stale_rows"] > 0,
+        "observed_file_row_count": context["observed_rows"],
+        "fetched_record_scope": evidence.get("fetched_record_scope"),
+        "source_fetch_completeness": evidence.get("source_fetch_completeness"),
+        "pagination_complete": evidence.get("pagination_complete") is True,
+        "page_request_count": int(evidence.get("page_request_count", 0)),
+        "request_attempt_count": int(evidence.get("request_attempt_count", 0)),
+        "successful_page_count": int(evidence.get("successful_page_count", 0)),
+        "failed_page_count": int(evidence.get("failed_page_count", 0)),
+        "normalized_record_count": int(evidence.get("normalized_records", 0)),
+        "evidence_reconciliation_equation": evidence.get(
+            "reconciliation_equation",
+            "fetched_records = accepted_records + rejected_records + parse_failures",
+        ),
+        "source_adapter_artifacts": evidence.get("source_adapter_artifacts", {}),
+        "canonical_evidence_error": context["evidence_error"],
+        "identity_lifecycle_error": context["identity_error"],
+        "identity_lifecycle_artifacts": identity.get("artifacts", {}),
+        "identity_observed_current_count": int(
+            identity.get("observed_current_count", 0)
+        ),
+        "identity_transition_event_count": int(
+            identity.get("transition_event_count", 0)
+        ),
+    }
+
+
 def source_execution_outcome_fields(
     context: Mapping[str, Any],
 ) -> dict[str, Any]:
