@@ -48,8 +48,8 @@ from phase1_source_runner_common import (
     source_runtime_contract_fields,
     source_schema_version_fields,
     source_status_identity_fields,
-    source_validation_quality_fields,
     source_status_metrics_from_context,
+    source_validation_quality_fields,
     validate_collection_scope,
 )
 from vehicle_config import CONFIG_SCHEMA_VERSION, load_vehicle_config
