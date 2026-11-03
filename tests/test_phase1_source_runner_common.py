@@ -254,6 +254,61 @@ class SourceRunnerCommonTests(unittest.TestCase):
         self.assertEqual(fields["identity_observed_current_count"], 5)
         self.assertEqual(fields["identity_transition_event_count"], 2)
 
+
+    def test_source_status_metrics_shared_contract(self):
+        metrics = common.source_status_metrics(
+            current_rows=3,
+            stale_rows=2,
+            fetched_record_count=5,
+            accepted_record_count=3,
+            rejected_record_count=2,
+            parse_failure_count=0,
+            identity_tracked_listing_count=4,
+            identity_new_listing_count=1,
+            identity_reappeared_listing_count=1,
+            identity_missing_listing_count=2,
+            identity_retired_listing_count=1,
+            failure_reasons=["warning"],
+        )
+        self.assertEqual(metrics["row_count"], 3)
+        self.assertEqual(metrics["current_row_count"], 3)
+        self.assertEqual(metrics["stale_row_count"], 2)
+        self.assertEqual(metrics["fetched_record_count"], 5)
+        self.assertEqual(metrics["accepted_record_count"], 3)
+        self.assertEqual(metrics["rejected_record_count"], 2)
+        self.assertEqual(metrics["parse_failure_count"], 0)
+        self.assertEqual(metrics["identity_tracked_listing_count"], 4)
+        self.assertEqual(metrics["identity_new_listing_count"], 1)
+        self.assertEqual(metrics["identity_reappeared_listing_count"], 1)
+        self.assertEqual(metrics["identity_missing_listing_count"], 2)
+        self.assertEqual(metrics["identity_retired_listing_count"], 1)
+        self.assertEqual(metrics["failure_reasons"], ["warning"])
+
+    def test_source_status_metrics_from_context(self):
+        metrics = common.source_status_metrics_from_context(
+            {
+                "current_rows": 3,
+                "stale_rows": 2,
+                "evidence": {
+                    "fetched_records": 5,
+                    "accepted_records": 3,
+                    "rejected_records": 2,
+                    "parse_failures": 0,
+                },
+                "identity": {
+                    "tracked_listing_count": 4,
+                    "new_listing_count": 1,
+                    "reappeared_listing_count": 1,
+                    "missing_listing_count": 2,
+                    "retired_listing_count": 1,
+                },
+                "failures": ["warning"],
+            }
+        )
+        self.assertEqual(metrics["accepted_record_count"], 3)
+        self.assertEqual(metrics["identity_retired_listing_count"], 1)
+        self.assertEqual(metrics["failure_reasons"], ["warning"])
+
     def test_collection_scope_validation(self):
         common.validate_collection_scope("full", ("full", "single_pair"))
         with self.assertRaisesRegex(ValueError, "Unsupported collection scope"):
