@@ -307,6 +307,62 @@ def source_status_decision_fields(
 
 
 
+
+def source_status_metrics(
+    *,
+    current_rows: int,
+    stale_rows: int,
+    fetched_record_count: int,
+    accepted_record_count: int,
+    rejected_record_count: int,
+    parse_failure_count: int,
+    identity_tracked_listing_count: int,
+    identity_new_listing_count: int,
+    identity_reappeared_listing_count: int,
+    identity_missing_listing_count: int,
+    identity_retired_listing_count: int,
+    failure_reasons: list[str],
+) -> dict[str, Any]:
+    return {
+        "row_count": current_rows,
+        "current_row_count": current_rows,
+        "stale_row_count": stale_rows,
+        "fetched_record_count": fetched_record_count,
+        "accepted_record_count": accepted_record_count,
+        "rejected_record_count": rejected_record_count,
+        "parse_failure_count": parse_failure_count,
+        "identity_tracked_listing_count": identity_tracked_listing_count,
+        "identity_new_listing_count": identity_new_listing_count,
+        "identity_reappeared_listing_count": identity_reappeared_listing_count,
+        "identity_missing_listing_count": identity_missing_listing_count,
+        "identity_retired_listing_count": identity_retired_listing_count,
+        "failure_reasons": failure_reasons,
+    }
+
+
+def source_status_metrics_from_context(
+    context: Mapping[str, Any],
+) -> dict[str, Any]:
+    evidence = context["evidence"]
+    identity = context["identity"]
+    return source_status_metrics(
+        current_rows=context["current_rows"],
+        stale_rows=context["stale_rows"],
+        fetched_record_count=int(evidence.get("fetched_records", 0)),
+        accepted_record_count=int(evidence.get("accepted_records", 0)),
+        rejected_record_count=int(evidence.get("rejected_records", 0)),
+        parse_failure_count=int(evidence.get("parse_failures", 0)),
+        identity_tracked_listing_count=int(identity.get("tracked_listing_count", 0)),
+        identity_new_listing_count=int(identity.get("new_listing_count", 0)),
+        identity_reappeared_listing_count=int(
+            identity.get("reappeared_listing_count", 0)
+        ),
+        identity_missing_listing_count=int(identity.get("missing_listing_count", 0)),
+        identity_retired_listing_count=int(identity.get("retired_listing_count", 0)),
+        failure_reasons=context["failures"],
+    )
+
+
 def source_evidence_status_fields(
     context: Mapping[str, Any],
 ) -> dict[str, Any]:
