@@ -322,6 +322,34 @@ class SourceRunnerCommonTests(unittest.TestCase):
         self.assertEqual(fields["source_adapter_schema_version"], 4)
         self.assertEqual(fields["identity_lifecycle_schema_version"], 5)
 
+
+    def test_source_status_identity_fields(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            config_path = root / "config.json"
+            fields = common.source_status_identity_fields(
+                {
+                    "active_run": "run-1",
+                    "config": {"vehicle_key": "vehicle"},
+                    "compatibility_identity": {"vehicle": "vehicle"},
+                    "compatibility_fingerprint": "fingerprint",
+                    "config_path": config_path,
+                    "root": root,
+                    "completed_at": "completed",
+                    "status_name": "success",
+                },
+                source="autotrader",
+            )
+        self.assertEqual(fields["run_id"], "run-1")
+        self.assertEqual(fields["vehicle_key"], "vehicle")
+        self.assertEqual(fields["source"], "autotrader")
+        self.assertEqual(fields["compatibility_identity"], {"vehicle": "vehicle"})
+        self.assertEqual(fields["compatibility_fingerprint"], "fingerprint")
+        self.assertEqual(fields["config_path"], "config.json")
+        self.assertEqual(fields["completed_at_utc"], "completed")
+        self.assertEqual(fields["execution_status"], "success")
+        self.assertEqual(fields["collection_status"], "success")
+
     def test_collection_scope_validation(self):
         common.validate_collection_scope("full", ("full", "single_pair"))
         with self.assertRaisesRegex(ValueError, "Unsupported collection scope"):
