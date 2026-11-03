@@ -309,6 +309,27 @@ def source_status_decision_fields(
 
 
 
+
+def source_status_identity_fields(
+    context: Mapping[str, Any],
+    *,
+    source: str,
+) -> dict[str, Any]:
+    return {
+        "run_id": context["active_run"],
+        "vehicle_key": context["config"]["vehicle_key"],
+        "source": source,
+        "compatibility_identity": context["compatibility_identity"],
+        "compatibility_fingerprint": context["compatibility_fingerprint"],
+        "config_path": str(
+            context["config_path"].relative_to(context["root"])
+        ),
+        "completed_at_utc": context["completed_at"],
+        "execution_status": context["status_name"],
+        "collection_status": context["status_name"],
+    }
+
+
 def source_schema_version_fields(
     *,
     config_schema_version: int,
