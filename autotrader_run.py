@@ -44,6 +44,7 @@ from phase1_source_runner_common import (
     snapshot_reconciliation_signature,
     source_evidence_status_fields,
     source_execution_outcome_fields,
+    source_status_metrics_from_context,
     source_runtime_contract_fields,
     validate_collection_scope,
 )
@@ -162,24 +163,13 @@ def run_autotrader(
         "config_path": str(config_path.relative_to(root)),
         "completed_at_utc": completed_at,
         "execution_status": status_name, "collection_status": status_name,
-        "failure_reasons": failures,
         "distance_processing_disabled": False,
         "distance_filter_disabled": False,
         "distance_evidence_contract": "explicit_route_api_or_geodesic_or_unavailable",
-        "row_count": current_rows, "current_row_count": current_rows,
-        "stale_row_count": stale_rows,
-        "fetched_record_count": int(evidence.get("fetched_records", 0)),
-        "accepted_record_count": int(evidence.get("accepted_records", 0)),
-        "rejected_record_count": int(evidence.get("rejected_records", 0)),
-        "parse_failure_count": int(evidence.get("parse_failures", 0)),
         "canonical_evidence_artifacts": evidence.get("artifacts", {}),
-        "identity_tracked_listing_count": int(identity.get("tracked_listing_count", 0)),
-        "identity_new_listing_count": int(identity.get("new_listing_count", 0)),
-        "identity_reappeared_listing_count": int(identity.get("reappeared_listing_count", 0)),
-        "identity_missing_listing_count": int(identity.get("missing_listing_count", 0)),
-        "identity_retired_listing_count": int(identity.get("retired_listing_count", 0)),
         **{**validation, "row_count": current_rows}, **quality,
     }
+    status.update(source_status_metrics_from_context(locals()))
     status.update(source_evidence_status_fields(locals()))
     status.update(source_runtime_contract_fields(locals()))
     status.update(source_execution_outcome_fields(locals()))
