@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -301,6 +301,49 @@ def source_status_decision_fields(
             else "not_updated"
         ),
     }
+
+
+
+def finalize_source_status_from_context(
+    status: dict[str, Any],
+    context: Mapping[str, Any],
+    *,
+    source: str,
+) -> None:
+    status.update(
+        source_status_decision_fields(
+            root=context["root"],
+            config=context["config"],
+            source=source,
+            active_run=context["active_run"],
+            started_ns=context["started_ns"],
+            rec_before_sig=context["rec_before_sig"],
+            archive_before_sigs=context["archive_before_sigs"],
+            fresh=context["fresh"],
+            output_path=context["output_path"],
+            status_name=context["status_name"],
+            identity_error=context["identity_error"],
+            evidence=context["evidence"],
+        )
+    )
+
+
+def print_source_summary(
+    vehicle_key: str,
+    source: str,
+    status_name: str,
+    status: dict[str, Any],
+) -> None:
+    print(
+        f"[{vehicle_key}:{source}] {status_name} "
+        f"| fetched={status['fetched_record_count']} "
+        f"| accepted={status['accepted_record_count']} "
+        f"| rejected={status['rejected_record_count']} "
+        f"| parse_failures={status['parse_failure_count']} "
+        f"| lifecycle={status['identity_lifecycle_status']} "
+        f"| new={status['identity_new_listing_count']} "
+        f"| reappeared={status['identity_reappeared_listing_count']}"
+    )
 
 
 def collector_status_name(
