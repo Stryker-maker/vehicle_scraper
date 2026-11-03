@@ -139,8 +139,13 @@ class SourceRunnerCommonTests(unittest.TestCase):
             path = Path(directory) / "latest.csv"
             path.write_text("data", encoding="utf-8")
             valid = {"row_count": 3, "schema_valid": True}
-            with patch.object(common, "file_signature", side_effect=[(200, 30), (200, 30)]), patch.object(
-                common, "validate_csv", return_value=valid
+            with (
+                patch.object(
+                    common,
+                    "file_signature",
+                    side_effect=[(200, 30), (200, 30)],
+                ),
+                patch.object(common, "validate_csv", return_value=valid),
             ):
                 fresh = common.assess_source_output(
                     path,
