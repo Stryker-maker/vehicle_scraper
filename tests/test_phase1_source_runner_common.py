@@ -28,10 +28,41 @@ class SourceRunnerCommonTests(unittest.TestCase):
             config = Path(directory) / "config.json"
             original = b'{"value":1}'
             config.write_bytes(original)
-            self.assertTrue(common.restore_config_if_mutated(config, original))
+            self.assertTrue(common.restore_config_if_mutated(config, original, []))
             config.write_bytes(b'{"value":2}')
-            self.assertFalse(common.restore_config_if_mutated(config, original))
+            failures = []
+            self.assertFalse(
+                common.restore_config_if_mutated(config, original, failures)
+            )
+            self.assertEqual(failures, ["approved_config_mutated"])
             self.assertEqual(config.read_bytes(), original)
+
+
+    def test_snapshot_reconciliation_signature(self):
+        with tempfile.TemporaryDirectory() as directory:
+            missing = Path(directory) / "missing.json"
+            self.assertIsNone(common.snapshot_reconciliation_signature(missing))
+            existing = Path(directory) / "reconciliation.json"
+            existing.write_text("{}", encoding="utf-8")
+            stat = existing.stat()
+            self.assertEqual(
+                common.snapshot_reconciliation_signature(existing),
+                (stat.st_mtime_ns, stat.st_size),
+            )
+
+    def test_resolve_collector_command_preserves_defaulting_behavior(self):
+        self.assertEqual(
+            common.resolve_collector_command(None, ["python", "adapter.py"]),
+            ["python", "adapter.py"],
+        )
+        self.assertEqual(
+            common.resolve_collector_command([], ["python", "adapter.py"]),
+            ["python", "adapter.py"],
+        )
+        self.assertEqual(
+            common.resolve_collector_command(["python", "custom.py"], ["unused"]),
+            ["python", "custom.py"],
+        )
 
     def test_restore_identity_only_for_unhealthy_status(self):
         restore = Mock()
