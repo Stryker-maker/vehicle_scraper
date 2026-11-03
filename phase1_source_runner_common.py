@@ -310,15 +310,17 @@ def source_status_decision_fields(
 
 
 def source_schema_version_fields(
-    context: Mapping[str, Any],
+    *,
+    config_schema_version: int,
+    evidence_schema_version: int,
+    adapter_schema_version: int,
+    identity_schema_version: int,
 ) -> dict[str, Any]:
     return {
-        "configuration_schema_version": context["CONFIG_SCHEMA_VERSION"],
-        "canonical_evidence_schema_version": context["EVIDENCE_SCHEMA_VERSION"],
-        "source_adapter_schema_version": context["ADAPTER_SCHEMA_VERSION"],
-        "identity_lifecycle_schema_version": context[
-            "IDENTITY_LIFECYCLE_SCHEMA_VERSION"
-        ],
+        "configuration_schema_version": config_schema_version,
+        "canonical_evidence_schema_version": evidence_schema_version,
+        "source_adapter_schema_version": adapter_schema_version,
+        "identity_lifecycle_schema_version": identity_schema_version,
     }
 
 
