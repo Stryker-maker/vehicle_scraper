@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -376,6 +376,70 @@ def build_source_status(
     status["row_count"] = current_rows
     status.update(quality)
     status.update(source_fields)
+    return status
+
+
+
+def build_source_status_from_context(
+    context: Mapping[str, Any],
+    *,
+    source: str,
+    source_fields: dict[str, Any],
+) -> dict[str, Any]:
+    status = build_source_status(
+        source=source,
+        status_schema_version=context["SOURCE_STATUS_SCHEMA_VERSION"],
+        config_schema_version=context["CONFIG_SCHEMA_VERSION"],
+        evidence_schema_version=context["EVIDENCE_SCHEMA_VERSION"],
+        adapter_schema_version=context["ADAPTER_SCHEMA_VERSION"],
+        identity_schema_version=context["IDENTITY_LIFECYCLE_SCHEMA_VERSION"],
+        active_run=context["active_run"],
+        config=context["config"],
+        collection_scope=context["collection_scope"],
+        compatibility_identity=context["compatibility_identity"],
+        compatibility_fingerprint=context["compatibility_fingerprint"],
+        config_path=context["config_path"],
+        root=context["root"],
+        command=context["command"],
+        started_at=context["started_at"],
+        completed_at=context["completed_at"],
+        status_name=context["status_name"],
+        returncode=context["returncode"],
+        timed_out=context["timed_out"],
+        timeout_seconds=context["timeout_seconds"],
+        failures=context["failures"],
+        output_path=context["output_path"],
+        fresh=context["fresh"],
+        current_rows=context["current_rows"],
+        stale_rows=context["stale_rows"],
+        observed_rows=context["observed_rows"],
+        config_isolated=context["config_isolated"],
+        evidence=context["evidence"],
+        evidence_error=context["evidence_error"],
+        identity_error=context["identity_error"],
+        identity=context["identity"],
+        validation=context["validation"],
+        quality=context["quality"],
+        stdout=context["stdout"],
+        stderr=context["stderr"],
+        source_fields=source_fields,
+    )
+    status.update(
+        source_status_decision_fields(
+            root=context["root"],
+            config=context["config"],
+            source=source,
+            active_run=context["active_run"],
+            started_ns=context["started_ns"],
+            rec_before_sig=context["rec_before_sig"],
+            archive_before_sigs=context["archive_before_sigs"],
+            fresh=context["fresh"],
+            output_path=context["output_path"],
+            status_name=context["status_name"],
+            identity_error=context["identity_error"],
+            evidence=context["evidence"],
+        )
+    )
     return status
 
 
