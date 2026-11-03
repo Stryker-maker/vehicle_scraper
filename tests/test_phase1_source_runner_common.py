@@ -312,11 +312,13 @@ class SourceRunnerCommonTests(unittest.TestCase):
 
     def test_source_schema_version_fields(self):
         fields = common.source_schema_version_fields(
+            status_schema_version=8,
             config_schema_version=2,
             evidence_schema_version=3,
             adapter_schema_version=4,
             identity_schema_version=5,
         )
+        self.assertEqual(fields["schema_version"], 8)
         self.assertEqual(fields["configuration_schema_version"], 2)
         self.assertEqual(fields["canonical_evidence_schema_version"], 3)
         self.assertEqual(fields["source_adapter_schema_version"], 4)
@@ -349,6 +351,17 @@ class SourceRunnerCommonTests(unittest.TestCase):
         self.assertEqual(fields["completed_at_utc"], "completed")
         self.assertEqual(fields["execution_status"], "success")
         self.assertEqual(fields["collection_status"], "success")
+
+
+    def test_source_validation_quality_fields(self):
+        fields = common.source_validation_quality_fields(
+            {"schema_valid": True, "row_count": 99},
+            {"quality_status": "acceptable"},
+            3,
+        )
+        self.assertTrue(fields["schema_valid"])
+        self.assertEqual(fields["row_count"], 3)
+        self.assertEqual(fields["quality_status"], "acceptable")
 
     def test_collection_scope_validation(self):
         common.validate_collection_scope("full", ("full", "single_pair"))
