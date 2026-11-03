@@ -24,7 +24,6 @@ from phase1_common import (
     file_signature,
     source_status_path,
     utc_now,
-    validate_invocation_archive_output,
     write_json,
 )
 from phase1_source_runner_common import (
