@@ -6,7 +6,12 @@ import sys
 from pathlib import Path
 from typing import Any, Callable, Sequence
 
-from phase1_common import analyze_csv_quality, file_signature, validate_csv
+from phase1_common import (
+    analyze_csv_quality,
+    file_signature,
+    validate_csv,
+    validate_invocation_archive_output,
+)
 
 
 def validate_collection_scope(
@@ -112,6 +117,47 @@ def assess_source_output(
     if fresh and current_rows < 1:
         failures.append("empty_output")
     return fresh, validation, observed_rows, current_rows, stale_rows, failures
+
+
+def source_status_decision_fields(
+    *,
+    root: Path,
+    config: dict[str, Any],
+    source: str,
+    active_run: str,
+    started_ns: int,
+    rec_before_sig: tuple[int, int] | None,
+    archive_before_sigs: dict[Path, tuple[int, int] | None],
+    fresh: bool,
+    output_path: Path,
+    status_name: str,
+    identity_error: str | None,
+    evidence: dict[str, Any],
+) -> dict[str, Any]:
+    return {
+        "latest_output": str(output_path.relative_to(root)) if fresh else None,
+        "archive_output": (
+            validate_invocation_archive_output(
+                root,
+                config,
+                source,
+                active_run,
+                started_ns,
+                rec_before_sig,
+                archive_before_sigs,
+            )
+            if fresh
+            else None
+        ),
+        "evidence_reconciliation_status": (
+            "reconciled" if evidence.get("reconciled") is True else "not_reconciled"
+        ),
+        "identity_lifecycle_status": (
+            "updated"
+            if status_name == "success" and not identity_error
+            else "not_updated"
+        ),
+    }
 
 
 def collector_status_name(
