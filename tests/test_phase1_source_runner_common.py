@@ -8,6 +8,108 @@ import phase1_source_runner_common as common
 
 
 class SourceRunnerCommonTests(unittest.TestCase):
+
+    def test_build_source_evidence_and_identity_success_and_failure_paths(self):
+        evidence = {
+            "reconciled": True,
+            "pagination_complete": True,
+            "accepted_records": 2,
+            "artifacts": {"accepted": "accepted.csv"},
+            "source_adapter_artifacts": {"records": "records.jsonl"},
+        }
+        identity = {"observed_current_count": 2, "artifacts": {"current": "current.jsonl"}}
+        builder = Mock(return_value=evidence)
+        failures = []
+        with patch.object(
+            common, "update_source_identity_lifecycle", return_value=identity
+        ) as update_identity:
+            result = common.build_source_evidence_and_identity(
+                root=Path("."),
+                config={"vehicle_key": "vehicle"},
+                source="autotrader",
+                active_run="run-1",
+                completed_at="2026-11-03T00:00:00Z",
+                fresh=True,
+                validation={"schema_valid": True},
+                current_rows=2,
+                failures=failures,
+                adapter_schema_version=3,
+                evidence_schema_version=2,
+                build_canonical_evidence=builder,
+            )
+        self.assertEqual(result, (evidence, None, identity, None))
+        self.assertEqual(failures, [])
+        update_identity.assert_called_once()
+        self.assertEqual(update_identity.call_args.kwargs["source"], "autotrader")
+
+        failed_build = Mock(side_effect=RuntimeError("canonical failure"))
+        failures = []
+        result = common.build_source_evidence_and_identity(
+            root=Path("."),
+            config={"vehicle_key": "vehicle"},
+            source="kijiji",
+            active_run="run-2",
+            completed_at="2026-11-03T00:00:00Z",
+            fresh=True,
+            validation={"schema_valid": True},
+            current_rows=2,
+            failures=failures,
+            adapter_schema_version=4,
+            evidence_schema_version=2,
+            build_canonical_evidence=failed_build,
+            additional_evidence_defaults={"query_location_count": 0},
+        )
+        self.assertIn("canonical failure", result[1])
+        self.assertEqual(failures, ["canonical_evidence_failed"])
+        self.assertEqual(result[0]["query_location_count"], 0)
+
+        stale_builder = Mock()
+        result = common.build_source_evidence_and_identity(
+            root=Path("."),
+            config={"vehicle_key": "vehicle"},
+            source="kijiji",
+            active_run="run-3",
+            completed_at="2026-11-03T00:00:00Z",
+            fresh=False,
+            validation={"schema_valid": True},
+            current_rows=0,
+            failures=[],
+            adapter_schema_version=4,
+            evidence_schema_version=2,
+            build_canonical_evidence=stale_builder,
+        )
+        stale_builder.assert_not_called()
+        self.assertIsNone(result[1])
+        self.assertEqual(result[0]["accepted_records"], 0)
+
+    def test_build_source_evidence_blocks_identity_on_reconciliation_failure(self):
+        evidence = {
+            "reconciled": False,
+            "pagination_complete": True,
+            "accepted_records": 1,
+            "artifacts": {"accepted": "accepted.csv"},
+            "source_adapter_artifacts": {},
+        }
+        failures = []
+        with patch.object(common, "update_source_identity_lifecycle") as update_identity:
+            result = common.build_source_evidence_and_identity(
+                root=Path("."),
+                config={"vehicle_key": "vehicle"},
+                source="kijiji",
+                active_run="run-1",
+                completed_at="2026-11-03T00:00:00Z",
+                fresh=True,
+                validation={"schema_valid": True},
+                current_rows=1,
+                failures=failures,
+                adapter_schema_version=4,
+                evidence_schema_version=2,
+                build_canonical_evidence=Mock(return_value=evidence),
+            )
+        self.assertIn("evidence_reconciliation_failed", failures)
+        update_identity.assert_not_called()
+        self.assertEqual(result[2]["observed_current_count"], 0)
+
     def test_collection_scope_validation(self):
         common.validate_collection_scope("full", ("full", "single_pair"))
         with self.assertRaisesRegex(ValueError, "Unsupported collection scope"):
