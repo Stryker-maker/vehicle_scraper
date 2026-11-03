@@ -166,7 +166,14 @@ def run_autotrader(
         "canonical_evidence_artifacts": evidence.get("artifacts", {}),
         **{**validation, "row_count": current_rows}, **quality,
     }
-    status.update(source_schema_version_fields(locals()))
+    status.update(
+        source_schema_version_fields(
+            config_schema_version=CONFIG_SCHEMA_VERSION,
+            evidence_schema_version=EVIDENCE_SCHEMA_VERSION,
+            adapter_schema_version=ADAPTER_SCHEMA_VERSION,
+            identity_schema_version=IDENTITY_LIFECYCLE_SCHEMA_VERSION,
+        )
+    )
     status.update(source_status_metrics_from_context(locals()))
     status.update(source_evidence_status_fields(locals()))
     status.update(source_runtime_contract_fields(locals()))
