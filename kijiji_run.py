@@ -43,6 +43,7 @@ from phase1_source_runner_common import (
     restore_identity_if_unhealthy,
     snapshot_archive_signatures,
     snapshot_reconciliation_signature,
+    source_evidence_status_fields,
     source_execution_outcome_fields,
     source_runtime_contract_fields,
     validate_collection_scope,
@@ -185,16 +186,7 @@ def run_kijiji(
         "row_count": current_rows,
         "current_row_count": current_rows,
         "stale_row_count": stale_rows,
-        "stale_output_available": stale_rows > 0,
-        "observed_file_row_count": observed_rows,
-        "fetched_record_scope": evidence.get("fetched_record_scope"),
-        "source_fetch_completeness": evidence.get("source_fetch_completeness"),
-        "pagination_complete": evidence.get("pagination_complete") is True,
         "query_location_count": int(evidence.get("query_location_count", 0)),
-        "page_request_count": int(evidence.get("page_request_count", 0)),
-        "request_attempt_count": int(evidence.get("request_attempt_count", 0)),
-        "successful_page_count": int(evidence.get("successful_page_count", 0)),
-        "failed_page_count": int(evidence.get("failed_page_count", 0)),
         "listing_specific_location_record_count": int(
             evidence.get("listing_specific_location_records", 0)
         ),
@@ -202,31 +194,19 @@ def run_kijiji(
             evidence.get("unknown_location_records", 0)
         ),
         "fetched_record_count": int(evidence.get("fetched_records", 0)),
-        "normalized_record_count": int(evidence.get("normalized_records", 0)),
         "accepted_record_count": int(evidence.get("accepted_records", 0)),
         "rejected_record_count": int(evidence.get("rejected_records", 0)),
         "parse_failure_count": int(evidence.get("parse_failures", 0)),
-        "evidence_reconciliation_equation": evidence.get(
-            "reconciliation_equation",
-            "fetched_records = accepted_records + rejected_records + parse_failures",
-        ),
         "canonical_evidence_artifacts": evidence.get("artifacts", {}),
-        "source_adapter_artifacts": evidence.get(
-            "source_adapter_artifacts", {}
-        ),
-        "canonical_evidence_error": evidence_error,
-        "identity_lifecycle_error": identity_error,
-        "identity_lifecycle_artifacts": identity.get("artifacts", {}),
-        "identity_observed_current_count": int(identity.get("observed_current_count", 0)),
         "identity_tracked_listing_count": int(identity.get("tracked_listing_count", 0)),
         "identity_new_listing_count": int(identity.get("new_listing_count", 0)),
         "identity_reappeared_listing_count": int(identity.get("reappeared_listing_count", 0)),
         "identity_missing_listing_count": int(identity.get("missing_listing_count", 0)),
         "identity_retired_listing_count": int(identity.get("retired_listing_count", 0)),
-        "identity_transition_event_count": int(identity.get("transition_event_count", 0)),
         **{**validation, "row_count": current_rows},
         **quality,
     }
+    status.update(source_evidence_status_fields(locals()))
     status.update(source_runtime_contract_fields(locals()))
     status.update(source_execution_outcome_fields(locals()))
     finalize_source_status_from_context(status, locals(), source="kijiji")
