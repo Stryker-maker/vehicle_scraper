@@ -147,6 +147,11 @@ def run_autotrader(
     status = build_source_status_from_context(
         locals(),
         source="autotrader",
+        status_schema_version=SOURCE_STATUS_SCHEMA_VERSION,
+        config_schema_version=CONFIG_SCHEMA_VERSION,
+        evidence_schema_version=EVIDENCE_SCHEMA_VERSION,
+        adapter_schema_version=ADAPTER_SCHEMA_VERSION,
+        identity_schema_version=IDENTITY_LIFECYCLE_SCHEMA_VERSION,
         source_fields={
             "distance_processing_disabled": False,
             "distance_filter_disabled": False,
