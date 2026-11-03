@@ -34,6 +34,7 @@ from phase1_source_runner_common import (
     restore_config_if_mutated,
     restore_identity_if_unhealthy,
     snapshot_archive_signatures,
+    source_status_decision_fields,
     validate_collection_scope,
 )
 from vehicle_config import CONFIG_SCHEMA_VERSION, load_vehicle_config
@@ -216,6 +217,20 @@ def run_autotrader(
     )
 
     status = {
+        **source_status_decision_fields(
+            root=root,
+            config=config,
+            source="autotrader",
+            active_run=active_run,
+            started_ns=started_ns,
+            rec_before_sig=rec_before_sig,
+            archive_before_sigs=archive_before_sigs,
+            fresh=fresh,
+            output_path=output_path,
+            status_name=status_name,
+            identity_error=identity_error,
+            evidence=evidence,
+        ),
         "schema_version": SOURCE_STATUS_SCHEMA_VERSION,
         "configuration_schema_version": CONFIG_SCHEMA_VERSION,
         "canonical_evidence_schema_version": EVIDENCE_SCHEMA_VERSION,
@@ -234,10 +249,6 @@ def run_autotrader(
         "exit_code": returncode, "timed_out": timed_out,
         "timeout_seconds": timeout_seconds, "failure_reasons": failures,
         "expected_output": str(output_path.relative_to(root)),
-        "latest_output": str(output_path.relative_to(root)) if fresh else None,
-        "archive_output": validate_invocation_archive_output(
-            root, config, "autotrader", active_run, started_ns, rec_before_sig, archive_before_sigs
-        ) if fresh else None,
         "output_exists": output_path.exists(), "output_updated_this_run": fresh,
         "configured_max_results": None,
         "effective_max_results": "unbounded", "row_cap_disabled": True,
@@ -263,9 +274,6 @@ def run_autotrader(
         "accepted_record_count": int(evidence.get("accepted_records", 0)),
         "rejected_record_count": int(evidence.get("rejected_records", 0)),
         "parse_failure_count": int(evidence.get("parse_failures", 0)),
-        "evidence_reconciliation_status": (
-            "reconciled" if evidence.get("reconciled") is True else "not_reconciled"
-        ),
         "evidence_reconciliation_equation": evidence.get(
             "reconciliation_equation",
             "fetched_records = accepted_records + rejected_records + parse_failures",
@@ -273,9 +281,6 @@ def run_autotrader(
         "canonical_evidence_artifacts": evidence.get("artifacts", {}),
         "source_adapter_artifacts": evidence.get("source_adapter_artifacts", {}),
         "canonical_evidence_error": evidence_error,
-        "identity_lifecycle_status": (
-            "updated" if status_name == "success" and not identity_error else "not_updated"
-        ),
         "identity_lifecycle_error": identity_error,
         "identity_lifecycle_artifacts": identity.get("artifacts", {}),
         "identity_observed_current_count": int(identity.get("observed_current_count", 0)),
