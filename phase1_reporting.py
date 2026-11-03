@@ -279,7 +279,7 @@ def _collect_manual_review_sources(
                     raise ValueError("identity_record_missing_for_accepted_listing")
                 bundles.append((record, status, identity_by_id[canonical_id]))
             identities.extend(identity_records)
-        except (OSError, ValueError, json.JSONDecodeError) as exc:
+        except (OSError, ValueError) as exc:
             excluded[source] = str(exc)
             continue
         source_evidence[source] = {
