@@ -3,8 +3,8 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
-from pathlib import Path
 from collections.abc import Callable, Sequence
+from pathlib import Path
 from typing import Any
 
 from phase1_common import (
@@ -32,11 +32,30 @@ def snapshot_archive_signatures(
     return signatures
 
 
-def restore_config_if_mutated(config_path: Path, original_config: bytes) -> bool:
+def restore_config_if_mutated(
+    config_path: Path, original_config: bytes, failures: list[str]
+) -> bool:
     if config_path.read_bytes() == original_config:
         return True
     config_path.write_bytes(original_config)
+    failures.append("approved_config_mutated")
     return False
+
+
+def snapshot_reconciliation_signature(
+    reconciliation_path: Path,
+) -> tuple[int, int] | None:
+    try:
+        stat = reconciliation_path.stat()
+    except OSError:
+        return None
+    return stat.st_mtime_ns, stat.st_size
+
+
+def resolve_collector_command(
+    command: Sequence[str] | None, default_command: Sequence[str]
+) -> list[str]:
+    return list(command or default_command)
 
 
 def restore_identity_if_unhealthy(
