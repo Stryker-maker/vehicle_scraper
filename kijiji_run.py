@@ -15,7 +15,6 @@ from identity_lifecycle import (
     IDENTITY_LIFECYCLE_SCHEMA_VERSION,
     restore_artifacts,
     snapshot_artifacts,
-    update_source_identity_lifecycle,
 )
 from kijiji_adapter import ADAPTER_SCHEMA_VERSION
 from kijiji_canonical import build_kijiji_canonical_evidence
@@ -32,6 +31,7 @@ from phase1_common import (
 )
 from phase1_source_runner_common import (
     assess_source_output,
+    build_source_evidence_and_identity,
     collector_quality_report,
     collector_status_name,
     execute_source_collector,
@@ -48,105 +48,6 @@ from vehicle_config import CONFIG_SCHEMA_VERSION, load_vehicle_config
 SOURCE_STATUS_SCHEMA_VERSION = 8
 COLLECTION_SCOPE = "full"
 VALID_COLLECTION_SCOPES = ("full", "single_pair")
-
-
-def _empty_evidence() -> dict[str, Any]:
-    return {
-        "source_adapter_schema_version": ADAPTER_SCHEMA_VERSION,
-        "evidence_schema_version": EVIDENCE_SCHEMA_VERSION,
-        "fetched_records": 0,
-        "normalized_records": 0,
-        "accepted_records": 0,
-        "rejected_records": 0,
-        "parse_failures": 0,
-        "reconciled": False,
-        "fetched_record_scope": "not_evaluated",
-        "source_fetch_completeness": "not_evaluated",
-        "pagination_complete": False,
-        "query_location_count": 0,
-        "page_request_count": 0,
-        "request_attempt_count": 0,
-        "successful_page_count": 0,
-        "failed_page_count": 0,
-        "listing_specific_location_records": 0,
-        "unknown_location_records": 0,
-        "artifacts": {},
-        "source_adapter_artifacts": {},
-    }
-
-
-def _empty_identity() -> dict[str, Any]:
-    return {
-        "identity_lifecycle_schema_version": IDENTITY_LIFECYCLE_SCHEMA_VERSION,
-        "observed_current_count": 0,
-        "tracked_listing_count": 0,
-        "new_listing_count": 0,
-        "reappeared_listing_count": 0,
-        "active_listing_count": 0,
-        "current_reappeared_listing_count": 0,
-        "missing_listing_count": 0,
-        "retired_listing_count": 0,
-        "transition_event_count": 0,
-        "artifacts": {},
-    }
-
-
-
-
-def _build_kijiji_evidence_and_identity(
-    *,
-    root: Path,
-    config: dict[str, Any],
-    active_run: str,
-    completed_at: str,
-    fresh: bool,
-    validation: dict[str, Any],
-    current_rows: int,
-    failures: list[str],
-) -> tuple[dict[str, Any], str | None, dict[str, Any], str | None]:
-    evidence = _empty_evidence()
-    evidence_error: str | None = None
-    identity = _empty_identity()
-    identity_error: str | None = None
-    if fresh and validation["schema_valid"]:
-        try:
-            evidence = build_kijiji_canonical_evidence(
-                root=root, config=config, run_id=active_run,
-                completed_at_utc=completed_at,
-            )
-        except Exception as exc:
-            evidence_error = f"{type(exc).__name__}: {exc}"
-            failures.append("canonical_evidence_failed")
-        else:
-            if evidence.get("reconciled") is not True:
-                failures.append("evidence_reconciliation_failed")
-            if evidence.get("pagination_complete") is not True:
-                failures.append("pagination_incomplete")
-            if int(evidence.get("accepted_records", 0)) < 1:
-                failures.append("no_accepted_records")
-            if int(evidence.get("accepted_records", 0)) != current_rows:
-                failures.append("accepted_output_count_mismatch")
-            if not failures:
-                try:
-                    identity = update_source_identity_lifecycle(
-                        root=root,
-                        config=config,
-                        source="kijiji",
-                        run_id=active_run,
-                        observed_at_utc=completed_at,
-                        accepted_artifact=str(evidence["artifacts"]["accepted"]),
-                        adapter_records_artifact=str(
-                            evidence.get("source_adapter_artifacts", {}).get("records")
-                            or ""
-                        ) or None,
-                    )
-                except Exception as exc:
-                    identity_error = f"{type(exc).__name__}: {exc}"
-                    failures.append("identity_lifecycle_failed")
-                else:
-                    if int(identity.get("observed_current_count", -1)) != current_rows:
-                        failures.append("identity_current_count_mismatch")
-    return evidence, evidence_error, identity, identity_error
 
 
 def run_kijiji(
@@ -216,15 +117,24 @@ def run_kijiji(
 
     completed_at = utc_now()
     evidence, evidence_error, identity, identity_error = (
-        _build_kijiji_evidence_and_identity(
+        build_source_evidence_and_identity(
             root=root,
             config=config,
+            source="kijiji",
             active_run=active_run,
             completed_at=completed_at,
             fresh=fresh,
             validation=validation,
             current_rows=current_rows,
             failures=failures,
+            adapter_schema_version=ADAPTER_SCHEMA_VERSION,
+            evidence_schema_version=EVIDENCE_SCHEMA_VERSION,
+            build_canonical_evidence=build_kijiji_canonical_evidence,
+            additional_evidence_defaults={
+                "query_location_count": 0,
+                "listing_specific_location_records": 0,
+                "unknown_location_records": 0,
+            },
         )
     )
 
