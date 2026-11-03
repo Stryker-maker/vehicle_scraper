@@ -8,7 +8,7 @@ import time
 from pathlib import Path
 from typing import Any, Sequence
 
-from autotrader_adapter import ADAPTER_SCHEMA_VERSION, artifact_paths
+from autotrader_adapter import ADAPTER_SCHEMA_VERSION
 from autotrader_canonical import build_autotrader_canonical_evidence
 from baseline_compatibility import build_compatibility_fingerprint
 from canonical_evidence import EVIDENCE_SCHEMA_VERSION
@@ -20,7 +20,7 @@ from identity_lifecycle import (
 )
 from phase1_common import (
     DEFAULT_TIMEOUT_SECONDS, analyze_csv_quality, expected_output_path,
-    file_signature, load_json, source_status_path, utc_now, validate_csv,
+    file_signature, source_status_path, utc_now, validate_csv,
     validate_invocation_archive_output, write_json,
 )
 from vehicle_config import CONFIG_SCHEMA_VERSION, load_vehicle_config

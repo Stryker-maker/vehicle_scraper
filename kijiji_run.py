@@ -16,7 +16,7 @@ from identity_lifecycle import (
     snapshot_artifacts,
     update_source_identity_lifecycle,
 )
-from kijiji_adapter import ADAPTER_SCHEMA_VERSION, artifact_paths
+from kijiji_adapter import ADAPTER_SCHEMA_VERSION
 from kijiji_canonical import build_kijiji_canonical_evidence
 from kijiji_locations import LOCATION_REGISTRY_VERSION
 from phase1_common import (
@@ -24,7 +24,6 @@ from phase1_common import (
     analyze_csv_quality,
     expected_output_path,
     file_signature,
-    load_json,
     source_status_path,
     utc_now,
     validate_csv,
