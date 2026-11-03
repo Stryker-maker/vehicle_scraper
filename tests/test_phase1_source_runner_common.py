@@ -1,4 +1,6 @@
 import subprocess
+from contextlib import redirect_stdout
+from io import StringIO
 import tempfile
 import unittest
 from pathlib import Path
@@ -109,6 +111,57 @@ class SourceRunnerCommonTests(unittest.TestCase):
         self.assertIn("evidence_reconciliation_failed", failures)
         update_identity.assert_not_called()
         self.assertEqual(result[2]["observed_current_count"], 0)
+
+
+    def test_finalize_source_status_from_context(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            output = root / "latest.csv"
+            context = {
+                "root": root,
+                "config": {"vehicle_key": "vehicle"},
+                "active_run": "run-1",
+                "started_ns": 100,
+                "rec_before_sig": None,
+                "archive_before_sigs": {},
+                "fresh": True,
+                "output_path": output,
+                "status_name": "success",
+                "identity_error": None,
+                "evidence": {"reconciled": True},
+            }
+            status = {}
+            with patch.object(
+                common,
+                "validate_invocation_archive_output",
+                return_value="data/vehicle/autotrader/archive.csv",
+            ):
+                common.finalize_source_status_from_context(
+                    status, context, source="autotrader"
+                )
+        self.assertEqual(status["latest_output"], "latest.csv")
+        self.assertEqual(
+            status["archive_output"], "data/vehicle/autotrader/archive.csv"
+        )
+        self.assertEqual(status["evidence_reconciliation_status"], "reconciled")
+        self.assertEqual(status["identity_lifecycle_status"], "updated")
+
+    def test_print_source_summary(self):
+        status = {
+            "fetched_record_count": 10,
+            "accepted_record_count": 4,
+            "rejected_record_count": 6,
+            "parse_failure_count": 1,
+            "identity_lifecycle_status": "updated",
+            "identity_new_listing_count": 2,
+            "identity_reappeared_listing_count": 1,
+        }
+        output = StringIO()
+        with redirect_stdout(output):
+            common.print_source_summary("vehicle", "kijiji", "success", status)
+        self.assertIn("[vehicle:kijiji] success", output.getvalue())
+        self.assertIn("fetched=10", output.getvalue())
+        self.assertIn("reappeared=1", output.getvalue())
 
     def test_collection_scope_validation(self):
         common.validate_collection_scope("full", ("full", "single_pair"))
