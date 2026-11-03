@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import os
-import subprocess
 import sys
 import time
 from pathlib import Path
@@ -19,9 +18,23 @@ from identity_lifecycle import (
     update_source_identity_lifecycle,
 )
 from phase1_common import (
-    DEFAULT_TIMEOUT_SECONDS, analyze_csv_quality, expected_output_path,
-    file_signature, source_status_path, utc_now, validate_csv,
-    validate_invocation_archive_output, write_json,
+    DEFAULT_TIMEOUT_SECONDS,
+    expected_output_path,
+    file_signature,
+    source_status_path,
+    utc_now,
+    validate_invocation_archive_output,
+    write_json,
+)
+from phase1_source_runner_common import (
+    assess_source_output,
+    collector_quality_report,
+    collector_status_name,
+    execute_source_collector,
+    restore_config_if_mutated,
+    restore_identity_if_unhealthy,
+    snapshot_archive_signatures,
+    validate_collection_scope,
 )
 from vehicle_config import CONFIG_SCHEMA_VERSION, load_vehicle_config
 
@@ -68,71 +81,6 @@ def _empty_identity() -> dict[str, Any]:
     }
 
 
-
-
-def _execute_autotrader_collector(
-    command: Sequence[str], *, root: Path, timeout_seconds: float
-) -> tuple[int | None, bool, str, str]:
-    stdout = stderr = ""
-    returncode: int | None = None
-    timed_out = False
-    try:
-        completed = subprocess.run(
-            command, cwd=root, text=True, capture_output=True,
-            check=False, timeout=timeout_seconds, env=os.environ.copy(),
-        )
-        returncode = completed.returncode
-        stdout, stderr = completed.stdout or "", completed.stderr or ""
-    except subprocess.TimeoutExpired as exc:
-        timed_out = True
-        stdout = (
-            (exc.stdout or "").decode("utf-8", errors="replace")
-            if isinstance(exc.stdout, bytes) else (exc.stdout or "")
-        )
-        stderr = (
-            (exc.stderr or "").decode("utf-8", errors="replace")
-            if isinstance(exc.stderr, bytes) else (exc.stderr or "")
-        )
-    for output, stream in ((stdout, sys.stdout), (stderr, sys.stderr)):
-        if output:
-            tail = output[-4000:]
-            print(tail, file=stream, end="" if tail.endswith("\n") else "\n")
-    return returncode, timed_out, stdout, stderr
-
-
-def _assess_autotrader_output(
-    output_path: Path,
-    *,
-    before_signature: tuple[int, int] | None,
-    started_ns: int,
-    returncode: int | None,
-    timed_out: bool,
-) -> tuple[bool, dict[str, Any], int, int, int, list[str]]:
-    after_signature = file_signature(output_path)
-    fresh = bool(
-        after_signature
-        and (
-            before_signature is None
-            or after_signature != before_signature
-            or after_signature[0] >= started_ns
-        )
-    )
-    validation = validate_csv(output_path)
-    observed_rows = int(validation["row_count"])
-    current_rows = observed_rows if fresh else 0
-    stale_rows = observed_rows if output_path.exists() and not fresh else 0
-    failures: list[str] = []
-    if timed_out:
-        failures.append("collector_timed_out")
-    elif returncode != 0:
-        failures.append("collector_command_failed")
-    if not fresh:
-        failures.append("no_fresh_output")
-    if fresh and not validation["schema_valid"]:
-        failures.append("invalid_output_schema")
-    if fresh and current_rows < 1:
-        failures.append("empty_output")
-    return fresh, validation, observed_rows, current_rows, stale_rows, failures
 
 
 def _build_autotrader_evidence_and_identity(
@@ -188,34 +136,6 @@ def _build_autotrader_evidence_and_identity(
     return evidence, evidence_error, identity, identity_error
 
 
-def _collector_status_name(
-    timed_out: bool, returncode: int | None, failures: list[str]
-) -> str:
-    if timed_out:
-        return "timed_out"
-    if returncode not in (0, None):
-        return "failed"
-    return "degraded" if failures else "success"
-
-
-def _collector_quality_report(
-    output_path: Path,
-    source: str,
-    fresh: bool,
-    schema_valid: bool,
-    stale_rows: int,
-) -> dict[str, Any]:
-    if fresh and schema_valid:
-        return analyze_csv_quality(output_path, source)
-    status = "not_evaluated_stale_output" if stale_rows else "not_evaluated"
-    return {
-        "data_quality_status": status,
-        "quality_warning_rows": 0,
-        "quality_warning_count": 0,
-        "quality_warning_summary": {},
-    }
-
-
 def run_autotrader(
     *, root: Path, config_path: Path, command: Sequence[str] | None = None,
     run_id: str | None = None, timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
@@ -225,8 +145,7 @@ def run_autotrader(
     original_config = config_path.read_bytes()
     config = load_vehicle_config(config_path)
     collection_scope = os.environ.get("COLLECTION_SCOPE", COLLECTION_SCOPE)
-    if collection_scope not in VALID_COLLECTION_SCOPES:
-        raise ValueError(f"Unsupported collection scope: {collection_scope}")
+    validate_collection_scope(collection_scope, VALID_COLLECTION_SCOPES)
     compatibility_identity, compatibility_fingerprint = build_compatibility_fingerprint(
         config=config,
         source="autotrader",
@@ -243,10 +162,7 @@ def run_autotrader(
     except OSError:
         rec_before_sig = None
     archive_dir = root / "data" / config["vehicle_key"] / "autotrader"
-    archive_before_sigs: dict[Path, tuple[int, int] | None] = {}
-    if archive_dir.exists():
-        for archive_file in archive_dir.glob("*.csv"):
-            archive_before_sigs[archive_file.resolve()] = file_signature(archive_file)
+    archive_before_sigs = snapshot_archive_signatures(archive_dir)
     before_signature = file_signature(output_path)
     started_at = utc_now()
     started_ns = time.time_ns()
@@ -255,7 +171,7 @@ def run_autotrader(
         str(config_path.relative_to(root)),
     ])
 
-    returncode, timed_out, stdout, stderr = _execute_autotrader_collector(
+    returncode, timed_out, stdout, stderr = execute_source_collector(
         command, root=root, timeout_seconds=timeout_seconds
     )
 
@@ -266,7 +182,7 @@ def run_autotrader(
         current_rows,
         stale_rows,
         failures,
-    ) = _assess_autotrader_output(
+    ) = assess_source_output(
         output_path,
         before_signature=before_signature,
         started_ns=started_ns,
@@ -288,16 +204,14 @@ def run_autotrader(
         )
     )
 
-    config_isolated = config_path.read_bytes() == original_config
+    config_isolated = restore_config_if_mutated(config_path, original_config)
     if not config_isolated:
-        config_path.write_bytes(original_config)
         failures.append("approved_config_mutated")
 
-    status_name = _collector_status_name(timed_out, returncode, failures)
-    if status_name != "success":
-        restore_artifacts(identity_before)
+    status_name = collector_status_name(timed_out, returncode, failures)
+    restore_identity_if_unhealthy(status_name, identity_before, restore_artifacts)
 
-    quality = _collector_quality_report(
+    quality = collector_quality_report(
         output_path, "autotrader", fresh, validation["schema_valid"], stale_rows
     )
 
