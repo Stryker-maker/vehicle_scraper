@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -188,7 +189,10 @@ def run_kijiji(
     )
 
     returncode, timed_out, stdout, stderr = execute_source_collector(
-        command, root=root, timeout_seconds=timeout_seconds
+        command,
+        root=root,
+        timeout_seconds=timeout_seconds,
+        subprocess_module=subprocess,
     )
 
     (
