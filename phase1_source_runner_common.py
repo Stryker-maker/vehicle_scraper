@@ -7,17 +7,16 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any
 
+from identity_lifecycle import (
+    IDENTITY_LIFECYCLE_SCHEMA_VERSION,
+    update_source_identity_lifecycle,
+)
 from phase1_common import (
     analyze_csv_quality,
     file_signature,
     validate_csv,
     validate_invocation_archive_output,
 )
-from identity_lifecycle import (
-    IDENTITY_LIFECYCLE_SCHEMA_VERSION,
-    update_source_identity_lifecycle,
-)
-
 
 
 def empty_source_evidence(
@@ -79,6 +78,7 @@ def build_source_evidence_and_identity(
     evidence_schema_version: int,
     build_canonical_evidence: Callable[..., dict[str, Any]],
     additional_evidence_defaults: dict[str, Any] | None = None,
+    update_identity: Callable[..., dict[str, Any]] | None = None,
 ) -> tuple[dict[str, Any], str | None, dict[str, Any], str | None]:
     evidence = empty_source_evidence(
         adapter_schema_version,
@@ -110,7 +110,7 @@ def build_source_evidence_and_identity(
                 failures.append("accepted_output_count_mismatch")
             if not failures:
                 try:
-                    identity = update_source_identity_lifecycle(
+                    identity = (update_identity or update_source_identity_lifecycle)(
                         root=root,
                         config=config,
                         source=source,
