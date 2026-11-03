@@ -45,6 +45,7 @@ from phase1_source_runner_common import (
     source_evidence_status_fields,
     source_execution_outcome_fields,
     source_runtime_contract_fields,
+    source_schema_version_fields,
     source_status_metrics_from_context,
     validate_collection_scope,
 )
@@ -151,10 +152,6 @@ def run_autotrader(
 
     status = {
         "schema_version": SOURCE_STATUS_SCHEMA_VERSION,
-        "configuration_schema_version": CONFIG_SCHEMA_VERSION,
-        "canonical_evidence_schema_version": EVIDENCE_SCHEMA_VERSION,
-        "source_adapter_schema_version": ADAPTER_SCHEMA_VERSION,
-        "identity_lifecycle_schema_version": IDENTITY_LIFECYCLE_SCHEMA_VERSION,
         "run_id": active_run,
         "vehicle_key": config["vehicle_key"], "source": "autotrader",
         "collection_scope": collection_scope,
@@ -169,6 +166,7 @@ def run_autotrader(
         "canonical_evidence_artifacts": evidence.get("artifacts", {}),
         **{**validation, "row_count": current_rows}, **quality,
     }
+    status.update(source_schema_version_fields(locals()))
     status.update(source_status_metrics_from_context(locals()))
     status.update(source_evidence_status_fields(locals()))
     status.update(source_runtime_contract_fields(locals()))
