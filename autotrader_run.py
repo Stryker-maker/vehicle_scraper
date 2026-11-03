@@ -6,7 +6,8 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Any, Sequence
+from collections.abc import Sequence
+from typing import Any
 
 from autotrader_adapter import ADAPTER_SCHEMA_VERSION
 from autotrader_canonical import build_autotrader_canonical_evidence
