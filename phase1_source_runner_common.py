@@ -304,6 +304,23 @@ def source_status_decision_fields(
 
 
 
+
+def source_runtime_contract_fields(
+    context: Mapping[str, Any],
+) -> dict[str, Any]:
+    return {
+        "runtime_config_projection": "direct_schema_v2",
+        "approved_config_contains_legacy_controls": False,
+        "configured_max_results": None,
+        "effective_max_results": "unbounded",
+        "row_cap_disabled": True,
+        "config_isolated": context["config_isolated"],
+        "legacy_source_ranking_disabled": True,
+        "legacy_price_history_active": False,
+        "legacy_price_history_status": "retired_not_used_by_supported_output",
+    }
+
+
 def finalize_source_status_from_context(
     status: dict[str, Any],
     context: Mapping[str, Any],
