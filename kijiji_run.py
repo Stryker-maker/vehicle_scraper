@@ -33,6 +33,7 @@ from phase1_common import (
 from phase1_source_runner_common import (
     assess_source_output,
     build_source_evidence_and_identity,
+    build_source_status,
     collector_quality_report,
     collector_status_name,
     execute_source_collector,
@@ -153,97 +154,62 @@ def run_kijiji(
         analyze_csv_quality_func=analyze_csv_quality,
     )
 
-    status = {
-        "schema_version": SOURCE_STATUS_SCHEMA_VERSION,
-        "configuration_schema_version": CONFIG_SCHEMA_VERSION,
-        "canonical_evidence_schema_version": EVIDENCE_SCHEMA_VERSION,
-        "source_adapter_schema_version": ADAPTER_SCHEMA_VERSION,
-        "identity_lifecycle_schema_version": IDENTITY_LIFECYCLE_SCHEMA_VERSION,
-        "location_registry_version": LOCATION_REGISTRY_VERSION,
-        "runtime_config_projection": "direct_schema_v2",
-        "approved_config_contains_legacy_controls": False,
-        "run_id": active_run,
-        "vehicle_key": config["vehicle_key"],
-        "source": "kijiji",
-        "collection_scope": collection_scope,
-        "compatibility_identity": compatibility_identity,
-        "compatibility_fingerprint": compatibility_fingerprint,
-        "config_path": str(config_path.relative_to(root)),
-        "command": command,
-        "started_at_utc": started_at,
-        "completed_at_utc": completed_at,
-        "execution_status": status_name,
-        "collection_status": status_name,
-        "exit_code": returncode,
-        "timed_out": timed_out,
-        "timeout_seconds": timeout_seconds,
-        "failure_reasons": failures,
-        "expected_output": str(output_path.relative_to(root)),
-        "output_exists": output_path.exists(),
-        "output_updated_this_run": fresh,
-        "configured_max_results": None,
-        "effective_max_results": "unbounded",
-        "row_cap_disabled": True,
-        "config_isolated": config_isolated,
-        "distance_processing_disabled": True,
-        "distance_filter_disabled": True,
-        "legacy_source_ranking_disabled": True,
-        "legacy_price_history_active": False,
-        "legacy_price_history_status": "retired_not_used_by_supported_output",
-        "location_evidence_contract": (
-            "listing_specific_source_geography_or_unknown_"
-            "query_origin_never_location"
-        ),
-        "distance_evidence_contract": (
-            "disabled_until_listing_specific_geography_is_routable_and_verified"
-        ),
-        "row_count": current_rows,
-        "current_row_count": current_rows,
-        "stale_row_count": stale_rows,
-        "stale_output_available": stale_rows > 0,
-        "observed_file_row_count": observed_rows,
-        "fetched_record_scope": evidence.get("fetched_record_scope"),
-        "source_fetch_completeness": evidence.get("source_fetch_completeness"),
-        "pagination_complete": evidence.get("pagination_complete") is True,
-        "query_location_count": int(evidence.get("query_location_count", 0)),
-        "page_request_count": int(evidence.get("page_request_count", 0)),
-        "request_attempt_count": int(evidence.get("request_attempt_count", 0)),
-        "successful_page_count": int(evidence.get("successful_page_count", 0)),
-        "failed_page_count": int(evidence.get("failed_page_count", 0)),
-        "listing_specific_location_record_count": int(
-            evidence.get("listing_specific_location_records", 0)
-        ),
-        "unknown_location_record_count": int(
-            evidence.get("unknown_location_records", 0)
-        ),
-        "fetched_record_count": int(evidence.get("fetched_records", 0)),
-        "normalized_record_count": int(evidence.get("normalized_records", 0)),
-        "accepted_record_count": int(evidence.get("accepted_records", 0)),
-        "rejected_record_count": int(evidence.get("rejected_records", 0)),
-        "parse_failure_count": int(evidence.get("parse_failures", 0)),
-        "evidence_reconciliation_equation": evidence.get(
-            "reconciliation_equation",
-            "fetched_records = accepted_records + rejected_records + parse_failures",
-        ),
-        "canonical_evidence_artifacts": evidence.get("artifacts", {}),
-        "source_adapter_artifacts": evidence.get(
-            "source_adapter_artifacts", {}
-        ),
-        "canonical_evidence_error": evidence_error,
-        "identity_lifecycle_error": identity_error,
-        "identity_lifecycle_artifacts": identity.get("artifacts", {}),
-        "identity_observed_current_count": int(identity.get("observed_current_count", 0)),
-        "identity_tracked_listing_count": int(identity.get("tracked_listing_count", 0)),
-        "identity_new_listing_count": int(identity.get("new_listing_count", 0)),
-        "identity_reappeared_listing_count": int(identity.get("reappeared_listing_count", 0)),
-        "identity_missing_listing_count": int(identity.get("missing_listing_count", 0)),
-        "identity_retired_listing_count": int(identity.get("retired_listing_count", 0)),
-        "identity_transition_event_count": int(identity.get("transition_event_count", 0)),
-        **{**validation, "row_count": current_rows},
-        **quality,
-        "stdout_tail": stdout[-4000:],
-        "stderr_tail": stderr[-4000:],
-    }
+    status = build_source_status(
+        source="kijiji",
+        status_schema_version=SOURCE_STATUS_SCHEMA_VERSION,
+        config_schema_version=CONFIG_SCHEMA_VERSION,
+        evidence_schema_version=EVIDENCE_SCHEMA_VERSION,
+        adapter_schema_version=ADAPTER_SCHEMA_VERSION,
+        identity_schema_version=IDENTITY_LIFECYCLE_SCHEMA_VERSION,
+        active_run=active_run,
+        config=config,
+        collection_scope=collection_scope,
+        compatibility_identity=compatibility_identity,
+        compatibility_fingerprint=compatibility_fingerprint,
+        config_path=config_path,
+        root=root,
+        command=command,
+        started_at=started_at,
+        completed_at=completed_at,
+        status_name=status_name,
+        returncode=returncode,
+        timed_out=timed_out,
+        timeout_seconds=timeout_seconds,
+        failures=failures,
+        output_path=output_path,
+        fresh=fresh,
+        current_rows=current_rows,
+        stale_rows=stale_rows,
+        observed_rows=observed_rows,
+        config_isolated=config_isolated,
+        evidence=evidence,
+        evidence_error=evidence_error,
+        identity_error=identity_error,
+        identity=identity,
+        validation=validation,
+        quality=quality,
+        stdout=stdout,
+        stderr=stderr,
+        source_fields={
+            "location_registry_version": LOCATION_REGISTRY_VERSION,
+            "distance_processing_disabled": True,
+            "distance_filter_disabled": True,
+            "location_evidence_contract": (
+                "listing_specific_source_geography_or_unknown_"
+                "query_origin_never_location"
+            ),
+            "distance_evidence_contract": (
+                "disabled_until_listing_specific_geography_is_routable_and_verified"
+            ),
+            "query_location_count": int(evidence.get("query_location_count", 0)),
+            "listing_specific_location_record_count": int(
+                evidence.get("listing_specific_location_records", 0)
+            ),
+            "unknown_location_record_count": int(
+                evidence.get("unknown_location_records", 0)
+            ),
+        },
+    )
     status.update(
         source_status_decision_fields(
             root=root,
