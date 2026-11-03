@@ -179,6 +179,39 @@ class SourceRunnerCommonTests(unittest.TestCase):
             "retired_not_used_by_supported_output",
         )
 
+
+    def test_source_execution_outcome_fields(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            output = root / "latest.csv"
+            output.write_text("data", encoding="utf-8")
+            fields = common.source_execution_outcome_fields(
+                {
+                    "command": ["python", "adapter.py"],
+                    "collection_scope": "full",
+                    "started_at": "start",
+                    "returncode": 0,
+                    "timed_out": False,
+                    "timeout_seconds": 90,
+                    "output_path": output,
+                    "root": root,
+                    "fresh": True,
+                    "stdout": "out",
+                    "stderr": "err",
+                }
+            )
+        self.assertEqual(fields["command"], ["python", "adapter.py"])
+        self.assertEqual(fields["collection_scope"], "full")
+        self.assertEqual(fields["started_at_utc"], "start")
+        self.assertEqual(fields["exit_code"], 0)
+        self.assertFalse(fields["timed_out"])
+        self.assertEqual(fields["timeout_seconds"], 90)
+        self.assertEqual(fields["expected_output"], "latest.csv")
+        self.assertTrue(fields["output_exists"])
+        self.assertTrue(fields["output_updated_this_run"])
+        self.assertEqual(fields["stdout_tail"], "out")
+        self.assertEqual(fields["stderr_tail"], "err")
+
     def test_collection_scope_validation(self):
         common.validate_collection_scope("full", ("full", "single_pair"))
         with self.assertRaisesRegex(ValueError, "Unsupported collection scope"):
