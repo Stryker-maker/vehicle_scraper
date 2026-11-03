@@ -5,8 +5,8 @@ import os
 import subprocess
 import sys
 import time
-from pathlib import Path
 from collections.abc import Sequence
+from pathlib import Path
 from typing import Any
 
 from baseline_compatibility import build_compatibility_fingerprint
@@ -21,8 +21,8 @@ from kijiji_adapter import ADAPTER_SCHEMA_VERSION
 from kijiji_canonical import build_kijiji_canonical_evidence
 from kijiji_locations import LOCATION_REGISTRY_VERSION
 from phase1_common import (
-    analyze_csv_quality,
     DEFAULT_TIMEOUT_SECONDS,
+    analyze_csv_quality,
     expected_output_path,
     file_signature,
     source_status_path,
