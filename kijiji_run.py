@@ -158,7 +158,7 @@ def run_kijiji(
     timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
 ) -> dict[str, Any]:
     root = root.resolve()
-    config_path = config_path if config_path.is_absolute() else root / config_path
+    config_path = root / config_path
     original_config = config_path.read_bytes()
     config = load_vehicle_config(config_path)
     collection_scope = os.environ.get("COLLECTION_SCOPE", COLLECTION_SCOPE)
