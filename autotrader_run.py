@@ -36,13 +36,13 @@ from phase1_source_runner_common import (
     collector_status_name,
     execute_source_collector,
     finalize_source_status_from_context,
-    source_runtime_contract_fields,
     print_source_summary,
     resolve_collector_command,
     restore_config_if_mutated,
     restore_identity_if_unhealthy,
     snapshot_archive_signatures,
     snapshot_reconciliation_signature,
+    source_runtime_contract_fields,
     validate_collection_scope,
 )
 from vehicle_config import CONFIG_SCHEMA_VERSION, load_vehicle_config
