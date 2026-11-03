@@ -202,7 +202,9 @@ def collector_quality_report(
     fresh: bool,
     schema_valid: bool,
     stale_rows: int,
-    analyze_csv_quality_func: Callable[[Path, str], dict[str, Any]] = analyze_csv_quality,
+    analyze_csv_quality_func: Callable[[Path, str], dict[str, Any]] = (
+        analyze_csv_quality
+    ),
 ) -> dict[str, Any]:
     if fresh and schema_valid:
         return analyze_csv_quality_func(output_path, source)
