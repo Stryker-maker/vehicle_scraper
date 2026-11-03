@@ -48,6 +48,7 @@ from phase1_source_runner_common import (
     source_runtime_contract_fields,
     source_schema_version_fields,
     source_status_identity_fields,
+    source_validation_quality_fields,
     source_status_metrics_from_context,
     validate_collection_scope,
 )
@@ -161,7 +162,6 @@ def run_kijiji(
     )
 
     status = {
-        "schema_version": SOURCE_STATUS_SCHEMA_VERSION,
         "location_registry_version": LOCATION_REGISTRY_VERSION,
         "distance_processing_disabled": True,
         "distance_filter_disabled": True,
@@ -179,13 +179,12 @@ def run_kijiji(
         "unknown_location_record_count": int(
             evidence.get("unknown_location_records", 0)
         ),
-        "canonical_evidence_artifacts": evidence.get("artifacts", {}),
-        **{**validation, "row_count": current_rows},
-        **quality,
     }
+    status.update(source_validation_quality_fields(validation, quality, current_rows))
     status.update(source_status_identity_fields(locals(), source="kijiji"))
     status.update(
         source_schema_version_fields(
+            status_schema_version=SOURCE_STATUS_SCHEMA_VERSION,
             config_schema_version=CONFIG_SCHEMA_VERSION,
             evidence_schema_version=EVIDENCE_SCHEMA_VERSION,
             adapter_schema_version=ADAPTER_SCHEMA_VERSION,
