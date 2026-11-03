@@ -45,8 +45,8 @@ from phase1_source_runner_common import (
     snapshot_reconciliation_signature,
     source_evidence_status_fields,
     source_execution_outcome_fields,
-    source_status_metrics_from_context,
     source_runtime_contract_fields,
+    source_status_metrics_from_context,
     validate_collection_scope,
 )
 from vehicle_config import CONFIG_SCHEMA_VERSION, load_vehicle_config
