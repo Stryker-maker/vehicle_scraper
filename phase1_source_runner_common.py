@@ -310,6 +310,18 @@ def source_status_decision_fields(
 
 
 
+
+def source_validation_quality_fields(
+    validation: dict[str, Any],
+    quality: dict[str, Any],
+    current_rows: int,
+) -> dict[str, Any]:
+    fields = dict(validation)
+    fields["row_count"] = current_rows
+    fields.update(quality)
+    return fields
+
+
 def source_status_identity_fields(
     context: Mapping[str, Any],
     *,
@@ -332,12 +344,14 @@ def source_status_identity_fields(
 
 def source_schema_version_fields(
     *,
+    status_schema_version: int,
     config_schema_version: int,
     evidence_schema_version: int,
     adapter_schema_version: int,
     identity_schema_version: int,
 ) -> dict[str, Any]:
     return {
+        "schema_version": status_schema_version,
         "configuration_schema_version": config_schema_version,
         "canonical_evidence_schema_version": evidence_schema_version,
         "source_adapter_schema_version": adapter_schema_version,
@@ -420,6 +434,7 @@ def source_evidence_status_fields(
             "reconciliation_equation",
             "fetched_records = accepted_records + rejected_records + parse_failures",
         ),
+        "canonical_evidence_artifacts": evidence.get("artifacts", {}),
         "source_adapter_artifacts": evidence.get("source_adapter_artifacts", {}),
         "canonical_evidence_error": context["evidence_error"],
         "identity_lifecycle_error": context["identity_error"],
