@@ -4,6 +4,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -137,6 +138,24 @@ class KijijiAdapterTests(unittest.TestCase):
 
     def tearDown(self):
         self.temp.cleanup()
+
+    def test_parse_listing_fails_closed_when_price_year_helper_returns_empty_values(
+        self,
+    ):
+        with patch(
+            "kijiji_adapter._kijiji_price_and_year",
+            return_value=(None, None, []),
+        ):
+            row, rejections, failures = parse_listing(
+                listing("invariant"),
+                config=self.config,
+                tiers={"tier1": [], "tier2": [], "tier3": []},
+                provenance={},
+            )
+
+        self.assertIsNone(row)
+        self.assertEqual(rejections, [])
+        self.assertEqual(failures, ["invalid_price", "invalid_year"])
 
     def test_validated_location_registry_and_search_url(self):
         descriptor = query_location("Edmonton, AB")
