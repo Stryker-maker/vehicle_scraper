@@ -10,7 +10,7 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from autotrader_adapter import ADAPTER_SCHEMA_VERSION as AUTOTRADER_ADAPTER_SCHEMA_VERSION
-from autotrader_run import run_autotrader
+from autotrader_run import run_autotrader, _restore_autotrader_config_if_mutated
 from baseline_compatibility import build_compatibility_fingerprint
 from canonical_evidence import EVIDENCE_SCHEMA_VERSION
 from kijiji_adapter import ADAPTER_SCHEMA_VERSION as KIJIJI_ADAPTER_SCHEMA_VERSION
@@ -45,6 +45,20 @@ class RunStatusCompatibilityMetadataTests(unittest.TestCase):
     def tearDown(self):
         """Remove the isolated test filesystem."""
         self.temp.cleanup()
+
+    def test_autotrader_config_mutation_is_restored_and_reported(self):
+        """Verify the runner restores an approved config before writing status."""
+        original_config = self.config_path.read_bytes()
+        self.config_path.write_bytes(b"mutated configuration")
+        failures = []
+
+        isolated = _restore_autotrader_config_if_mutated(
+            self.config_path, original_config, failures
+        )
+
+        self.assertFalse(isolated)
+        self.assertEqual(self.config_path.read_bytes(), original_config)
+        self.assertEqual(failures, ["approved_config_mutated"])
 
     @staticmethod
     def _evidence():
