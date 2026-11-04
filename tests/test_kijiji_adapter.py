@@ -157,6 +157,22 @@ class KijijiAdapterTests(unittest.TestCase):
         self.assertEqual(rejections, [])
         self.assertEqual(failures, ["invalid_price", "invalid_year"])
 
+    def test_parse_listing_preserves_independent_parse_failures(self):
+        with patch(
+            "kijiji_adapter._kijiji_price_and_year",
+            return_value=(55000, 2022, ["invalid_listing_payload"]),
+        ):
+            row, rejections, failures = parse_listing(
+                listing("parse-failure"),
+                config=self.config,
+                tiers={"tier1": [], "tier2": [], "tier3": []},
+                provenance={},
+            )
+
+        self.assertIsNone(row)
+        self.assertEqual(rejections, [])
+        self.assertEqual(failures, ["invalid_listing_payload"])
+
     def test_validated_location_registry_and_search_url(self):
         descriptor = query_location("Edmonton, AB")
         self.assertEqual(descriptor["location_id"], "1700202")
