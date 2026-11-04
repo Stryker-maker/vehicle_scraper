@@ -218,6 +218,16 @@ def _kijiji_collector_status_name(
     return "degraded" if failures else "success"
 
 
+def _restore_kijiji_config_if_mutated(
+    config_path: Path, original_config: bytes, failures: list[str]
+) -> bool:
+    config_isolated = config_path.read_bytes() == original_config
+    if not config_isolated:
+        config_path.write_bytes(original_config)
+        failures.append("approved_config_mutated")
+    return config_isolated
+
+
 def _kijiji_quality_report(
     output_path: Path,
     fresh: bool,
@@ -316,10 +326,9 @@ def run_kijiji(
         )
     )
 
-    config_isolated = config_path.read_bytes() == original_config
-    if not config_isolated:
-        config_path.write_bytes(original_config)
-        failures.append("approved_config_mutated")
+    config_isolated = _restore_kijiji_config_if_mutated(
+        config_path, original_config, failures
+    )
     status_name = _kijiji_collector_status_name(timed_out, returncode, failures)
     if status_name != "success":
         restore_artifacts(identity_before)
