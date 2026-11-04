@@ -460,15 +460,13 @@ def parse_listing(
     configuration = str(item.get("vehicleConfiguration") or "").strip()
     combined = " ".join((title, description, configuration))
     price, year, parse_failures = _kijiji_price_and_year(item, title)
-    if price is None or year is None:
-        missing_values = []
+    if parse_failures or price is None or year is None:
+        missing_values = set(parse_failures)
         if price is None:
-            missing_values.append("invalid_price")
+            missing_values.add("invalid_price")
         if year is None:
-            missing_values.append("invalid_year")
-        return None, [], sorted(set([*parse_failures, *missing_values]))
-    if parse_failures:
-        return None, [], parse_failures
+            missing_values.add("invalid_year")
+        return None, [], sorted(missing_values)
     mileage = clean_int(item.get("mileageFromOdometer"))
     fuel, engine = _fuel_and_engine(item, combined)
     location, address, location_status, address_status = extract_listing_geography(item)
