@@ -227,6 +227,74 @@ def _accepted_records(
     return records
 
 
+def _collect_manual_review_sources(
+    root: Path,
+    config: dict[str, Any],
+    enabled_sources: Sequence[str],
+    active_run: str,
+) -> tuple[
+    list[str],
+    dict[str, str],
+    dict[str, dict[str, int]],
+    list[tuple[dict[str, Any], dict[str, Any], dict[str, Any]]],
+    list[dict[str, Any]],
+]:
+    key = str(config["vehicle_key"])
+    included: list[str] = []
+    excluded: dict[str, str] = {}
+    source_evidence: dict[str, dict[str, int]] = {}
+    bundles: list[tuple[dict[str, Any], dict[str, Any], dict[str, Any]]] = []
+    identities: list[dict[str, Any]] = []
+    for source in enabled_sources:
+        if check_source_anomalously_isolated(root, key, source, active_run):
+            excluded[source] = "isolated_due_to_critical_anomaly"
+            continue
+        status_path = source_status_path(root, config, source)
+        if not status_path.exists():
+            excluded[source] = "missing_status"
+            continue
+        status = load_json(status_path)
+        if not status_is_current_success(status, active_run):
+            excluded[source] = str(status.get("execution_status", "not_current"))
+            continue
+        try:
+            records = _accepted_records(
+                root=root, status=status, active_run=active_run
+            )
+            identity_records = load_current_identity_records(
+                root=root,
+                config=config,
+                source=source,
+                run_id=active_run,
+            )
+            if len(identity_records) != len(records):
+                raise ValueError("identity_current_count_mismatch")
+            identity_by_id = {
+                str(value["canonical_listing_id"]): value
+                for value in identity_records
+            }
+            for record in records:
+                canonical_id = str(record.get("canonical_listing_id") or "")
+                if canonical_id not in identity_by_id:
+                    raise ValueError("identity_record_missing_for_accepted_listing")
+                bundles.append((record, status, identity_by_id[canonical_id]))
+            identities.extend(identity_records)
+        except (OSError, ValueError, json.JSONDecodeError) as exc:
+            excluded[source] = str(exc)
+            continue
+        source_evidence[source] = {
+            "fetched_records": int(status.get("fetched_record_count", 0)),
+            "accepted_records": int(status.get("accepted_record_count", 0)),
+            "rejected_records": int(status.get("rejected_record_count", 0)),
+            "parse_failures": int(status.get("parse_failure_count", 0)),
+            "tracked_listings": int(status.get("identity_tracked_listing_count", 0)),
+            "missing_listings": int(status.get("identity_missing_listing_count", 0)),
+            "retired_listings": int(status.get("identity_retired_listing_count", 0)),
+        }
+        included.append(source)
+    return included, excluded, source_evidence, bundles, identities
+
+
 def build_manual_review(
     *, root: Path, config_paths: Iterable[Path] | None = None,
     source_plan: SourcePlan | None = None, run_id: str | None = None,
@@ -240,58 +308,15 @@ def build_manual_review(
         config_path = raw_path if raw_path.is_absolute() else root / raw_path
         config = load_json(config_path)
         key = str(config["vehicle_key"])
-        included: list[str] = []
-        excluded: dict[str, str] = {}
-        source_evidence: dict[str, dict[str, int]] = {}
-        bundles: list[tuple[dict[str, Any], dict[str, Any], dict[str, Any]]] = []
-        identities: list[dict[str, Any]] = []
-        for source in enabled_sources:
-            if check_source_anomalously_isolated(root, key, source, active_run):
-                excluded[source] = "isolated_due_to_critical_anomaly"
-                continue
-            status_path = source_status_path(root, config, source)
-            if not status_path.exists():
-                excluded[source] = "missing_status"
-                continue
-            status = load_json(status_path)
-            if not status_is_current_success(status, active_run):
-                excluded[source] = str(status.get("execution_status", "not_current"))
-                continue
-            try:
-                records = _accepted_records(
-                    root=root, status=status, active_run=active_run
-                )
-                identity_records = load_current_identity_records(
-                    root=root,
-                    config=config,
-                    source=source,
-                    run_id=active_run,
-                )
-                if len(identity_records) != len(records):
-                    raise ValueError("identity_current_count_mismatch")
-                identity_by_id = {
-                    str(value["canonical_listing_id"]): value
-                    for value in identity_records
-                }
-                for record in records:
-                    canonical_id = str(record.get("canonical_listing_id") or "")
-                    if canonical_id not in identity_by_id:
-                        raise ValueError("identity_record_missing_for_accepted_listing")
-                    bundles.append((record, status, identity_by_id[canonical_id]))
-                identities.extend(identity_records)
-            except (OSError, ValueError, json.JSONDecodeError) as exc:
-                excluded[source] = str(exc)
-                continue
-            source_evidence[source] = {
-                "fetched_records": int(status.get("fetched_record_count", 0)),
-                "accepted_records": int(status.get("accepted_record_count", 0)),
-                "rejected_records": int(status.get("rejected_record_count", 0)),
-                "parse_failures": int(status.get("parse_failure_count", 0)),
-                "tracked_listings": int(status.get("identity_tracked_listing_count", 0)),
-                "missing_listings": int(status.get("identity_missing_listing_count", 0)),
-                "retired_listings": int(status.get("identity_retired_listing_count", 0)),
-            }
-            included.append(source)
+        (
+            included,
+            excluded,
+            source_evidence,
+            bundles,
+            identities,
+        ) = _collect_manual_review_sources(
+            root, config, enabled_sources, active_run
+        )
 
         duplicate_summary = build_duplicate_candidates(
             root=root,

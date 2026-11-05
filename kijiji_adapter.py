@@ -337,52 +337,41 @@ def _source_text(value: Any) -> str:
     return "" if value is None else str(value).strip()
 
 
-def parse_listing(
-    item: dict[str, Any],
-    *,
-    config: dict[str, Any],
-    tiers: dict[str, list[str]],
-    provenance: dict[str, Any],
-) -> tuple[dict[str, Any] | None, list[str], list[str]]:
-    url = str(item.get("url") or item.get("@id") or "").strip()
-    listing_id = _listing_id(item, url)
-    title = str(item.get("name") or "").strip()
-    description = str(item.get("description") or "").strip()
-    configuration = str(item.get("vehicleConfiguration") or "").strip()
-    combined = " ".join((title, description, configuration))
+def _kijiji_price_and_year(
+    item: dict[str, Any], title: str
+) -> tuple[int | None, int | None, list[str]]:
     offers = _offers(item)
     price = clean_int(offers.get("price"))
     year = clean_int(item.get("vehicleModelDate"))
     if year is None:
         match = re.search(r"\b(?:19|20)\d{2}\b", title)
         year = int(match.group(0)) if match else None
-    if price is None or year is None:
-        parse_failures: list[str] = []
-        if price is None:
-            parse_failures.append("invalid_price")
-        if year is None:
-            parse_failures.append("invalid_year")
-        return None, [], parse_failures
+    failures: list[str] = []
+    if price is None:
+        failures.append("invalid_price")
+    if year is None:
+        failures.append("invalid_year")
+    return price, year, failures
 
-    mileage = clean_int(item.get("mileageFromOdometer"))
-    fuel, engine = _fuel_and_engine(item, combined)
-    location, address, location_status, address_status = extract_listing_geography(item)
-    seller = item.get("seller") if isinstance(item.get("seller"), dict) else {}
-    seller_name = str(seller.get("name") or seller.get("legalName") or "Unknown").strip()
-    seller_type = "Dealer" if seller_name and seller_name != "Unknown" else "Unknown"
-    region_hint = extract_url_region_hint(url)
-    criteria = config["criteria"]
+
+def _kijiji_rejection_reasons(
+    criteria: dict[str, Any],
+    *,
+    listing_id: str,
+    url: str,
+    price: int,
+    year: int,
+    fuel: str,
+    engine: str,
+) -> list[str]:
     rejections: list[str] = []
     if not listing_id:
         rejections.append("missing_source_listing_id")
     if not url:
         rejections.append("missing_listing_url")
-    min_year: int = criteria["min_year"]
-    max_year: int = criteria["max_year"]
-    max_price: int = criteria["max_price_cad"]
-    if not min_year <= year <= max_year:
+    if not criteria["min_year"] <= year <= criteria["max_year"]:
         rejections.append("year_out_of_range")
-    if not 0 < price <= max_price:
+    if not 0 < price <= criteria["max_price_cad"]:
         rejections.append("price_out_of_range")
     required_fuel = str(criteria.get("fuel") or "").strip()
     if required_fuel and required_fuel.casefold() not in fuel.casefold():
@@ -390,9 +379,35 @@ def parse_listing(
     required_engine = str(criteria.get("engine") or "").strip()
     if required_engine and required_engine.casefold() not in engine.casefold():
         rejections.append("engine_unknown" if engine == "Unknown" else "engine_mismatch")
+    return rejections
 
+
+def _kijiji_listing_row(
+    item: dict[str, Any],
+    config: dict[str, Any],
+    tiers: dict[str, list[str]],
+    *,
+    title: str,
+    combined: str,
+    configuration: str,
+    url: str,
+    listing_id: str,
+    price: int,
+    year: int,
+    mileage: int | None,
+    fuel: str,
+    engine: str,
+    location: str,
+    address: str,
+    location_status: str,
+    address_status: str,
+    seller_name: str,
+    seller_type: str,
+    region_hint: str,
+    provenance: dict[str, Any],
+) -> dict[str, Any]:
     trim_source = configuration or title
-    row = {
+    return {
         "year": year,
         "make": _source_text(item.get("manufacturer"))
         or config["sources"]["kijiji"]["make"],
@@ -429,8 +444,69 @@ def parse_listing(
         "source": "Kijiji",
         **provenance,
     }
-    return row, sorted(set(rejections)), []
 
+
+def parse_listing(
+    item: dict[str, Any],
+    *,
+    config: dict[str, Any],
+    tiers: dict[str, list[str]],
+    provenance: dict[str, Any],
+) -> tuple[dict[str, Any] | None, list[str], list[str]]:
+    url = str(item.get("url") or item.get("@id") or "").strip()
+    listing_id = _listing_id(item, url)
+    title = str(item.get("name") or "").strip()
+    description = str(item.get("description") or "").strip()
+    configuration = str(item.get("vehicleConfiguration") or "").strip()
+    combined = " ".join((title, description, configuration))
+    price, year, parse_failures = _kijiji_price_and_year(item, title)
+    if parse_failures or price is None or year is None:
+        missing_values = set(parse_failures)
+        if price is None:
+            missing_values.add("invalid_price")
+        if year is None:
+            missing_values.add("invalid_year")
+        return None, [], sorted(missing_values)
+    mileage = clean_int(item.get("mileageFromOdometer"))
+    fuel, engine = _fuel_and_engine(item, combined)
+    location, address, location_status, address_status = extract_listing_geography(item)
+    seller = item.get("seller") if isinstance(item.get("seller"), dict) else {}
+    seller_name = str(seller.get("name") or seller.get("legalName") or "Unknown").strip()
+    seller_type = "Dealer" if seller_name and seller_name != "Unknown" else "Unknown"
+    region_hint = extract_url_region_hint(url)
+    rejections = _kijiji_rejection_reasons(
+        config["criteria"],
+        listing_id=listing_id,
+        url=url,
+        price=price,
+        year=year,
+        fuel=fuel,
+        engine=engine,
+    )
+    row = _kijiji_listing_row(
+        item,
+        config,
+        tiers,
+        title=title,
+        combined=combined,
+        configuration=configuration,
+        url=url,
+        listing_id=listing_id,
+        price=price,
+        year=year,
+        mileage=mileage,
+        fuel=fuel,
+        engine=engine,
+        location=location,
+        address=address,
+        location_status=location_status,
+        address_status=address_status,
+        seller_name=seller_name,
+        seller_type=seller_type,
+        region_hint=region_hint,
+        provenance=provenance,
+    )
+    return row, sorted(set(rejections)), []
 
 def default_session() -> SessionLike:
     import requests

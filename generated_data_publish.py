@@ -422,48 +422,36 @@ def prepare_manifest(
     return manifest
 
 
-def verify_staged_manifest(
-    *, root: Path, registry_path: Path = DEFAULT_REGISTRY_PATH
-) -> dict[str, Any]:
-    root = root.resolve()
-    manifest_path = root / MANIFEST_PATH
-    if not manifest_path.exists():
-        raise ValueError("Publication manifest is missing")
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    if not isinstance(manifest, dict) or manifest.get("publication_schema_version") != PUBLICATION_SCHEMA_VERSION:
-        raise ValueError("Publication manifest schema mismatch")
-
-    manifest_run_id = str(manifest.get("run_id") or "").strip()
-    if not manifest_run_id:
-        raise ValueError("Publication manifest missing run_id")
-
-    # Validate each isolation outcome in the staged manifest itself.
+def _validate_staged_isolation_metadata(
+    root: Path, manifest: dict[str, Any], manifest_run_id: str
+) -> tuple[list[dict[str, str]], list[dict[str, str]], list[dict[str, str]]]:
     staged_isolated = _parse_isolated_items(manifest.get("isolated_collections"))
     staged_no_output = _parse_isolated_items(
         manifest.get("no_output_collections", []), field="no_output_collections"
     )
     staged_requested = _parse_isolated_items(
-        manifest.get("isolation_requested_collections", staged_isolated + staged_no_output),
+        manifest.get(
+            "isolation_requested_collections",
+            staged_isolated + staged_no_output,
+        ),
         field="isolation_requested_collections",
     )
-
-    # Each manifest classification must match the same-run anomaly report.
-    expected_isolated = _extract_isolated_collections(root, manifest_run_id)
-    expected_no_output = _extract_no_output_collections(root, manifest_run_id)
-    expected_requested = _extract_requested_isolation_collections(root, manifest_run_id)
-
-    if staged_isolated != expected_isolated:
-        raise ValueError(
-            "Staged publication manifest isolated_collections metadata mismatch with same-run anomaly report"
-        )
-    if staged_no_output != expected_no_output:
-        raise ValueError(
-            "Staged publication manifest no_output_collections metadata mismatch with same-run anomaly report"
-        )
-    if staged_requested != expected_requested:
-        raise ValueError(
-            "Staged publication manifest isolation_requested_collections metadata mismatch with same-run anomaly report"
-        )
+    expected_values = (
+        _extract_isolated_collections(root, manifest_run_id),
+        _extract_no_output_collections(root, manifest_run_id),
+        _extract_requested_isolation_collections(root, manifest_run_id),
+    )
+    staged_values = (staged_isolated, staged_no_output, staged_requested)
+    error_messages = (
+        "Staged publication manifest isolated_collections metadata mismatch with same-run anomaly report",
+        "Staged publication manifest no_output_collections metadata mismatch with same-run anomaly report",
+        "Staged publication manifest isolation_requested_collections metadata mismatch with same-run anomaly report",
+    )
+    for staged_value, expected_value, message in zip(
+        staged_values, expected_values, error_messages, strict=True
+    ):
+        if staged_value != expected_value:
+            raise ValueError(message)
     isolated_keys = {(item["vehicle_key"], item["source"]) for item in staged_isolated}
     no_output_keys = {(item["vehicle_key"], item["source"]) for item in staged_no_output}
     requested_keys = {(item["vehicle_key"], item["source"]) for item in staged_requested}
@@ -471,7 +459,14 @@ def verify_staged_manifest(
         raise ValueError("Publication manifest classifies a collection as both isolated and no-output")
     if requested_keys != isolated_keys | no_output_keys:
         raise ValueError("Publication manifest isolation outcome classifications do not cover the requested set")
+    return staged_isolated, staged_no_output, staged_requested
 
+
+def _validate_staged_publication_paths(
+    root: Path,
+    registry_path: Path,
+    manifest: dict[str, Any],
+) -> tuple[list[str], list[str]]:
     active, paused = governed_keys(root, registry_path)
     staged = staged_name_status(root)
     staged_paths = sorted(path for _, path in staged)
@@ -489,6 +484,31 @@ def verify_staged_manifest(
         raise ValueError("Publication manifest does not match staged generated-data paths")
     if MANIFEST_PATH.as_posix() not in staged_paths:
         raise ValueError("Publication manifest is not staged")
+    return staged_paths, expected
+
+
+def verify_staged_manifest(
+    *, root: Path, registry_path: Path = DEFAULT_REGISTRY_PATH
+) -> dict[str, Any]:
+    root = root.resolve()
+    manifest_path = root / MANIFEST_PATH
+    if not manifest_path.exists():
+        raise ValueError("Publication manifest is missing")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if not isinstance(manifest, dict) or manifest.get("publication_schema_version") != PUBLICATION_SCHEMA_VERSION:
+        raise ValueError("Publication manifest schema mismatch")
+    manifest_run_id = str(manifest.get("run_id") or "").strip()
+    if not manifest_run_id:
+        raise ValueError("Publication manifest missing run_id")
+
+    (
+        staged_isolated,
+        staged_no_output,
+        staged_requested,
+    ) = _validate_staged_isolation_metadata(root, manifest, manifest_run_id)
+    staged_paths, expected = _validate_staged_publication_paths(
+        root, registry_path, manifest
+    )
     return {
         "publication_schema_version": PUBLICATION_SCHEMA_VERSION,
         "verification_status": "pass",

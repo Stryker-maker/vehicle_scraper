@@ -487,25 +487,51 @@ def _field_status(field_name: str, subject: dict[str, Any], listing_value: Any) 
     return "match" if matched else "conflict"
 
 
+def _owned_listing_values(
+    base: dict[str, Any], bundle: dict[str, Any]
+) -> dict[str, str | int]:
+    normalized = base["normalized"]
+    text = source_text(bundle["raw_payload"], normalized)
+    return {
+        "year": base["year"],
+        "trim": _text(normalized.get("trim")),
+        "fuel": _text(normalized.get("fuel")),
+        "engine": " ".join(
+            value for value in (_text(normalized.get("engine")), text) if value
+        ),
+        "drivetrain": _listing_drivetrain(text),
+    }
+
+
+def _owned_comparability_decision(
+    missing_subject: list[str],
+    matches: list[str],
+    conflicts: list[str],
+    reasons: list[str],
+) -> tuple[str, list[str], list[str]]:
+    if len(missing_subject) >= 4:
+        return "subject_profile_incomplete", reasons + ["owner_profile_requires_input"], missing_subject
+    if conflicts and "year" in conflicts:
+        return "broad_market_context", reasons + ["model_year_differs_from_subject"], missing_subject
+    if "year" in matches and len(matches) >= 3 and not conflicts:
+        return "close_subject_comparable", reasons + ["multiple_subject_attributes_match"], missing_subject
+    if "year" in matches or len(matches) >= 2:
+        return "partial_subject_comparable", reasons + ["some_subject_attributes_match"], missing_subject
+    if matches:
+        return "broad_market_context", reasons + ["limited_subject_attribute_match"], missing_subject
+    return "insufficient_configuration_evidence", reasons + ["no_supported_subject_match"], missing_subject
+
+
 def owned_comparability(
     base: dict[str, Any],
     bundle: dict[str, Any],
     subject: dict[str, Any],
 ) -> tuple[str, list[str], list[str]]:
     missing_subject = _missing_input_fields(subject)
-    normalized = base["normalized"]
-    text = source_text(bundle["raw_payload"], normalized)
-    listing_values = {
-        "year": base["year"],
-        "trim": _text(normalized.get("trim")),
-        "fuel": _text(normalized.get("fuel")),
-        "engine": " ".join(value for value in (_text(normalized.get("engine")), text) if value),
-        "drivetrain": _listing_drivetrain(text),
-    }
     matches: list[str] = []
     conflicts: list[str] = []
     unknown_listing: list[str] = []
-    for field_name, listing_value in listing_values.items():
+    for field_name, listing_value in _owned_listing_values(base, bundle).items():
         status = _field_status(field_name, subject, listing_value)
         if status == "skip":
             continue
@@ -520,17 +546,9 @@ def owned_comparability(
         *(f"subject_conflict:{name}" for name in conflicts),
         *(f"listing_evidence_missing:{name}" for name in unknown_listing),
     ]
-    if len(missing_subject) >= 4:
-        return "subject_profile_incomplete", reasons + ["owner_profile_requires_input"], missing_subject
-    if conflicts and "year" in conflicts:
-        return "broad_market_context", reasons + ["model_year_differs_from_subject"], missing_subject
-    if "year" in matches and len(matches) >= 3 and not conflicts:
-        return "close_subject_comparable", reasons + ["multiple_subject_attributes_match"], missing_subject
-    if "year" in matches or len(matches) >= 2:
-        return "partial_subject_comparable", reasons + ["some_subject_attributes_match"], missing_subject
-    if matches:
-        return "broad_market_context", reasons + ["limited_subject_attribute_match"], missing_subject
-    return "insufficient_configuration_evidence", reasons + ["no_supported_subject_match"], missing_subject
+    return _owned_comparability_decision(
+        missing_subject, matches, conflicts, reasons
+    )
 
 
 def _owned_record(bundle: dict[str, Any], subject: dict[str, Any], scope: str) -> dict[str, Any]:
@@ -701,6 +719,77 @@ def _apply_numeric_preferences(
         else:
             reasons.append(f"preference_match:{field}")
 
+def _apply_seller_type_preference(
+    base: dict[str, Any],
+    preferences: dict[str, Any],
+    reasons: list[str],
+    mismatches: list[str],
+    unknown_listing: list[str],
+) -> None:
+    seller_types = _profile_value(preferences, "acceptable_seller_types")
+    seller_type = _text(base["normalized"].get("seller_type_claim"))
+    if not seller_types:
+        return
+    if not seller_type:
+        unknown_listing.append("acceptable_seller_types")
+    elif seller_type.casefold() not in {str(value).casefold() for value in seller_types}:
+        mismatches.append("acceptable_seller_types")
+    else:
+        reasons.append("preference_match:acceptable_seller_types")
+
+
+def _apply_claim_presence_preferences(
+    evidence: dict[str, Any],
+    preferences: dict[str, Any],
+    reasons: list[str],
+    unknown_listing: list[str],
+) -> None:
+    for field_name, evidence_key in (
+        ("accident_title_requirement", "accident_title"),
+        ("service_history_requirement", "service_history"),
+    ):
+        if _profile_value(preferences, field_name) is None:
+            continue
+        if evidence[evidence_key]["value"] is None:
+            unknown_listing.append(field_name)
+        else:
+            reasons.append(f"source_claim_present_unverified:{field_name}")
+
+
+def _apply_cargo_preferences(
+    evidence: dict[str, Any],
+    preferences: dict[str, Any],
+    reasons: list[str],
+    mismatches: list[str],
+    unknown_listing: list[str],
+) -> None:
+    cargo_requirements = _profile_value(preferences, "cargo_requirements")
+    if not cargo_requirements:
+        return
+    claims = set(evidence["cargo_features"]["value"] or [])
+    required = {str(value) for value in cargo_requirements}
+    if not claims:
+        unknown_listing.append("cargo_requirements")
+    elif not required.issubset(claims):
+        mismatches.append("cargo_requirements")
+    else:
+        reasons.append("preference_match:cargo_requirements")
+
+
+def _preference_status(
+    missing_preferences: list[str],
+    mismatches: list[str],
+    unknown_listing: list[str],
+) -> str:
+    if missing_preferences:
+        return "preferences_incomplete"
+    if mismatches:
+        return "outside_stated_preferences"
+    if unknown_listing:
+        return "preference_match_unresolved_by_missing_listing_evidence"
+    return "within_stated_preferences_based_on_unverified_listing_claims"
+
+
 def evaluate_preferences(
     base: dict[str, Any],
     evidence: dict[str, Any],
@@ -712,54 +801,25 @@ def evaluate_preferences(
     unknown_listing: list[str] = []
 
     _apply_numeric_preferences(base, evidence, preferences, reasons, mismatches, unknown_listing)
-
-    seller_types = _profile_value(preferences, "acceptable_seller_types")
-    seller_type = _text(base["normalized"].get("seller_type_claim"))
-    if seller_types:
-        if not seller_type:
-            unknown_listing.append("acceptable_seller_types")
-        elif seller_type.casefold() not in {str(value).casefold() for value in seller_types}:
-            mismatches.append("acceptable_seller_types")
-        else:
-            reasons.append("preference_match:acceptable_seller_types")
-
-    for field_name, evidence_key in (
-        ("accident_title_requirement", "accident_title"),
-        ("service_history_requirement", "service_history"),
-    ):
-        required = _profile_value(preferences, field_name)
-        if required is not None:
-            if evidence[evidence_key]["value"] is None:
-                unknown_listing.append(field_name)
-            else:
-                reasons.append(f"source_claim_present_unverified:{field_name}")
-
-    cargo_requirements = _profile_value(preferences, "cargo_requirements")
-    if cargo_requirements:
-        claims = set(evidence["cargo_features"]["value"] or [])
-        required = {str(value) for value in cargo_requirements}
-        if not claims:
-            unknown_listing.append("cargo_requirements")
-        elif not required.issubset(claims):
-            mismatches.append("cargo_requirements")
-        else:
-            reasons.append("preference_match:cargo_requirements")
-
-    availability = _profile_value(preferences, "availability_constraints")
-    if availability:
+    _apply_seller_type_preference(
+        base, preferences, reasons, mismatches, unknown_listing
+    )
+    _apply_claim_presence_preferences(
+        evidence, preferences, reasons, unknown_listing
+    )
+    _apply_cargo_preferences(
+        evidence, preferences, reasons, mismatches, unknown_listing
+    )
+    if _profile_value(preferences, "availability_constraints"):
         unknown_listing.append("availability_constraints")
 
     reasons.extend(f"preference_mismatch:{name}" for name in sorted(set(mismatches)))
     reasons.extend(f"listing_evidence_missing:{name}" for name in sorted(set(unknown_listing)))
-    if missing_preferences:
-        status = "preferences_incomplete"
-    elif mismatches:
-        status = "outside_stated_preferences"
-    elif unknown_listing:
-        status = "preference_match_unresolved_by_missing_listing_evidence"
-    else:
-        status = "within_stated_preferences_based_on_unverified_listing_claims"
-    return status, reasons, missing_preferences
+    return (
+        _preference_status(missing_preferences, mismatches, unknown_listing),
+        reasons,
+        missing_preferences,
+    )
 
 
 def family_seller_questions(_base: dict[str, Any], evidence: dict[str, Any]) -> list[dict[str, str]]:

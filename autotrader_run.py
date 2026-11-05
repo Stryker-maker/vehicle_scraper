@@ -2,16 +2,16 @@ from __future__ import annotations
 
 import argparse
 import os
-import subprocess
 import sys
 import time
 from pathlib import Path
 from typing import Any, Sequence
 
-from autotrader_adapter import ADAPTER_SCHEMA_VERSION, artifact_paths
+from autotrader_adapter import ADAPTER_SCHEMA_VERSION
 from autotrader_canonical import build_autotrader_canonical_evidence
 from baseline_compatibility import build_compatibility_fingerprint
 from canonical_evidence import EVIDENCE_SCHEMA_VERSION
+from collector_execution import execute_collector
 from identity_lifecycle import (
     IDENTITY_LIFECYCLE_SCHEMA_VERSION,
     restore_artifacts,
@@ -20,7 +20,7 @@ from identity_lifecycle import (
 )
 from phase1_common import (
     DEFAULT_TIMEOUT_SECONDS, analyze_csv_quality, expected_output_path,
-    file_signature, load_json, source_status_path, utc_now, validate_csv,
+    file_signature, source_status_path, utc_now, validate_csv,
     validate_invocation_archive_output, write_json,
 )
 from vehicle_config import CONFIG_SCHEMA_VERSION, load_vehicle_config
@@ -70,6 +70,138 @@ def _empty_identity() -> dict[str, Any]:
 
 
 
+def _execute_autotrader_collector(
+    command: Sequence[str], *, root: Path, timeout_seconds: float
+) -> tuple[int | None, bool, str, str]:
+    return execute_collector(command, root=root, timeout_seconds=timeout_seconds)
+
+
+def _assess_autotrader_output(
+    output_path: Path,
+    *,
+    before_signature: tuple[int, int] | None,
+    started_ns: int,
+    returncode: int | None,
+    timed_out: bool,
+) -> tuple[bool, dict[str, Any], int, int, int, list[str]]:
+    after_signature = file_signature(output_path)
+    fresh = bool(
+        after_signature
+        and (
+            before_signature is None
+            or after_signature != before_signature
+            or after_signature[0] >= started_ns
+        )
+    )
+    validation = validate_csv(output_path)
+    observed_rows = int(validation["row_count"])
+    current_rows = observed_rows if fresh else 0
+    stale_rows = observed_rows if output_path.exists() and not fresh else 0
+    failures: list[str] = []
+    if timed_out:
+        failures.append("collector_timed_out")
+    elif returncode != 0:
+        failures.append("collector_command_failed")
+    if not fresh:
+        failures.append("no_fresh_output")
+    if fresh and not validation["schema_valid"]:
+        failures.append("invalid_output_schema")
+    if fresh and current_rows < 1:
+        failures.append("empty_output")
+    return fresh, validation, observed_rows, current_rows, stale_rows, failures
+
+
+def _build_autotrader_evidence_and_identity(
+    *,
+    root: Path,
+    config: dict[str, Any],
+    active_run: str,
+    completed_at: str,
+    fresh: bool,
+    validation: dict[str, Any],
+    current_rows: int,
+    failures: list[str],
+) -> tuple[dict[str, Any], str | None, dict[str, Any], str | None]:
+    evidence = _empty_evidence()
+    evidence_error: str | None = None
+    identity = _empty_identity()
+    identity_error: str | None = None
+    if fresh and validation["schema_valid"]:
+        try:
+            evidence = build_autotrader_canonical_evidence(
+                root=root, config=config, run_id=active_run,
+                completed_at_utc=completed_at,
+            )
+        except Exception as exc:
+            evidence_error = f"{type(exc).__name__}: {exc}"
+            failures.append("canonical_evidence_failed")
+        else:
+            if evidence.get("reconciled") is not True:
+                failures.append("evidence_reconciliation_failed")
+            if evidence.get("pagination_complete") is not True:
+                failures.append("pagination_incomplete")
+            if int(evidence.get("accepted_records", 0)) < 1:
+                failures.append("no_accepted_records")
+            if int(evidence.get("accepted_records", 0)) != current_rows:
+                failures.append("accepted_output_count_mismatch")
+            if not failures:
+                try:
+                    identity = update_source_identity_lifecycle(
+                        root=root, config=config, source="autotrader",
+                        run_id=active_run, observed_at_utc=completed_at,
+                        accepted_artifact=str(evidence["artifacts"]["accepted"]),
+                        adapter_records_artifact=str(
+                            evidence.get("source_adapter_artifacts", {}).get("records")
+                            or ""
+                        ) or None,
+                    )
+                except Exception as exc:
+                    identity_error = f"{type(exc).__name__}: {exc}"
+                    failures.append("identity_lifecycle_failed")
+                else:
+                    if int(identity.get("observed_current_count", -1)) != current_rows:
+                        failures.append("identity_current_count_mismatch")
+    return evidence, evidence_error, identity, identity_error
+
+
+def _collector_status_name(
+    timed_out: bool, returncode: int | None, failures: list[str]
+) -> str:
+    if timed_out:
+        return "timed_out"
+    if returncode not in (0, None):
+        return "failed"
+    return "degraded" if failures else "success"
+
+
+def _restore_autotrader_config_if_mutated(
+    config_path: Path, original_config: bytes, failures: list[str]
+) -> bool:
+    config_isolated = config_path.read_bytes() == original_config
+    if not config_isolated:
+        config_path.write_bytes(original_config)
+        failures.append("approved_config_mutated")
+    return config_isolated
+
+
+def _collector_quality_report(
+    output_path: Path,
+    source: str,
+    fresh: bool,
+    schema_valid: bool,
+    stale_rows: int,
+) -> dict[str, Any]:
+    if fresh and schema_valid:
+        return analyze_csv_quality(output_path, source)
+    status = "not_evaluated_stale_output" if stale_rows else "not_evaluated"
+    return {
+        "data_quality_status": status,
+        "quality_warning_rows": 0,
+        "quality_warning_count": 0,
+        "quality_warning_summary": {},
+    }
+
+
 def run_autotrader(
     *, root: Path, config_path: Path, command: Sequence[str] | None = None,
     run_id: str | None = None, timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
@@ -109,115 +241,50 @@ def run_autotrader(
         str(config_path.relative_to(root)),
     ])
 
-    stdout = stderr = ""
-    returncode: int | None = None
-    timed_out = False
-    try:
-        completed = subprocess.run(
-            command, cwd=root, text=True, capture_output=True,
-            check=False, timeout=timeout_seconds, env=os.environ.copy(),
-        )
-        returncode = completed.returncode
-        stdout, stderr = completed.stdout or "", completed.stderr or ""
-    except subprocess.TimeoutExpired as exc:
-        timed_out = True
-        stdout = (exc.stdout or "").decode("utf-8", errors="replace") if isinstance(exc.stdout, bytes) else (exc.stdout or "")
-        stderr = (exc.stderr or "").decode("utf-8", errors="replace") if isinstance(exc.stderr, bytes) else (exc.stderr or "")
-
-    for text, stream in ((stdout, sys.stdout), (stderr, sys.stderr)):
-        if text:
-            tail = text[-4000:]
-            print(tail, file=stream, end="" if tail.endswith("\n") else "\n")
-
-    after_signature = file_signature(output_path)
-    fresh = bool(after_signature and (
-        before_signature is None or after_signature != before_signature
-        or after_signature[0] >= started_ns
-    ))
-    validation = validate_csv(output_path)
-    observed_rows = int(validation["row_count"])
-    current_rows = observed_rows if fresh else 0
-    stale_rows = observed_rows if output_path.exists() and not fresh else 0
-
-    failures: list[str] = []
-    if timed_out:
-        failures.append("collector_timed_out")
-    elif returncode != 0:
-        failures.append("collector_command_failed")
-    if not fresh:
-        failures.append("no_fresh_output")
-    if fresh and not validation["schema_valid"]:
-        failures.append("invalid_output_schema")
-    if fresh and current_rows < 1:
-        failures.append("empty_output")
-
-    evidence = _empty_evidence()
-    evidence_error: str | None = None
-    identity = _empty_identity()
-    identity_error: str | None = None
-    completed_at = utc_now()
-    if fresh and validation["schema_valid"]:
-        try:
-            evidence = build_autotrader_canonical_evidence(
-                root=root, config=config, run_id=active_run,
-                completed_at_utc=completed_at,
-            )
-        except Exception as exc:
-            evidence_error = f"{type(exc).__name__}: {exc}"
-            failures.append("canonical_evidence_failed")
-        else:
-            if evidence.get("reconciled") is not True:
-                failures.append("evidence_reconciliation_failed")
-            if evidence.get("pagination_complete") is not True:
-                failures.append("pagination_incomplete")
-            if int(evidence.get("accepted_records", 0)) < 1:
-                failures.append("no_accepted_records")
-            if int(evidence.get("accepted_records", 0)) != current_rows:
-                failures.append("accepted_output_count_mismatch")
-            if not failures:
-                try:
-                    identity = update_source_identity_lifecycle(
-                        root=root, config=config, source="autotrader",
-                        run_id=active_run, observed_at_utc=completed_at,
-                        accepted_artifact=str(evidence["artifacts"]["accepted"]),
-                        adapter_records_artifact=str(
-                            evidence.get("source_adapter_artifacts", {}).get("records")
-                            or ""
-                        ) or None,
-                    )
-                except Exception as exc:
-                    identity_error = f"{type(exc).__name__}: {exc}"
-                    failures.append("identity_lifecycle_failed")
-                else:
-                    if int(identity.get("observed_current_count", -1)) != current_rows:
-                        failures.append("identity_current_count_mismatch")
-
-    config_isolated = config_path.read_bytes() == original_config
-    if not config_isolated:
-        config_path.write_bytes(original_config)
-        failures.append("approved_config_mutated")
-
-    status_name = (
-        "timed_out" if timed_out else "failed" if returncode not in (0, None)
-        else "degraded" if failures else "success"
+    returncode, timed_out, stdout, stderr = _execute_autotrader_collector(
+        command, root=root, timeout_seconds=timeout_seconds
     )
+
+    (
+        fresh,
+        validation,
+        observed_rows,
+        current_rows,
+        stale_rows,
+        failures,
+    ) = _assess_autotrader_output(
+        output_path,
+        before_signature=before_signature,
+        started_ns=started_ns,
+        returncode=returncode,
+        timed_out=timed_out,
+    )
+
+    completed_at = utc_now()
+    evidence, evidence_error, identity, identity_error = (
+        _build_autotrader_evidence_and_identity(
+            root=root,
+            config=config,
+            active_run=active_run,
+            completed_at=completed_at,
+            fresh=fresh,
+            validation=validation,
+            current_rows=current_rows,
+            failures=failures,
+        )
+    )
+
+    config_isolated = _restore_autotrader_config_if_mutated(
+        config_path, original_config, failures
+    )
+
+    status_name = _collector_status_name(timed_out, returncode, failures)
     if status_name != "success":
         restore_artifacts(identity_before)
 
-    if fresh and validation["schema_valid"]:
-        quality = analyze_csv_quality(output_path, "autotrader")
-    elif stale_rows:
-        quality = {
-            "data_quality_status": "not_evaluated_stale_output",
-            "quality_warning_rows": 0, "quality_warning_count": 0,
-            "quality_warning_summary": {},
-        }
-    else:
-        quality = {
-            "data_quality_status": "not_evaluated",
-            "quality_warning_rows": 0, "quality_warning_count": 0,
-            "quality_warning_summary": {},
-        }
+    quality = _collector_quality_report(
+        output_path, "autotrader", fresh, validation["schema_valid"], stale_rows
+    )
 
     status = {
         "schema_version": SOURCE_STATUS_SCHEMA_VERSION,

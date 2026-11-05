@@ -60,6 +60,7 @@ jobs:
           autotrader_history.py
           autotrader_adapter.py
           autotrader_canonical.py
+          collector_execution.py
           autotrader_run.py
           kijiji_locations.py
           kijiji_history.py
