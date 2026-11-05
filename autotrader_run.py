@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import os
-import subprocess
 import sys
 import time
 from pathlib import Path
@@ -12,6 +11,7 @@ from autotrader_adapter import ADAPTER_SCHEMA_VERSION
 from autotrader_canonical import build_autotrader_canonical_evidence
 from baseline_compatibility import build_compatibility_fingerprint
 from canonical_evidence import EVIDENCE_SCHEMA_VERSION
+from collector_execution import execute_collector
 from identity_lifecycle import (
     IDENTITY_LIFECYCLE_SCHEMA_VERSION,
     restore_artifacts,
@@ -73,31 +73,7 @@ def _empty_identity() -> dict[str, Any]:
 def _execute_autotrader_collector(
     command: Sequence[str], *, root: Path, timeout_seconds: float
 ) -> tuple[int | None, bool, str, str]:
-    stdout = stderr = ""
-    returncode: int | None = None
-    timed_out = False
-    try:
-        completed = subprocess.run(
-            command, cwd=root, text=True, capture_output=True,
-            check=False, timeout=timeout_seconds, env=os.environ.copy(),
-        )
-        returncode = completed.returncode
-        stdout, stderr = completed.stdout or "", completed.stderr or ""
-    except subprocess.TimeoutExpired as exc:
-        timed_out = True
-        stdout = (
-            (exc.stdout or "").decode("utf-8", errors="replace")
-            if isinstance(exc.stdout, bytes) else (exc.stdout or "")
-        )
-        stderr = (
-            (exc.stderr or "").decode("utf-8", errors="replace")
-            if isinstance(exc.stderr, bytes) else (exc.stderr or "")
-        )
-    for output, stream in ((stdout, sys.stdout), (stderr, sys.stderr)):
-        if output:
-            tail = output[-4000:]
-            print(tail, file=stream, end="" if tail.endswith("\n") else "\n")
-    return returncode, timed_out, stdout, stderr
+    return execute_collector(command, root=root, timeout_seconds=timeout_seconds)
 
 
 def _assess_autotrader_output(
