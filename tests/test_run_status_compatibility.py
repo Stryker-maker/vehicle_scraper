@@ -110,7 +110,7 @@ class RunStatusCompatibilityMetadataTests(unittest.TestCase):
             Path(path).write_text(json.dumps(value), encoding="utf-8")
 
         with patch.dict(os.environ, {"COLLECTION_SCOPE": "full"}, clear=False), \
-             patch(f"{module_name}.subprocess.run", return_value=SimpleNamespace(returncode=0, stdout="", stderr="")), \
+             patch("collector_execution.subprocess.run", return_value=SimpleNamespace(returncode=0, stdout="", stderr="")), \
              patch(f"{module_name}.file_signature", side_effect=[(1, 1), (2, 2)]), \
              patch(f"{module_name}.validate_csv", return_value=validation), \
              patch(f"{module_name}.expected_output_path", return_value=output_path), \
