@@ -19,8 +19,13 @@ from identity_lifecycle import (
     update_source_identity_lifecycle,
 )
 from phase1_common import (
-    DEFAULT_TIMEOUT_SECONDS, expected_output_path, file_signature,
-    source_status_path, utc_now, validate_invocation_archive_output, write_json,
+    DEFAULT_TIMEOUT_SECONDS,
+    expected_output_path,
+    file_signature,
+    source_status_path,
+    utc_now,
+    validate_invocation_archive_output,
+    write_json,
 )
 from source_runner_common import (
     assess_source_output,
