@@ -21,14 +21,19 @@ from kijiji_canonical import build_kijiji_canonical_evidence
 from kijiji_locations import LOCATION_REGISTRY_VERSION
 from phase1_common import (
     DEFAULT_TIMEOUT_SECONDS,
-    analyze_csv_quality,
     expected_output_path,
     file_signature,
     source_status_path,
     utc_now,
-    validate_csv,
     validate_invocation_archive_output,
     write_json,
+)
+from source_runner_common import (
+    assess_source_output,
+    collector_quality_report,
+    collector_status_name,
+    empty_identity,
+    restore_config_if_mutated,
 )
 from vehicle_config import CONFIG_SCHEMA_VERSION, load_vehicle_config
 
@@ -62,63 +67,10 @@ def _empty_evidence() -> dict[str, Any]:
     }
 
 
-def _empty_identity() -> dict[str, Any]:
-    return {
-        "identity_lifecycle_schema_version": IDENTITY_LIFECYCLE_SCHEMA_VERSION,
-        "observed_current_count": 0,
-        "tracked_listing_count": 0,
-        "new_listing_count": 0,
-        "reappeared_listing_count": 0,
-        "active_listing_count": 0,
-        "current_reappeared_listing_count": 0,
-        "missing_listing_count": 0,
-        "retired_listing_count": 0,
-        "transition_event_count": 0,
-        "artifacts": {},
-    }
-
-
-
-
 def _execute_kijiji_collector(
     command: Sequence[str], *, root: Path, timeout_seconds: float
 ) -> tuple[int | None, bool, str, str]:
     return execute_collector(command, root=root, timeout_seconds=timeout_seconds)
-
-
-def _assess_kijiji_output(
-    output_path: Path,
-    *,
-    before_signature: tuple[int, int] | None,
-    started_ns: int,
-    returncode: int | None,
-    timed_out: bool,
-) -> tuple[bool, dict[str, Any], int, int, int, list[str]]:
-    after_signature = file_signature(output_path)
-    fresh = bool(
-        after_signature
-        and (
-            before_signature is None
-            or after_signature != before_signature
-            or after_signature[0] >= started_ns
-        )
-    )
-    validation = validate_csv(output_path)
-    observed_rows = int(validation["row_count"])
-    current_rows = observed_rows if fresh else 0
-    stale_rows = observed_rows if output_path.exists() and not fresh else 0
-    failures: list[str] = []
-    if timed_out:
-        failures.append("collector_timed_out")
-    elif returncode != 0:
-        failures.append("collector_command_failed")
-    if not fresh:
-        failures.append("no_fresh_output")
-    if fresh and not validation["schema_valid"]:
-        failures.append("invalid_output_schema")
-    if fresh and current_rows < 1:
-        failures.append("empty_output")
-    return fresh, validation, observed_rows, current_rows, stale_rows, failures
 
 
 def _build_kijiji_evidence_and_identity(
@@ -134,7 +86,7 @@ def _build_kijiji_evidence_and_identity(
 ) -> tuple[dict[str, Any], str | None, dict[str, Any], str | None]:
     evidence = _empty_evidence()
     evidence_error: str | None = None
-    identity = _empty_identity()
+    identity = empty_identity(IDENTITY_LIFECYCLE_SCHEMA_VERSION)
     identity_error: str | None = None
     if fresh and validation["schema_valid"]:
         try:
@@ -175,43 +127,6 @@ def _build_kijiji_evidence_and_identity(
                     if int(identity.get("observed_current_count", -1)) != current_rows:
                         failures.append("identity_current_count_mismatch")
     return evidence, evidence_error, identity, identity_error
-
-
-def _kijiji_collector_status_name(
-    timed_out: bool, returncode: int | None, failures: list[str]
-) -> str:
-    if timed_out:
-        return "timed_out"
-    if returncode not in (0, None):
-        return "failed"
-    return "degraded" if failures else "success"
-
-
-def _restore_kijiji_config_if_mutated(
-    config_path: Path, original_config: bytes, failures: list[str]
-) -> bool:
-    config_isolated = config_path.read_bytes() == original_config
-    if not config_isolated:
-        config_path.write_bytes(original_config)
-        failures.append("approved_config_mutated")
-    return config_isolated
-
-
-def _kijiji_quality_report(
-    output_path: Path,
-    fresh: bool,
-    schema_valid: bool,
-    stale_rows: int,
-) -> dict[str, Any]:
-    if fresh and schema_valid:
-        return analyze_csv_quality(output_path, "kijiji")
-    status = "not_evaluated_stale_output" if stale_rows else "not_evaluated"
-    return {
-        "data_quality_status": status,
-        "quality_warning_rows": 0,
-        "quality_warning_count": 0,
-        "quality_warning_summary": {},
-    }
 
 
 def run_kijiji(
@@ -273,7 +188,7 @@ def run_kijiji(
         current_rows,
         stale_rows,
         failures,
-    ) = _assess_kijiji_output(
+    ) = assess_source_output(
         output_path,
         before_signature=before_signature,
         started_ns=started_ns,
@@ -295,15 +210,15 @@ def run_kijiji(
         )
     )
 
-    config_isolated = _restore_kijiji_config_if_mutated(
+    config_isolated = restore_config_if_mutated(
         config_path, original_config, failures
     )
-    status_name = _kijiji_collector_status_name(timed_out, returncode, failures)
+    status_name = collector_status_name(timed_out, returncode, failures)
     if status_name != "success":
         restore_artifacts(identity_before)
 
-    quality = _kijiji_quality_report(
-        output_path, fresh, validation["schema_valid"], stale_rows
+    quality = collector_quality_report(
+        output_path, "kijiji", fresh, validation["schema_valid"], stale_rows
     )
 
     status = {
