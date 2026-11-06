@@ -112,14 +112,15 @@ class RunStatusCompatibilityMetadataTests(unittest.TestCase):
 
         with patch.dict(os.environ, {"COLLECTION_SCOPE": "full"}, clear=False), \
              patch("collector_execution.subprocess.run", return_value=SimpleNamespace(returncode=0, stdout="", stderr="")), \
-             patch(f"{module_name}.file_signature", side_effect=[(1, 1), (2, 2)]), \
-             patch(f"{module_name}.validate_csv", return_value=validation), \
+             patch(f"{module_name}.file_signature", return_value=(1, 1)), \
+             patch("source_runner_common.file_signature", return_value=(2, 2)), \
+             patch("source_runner_common.validate_csv", return_value=validation), \
              patch(f"{module_name}.expected_output_path", return_value=output_path), \
              patch(f"{module_name}.source_status_path", return_value=status_path), \
              patch(f"{module_name}.snapshot_artifacts", return_value={}), \
              patch(f"{module_name}.build_{'kijiji' if module_name == 'kijiji_run' else 'autotrader'}_canonical_evidence", return_value=evidence), \
              patch(f"{module_name}.update_source_identity_lifecycle", return_value=self._identity()), \
-             patch(f"{module_name}.analyze_csv_quality", return_value=quality), \
+             patch("source_runner_common.analyze_csv_quality", return_value=quality), \
              patch(f"{module_name}.write_json", side_effect=persist_status):
             status = runner(root=self.root, config_path=self.config_path, command=["fake"], run_id="run-1")
         return status, captured["status"]
