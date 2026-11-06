@@ -10,12 +10,13 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from autotrader_adapter import ADAPTER_SCHEMA_VERSION as AUTOTRADER_ADAPTER_SCHEMA_VERSION
-from autotrader_run import run_autotrader, _restore_autotrader_config_if_mutated
+from autotrader_run import run_autotrader
 from baseline_compatibility import build_compatibility_fingerprint
 from canonical_evidence import EVIDENCE_SCHEMA_VERSION
 from kijiji_adapter import ADAPTER_SCHEMA_VERSION as KIJIJI_ADAPTER_SCHEMA_VERSION
 from kijiji_locations import LOCATION_REGISTRY_VERSION
-from kijiji_run import run_kijiji, _restore_kijiji_config_if_mutated
+from kijiji_run import run_kijiji
+from source_runner_common import restore_config_if_mutated
 from vehicle_config import CONFIG_SCHEMA_VERSION
 from workflow_anomalies import compare_health_reports
 
@@ -52,7 +53,7 @@ class RunStatusCompatibilityMetadataTests(unittest.TestCase):
         self.config_path.write_bytes(b"mutated configuration")
         failures = []
 
-        isolated = _restore_autotrader_config_if_mutated(
+        isolated = restore_config_if_mutated(
             self.config_path, original_config, failures
         )
 
@@ -66,7 +67,7 @@ class RunStatusCompatibilityMetadataTests(unittest.TestCase):
         self.config_path.write_bytes(b"mutated configuration")
         failures = []
 
-        isolated = _restore_kijiji_config_if_mutated(
+        isolated = restore_config_if_mutated(
             self.config_path, original_config, failures
         )
 
